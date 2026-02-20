@@ -1,0 +1,1608 @@
+{
+  "template_name": "alexandria-cover-v1",
+  "cover_size": {
+    "width": 3784,
+    "height": 2777,
+    "dpi": 300
+  },
+  "consensus_region": {
+    "center_x": 2864,
+    "center_y": 1620,
+    "radius": 500,
+    "frame_bbox": [
+      2269,
+      1025,
+      3459,
+      2215
+    ],
+    "confidence": 0.0
+  },
+  "cover_count": 99,
+  "outlier_count": 0,
+  "covers": [
+    {
+      "cover_id": 1,
+      "folder": "1. A Room with a View - E. M. Forster copy",
+      "jpg": "Input Covers/1. A Room with a View - E. M. Forster copy/A Room with a View - E. M. Forster.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9617042401842647,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 2,
+      "folder": "2. Moby Dick_ Or, The Whale - Herman Melville copy",
+      "jpg": "Input Covers/2. Moby Dick_ Or, The Whale - Herman Melville copy/Moby Dick_ Or, The Whale - Herman Melville.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9572565450927208,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 3,
+      "folder": "3. Gulliver\u2019s Travels into Several Remote Regions of the World - Jonathan Swift copy",
+      "jpg": "Input Covers/3. Gulliver\u2019s Travels into Several Remote Regions of the World - Jonathan Swift copy/Gulliver\u2019s Travels into Several Remote Regions of the World - Jonathan Swift.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9709172756495145,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 4,
+      "folder": "4. Emma - Jane Austen copy",
+      "jpg": "Input Covers/4. Emma - Jane Austen copy/Emma - Jane Austen.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9613536375699101,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 5,
+      "folder": "5. Frankenstein_ Or, The Modern Prometheus - Mary Wollstonecraft Shelley copy",
+      "jpg": "Input Covers/5. Frankenstein_ Or, The Modern Prometheus - Mary Wollstonecraft Shelley copy/Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9681305158074838,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 6,
+      "folder": "6. A Modest Proposal - Jonathan Swift copy",
+      "jpg": "Input Covers/6. A Modest Proposal - Jonathan Swift copy/A Modest Proposal - Jonathan Swift.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9703134936076634,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 7,
+      "folder": "7. The Complete Works of William Shakespeare - William Shakespeare copy",
+      "jpg": "Input Covers/7. The Complete Works of William Shakespeare - William Shakespeare copy/The Complete Works of William Shakespeare - William Shakespeare.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9751577132069531,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 8,
+      "folder": "8. The Mysterious Stranger, and Other Stories - Mark Twain copy",
+      "jpg": "Input Covers/8. The Mysterious Stranger, and Other Stories - Mark Twain copy/The Mysterious Stranger, and Other Stories - Mark Twain.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9725029445933816,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 9,
+      "folder": "9. Right Ho, Jeeves - P. G. Wodehouse copy",
+      "jpg": "Input Covers/9. Right Ho, Jeeves - P. G. Wodehouse copy/Right Ho, Jeeves - P. G. Wodehouse_\u041c\u043e\u043d\u0442\u0430\u0436\u043d\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c 1.jpg",
+      "center_x": 2862,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2267,
+        1025,
+        3457,
+        2215
+      ],
+      "confidence": 0.9663512558028996,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 10,
+      "folder": "10. The Enchanted April - Elizabeth Von Arnim copy",
+      "jpg": "Input Covers/10. The Enchanted April - Elizabeth Von Arnim copy/The Enchanted April - Elizabeth Von Arnim.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9634631611997594,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 11,
+      "folder": "11. Romeo and Juliet \u2014 William Shakespeare copy",
+      "jpg": "Input Covers/11. Romeo and Juliet \u2014 William Shakespeare copy/Romeo and Juliet - William Shakespeare.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9658018886552527,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 13,
+      "folder": "13. Cranford \u2014 Elizabeth Cleghorn Gaskell copy",
+      "jpg": "Input Covers/13. Cranford \u2014 Elizabeth Cleghorn Gaskell copy/Cranford - Elizabeth Cleghorn Gaskell.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9552220786350117,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 14,
+      "folder": "14. The Expedition of Humphry Clinker \u2014 Tobias Smollett copy",
+      "jpg": "Input Covers/14. The Expedition of Humphry Clinker \u2014 Tobias Smollett copy/The Expedition of Humphry Clinker - Tobias Smollett.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9755506444330329,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 15,
+      "folder": "15. History of Tom Jones, a Foundling \u2014 Henry Fielding copy",
+      "jpg": "Input Covers/15. History of Tom Jones, a Foundling \u2014 Henry Fielding copy/History of Tom Jones, a Foundling \u2014 Henry Fielding.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9707074147228621,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 16,
+      "folder": "16. The Pickwick Papers \u2014 Charles Dickens copy",
+      "jpg": "Input Covers/16. The Pickwick Papers \u2014 Charles Dickens copy/The Pickwick Papers \u2014 Charles Dickens.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9647591387619227,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 17,
+      "folder": "17. The Wind in the Willows \u2014 Kenneth Grahame copy",
+      "jpg": "Input Covers/17. The Wind in the Willows \u2014 Kenneth Grahame copy/The Wind in the Willows \u2014 Kenneth Grahame.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9523033848932391,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 18,
+      "folder": "18. A Journey to the Centre of the Earth \u2014 Jules Verne copy",
+      "jpg": "Input Covers/18. A Journey to the Centre of the Earth \u2014 Jules Verne copy/A Journey to the Centre of the Earth \u2014 Jules Verne.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9662533754415028,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 19,
+      "folder": "19. Crime and Punishment \u2014 Fyodor Dostoyevsky copy",
+      "jpg": "Input Covers/19. Crime and Punishment \u2014 Fyodor Dostoyevsky copy/Crime and Punishment - Fyodor Dostoyevsky.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9695342468511193,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 20,
+      "folder": "20. Middlemarch \u2014 George Eliot copy",
+      "jpg": "Input Covers/20. Middlemarch \u2014 George Eliot copy/Middlemarch \u2014 George Eliot.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9351979938005529,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 21,
+      "folder": "21. The Lady with the Dog and Other Stories \u2014 Anton Pavlovich Chekhov copy",
+      "jpg": "Input Covers/21. The Lady with the Dog and Other Stories \u2014 Anton Pavlovich Chekhov copy/The Lady with the Dog and Other Stories \u2014 Anton Pavlovich Chekhov.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9714322125171494,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 22,
+      "folder": "22. The Lady of the Lake \u2014 Walter Scott copy",
+      "jpg": "Input Covers/22. The Lady of the Lake \u2014 Walter Scott copy/The Lady of the Lake \u2014 Walter Scott.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.963349216943502,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 23,
+      "folder": "23. The Satyricon \u2014 Complete \u2014 Petronius Arbiter copy",
+      "jpg": "Input Covers/23. The Satyricon \u2014 Complete \u2014 Petronius Arbiter copy/The Satyricon - Complete \u2014 Petronius Arbiter.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9549293778729624,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 24,
+      "folder": "24. Little Women_ Or, Meg, Jo, Beth, and Amy \u2014 Louisa May Alcott copy",
+      "jpg": "Input Covers/24. Little Women_ Or, Meg, Jo, Beth, and Amy \u2014 Louisa May Alcott copy/Little Women_ Or, Meg, Jo, Beth, and Amy \u2014 Louisa May Alcott.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9779102010985036,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 25,
+      "folder": "25. The Eyes Have It \u2014 Philip K. Dick copy",
+      "jpg": "Input Covers/25. The Eyes Have It \u2014 Philip K. Dick copy/The Eyes Have It \u2014 Philip K. Dick.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9692422182977479,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 26,
+      "folder": "26. Alice_s Adventures in Wonderland \u2014 Lewis Carroll copy",
+      "jpg": "Input Covers/26. Alice_s Adventures in Wonderland \u2014 Lewis Carroll copy/Alice_s Adventures in Wonderland \u2014 Lewis Carroll.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.96847191663004,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 27,
+      "folder": "27. Pride and Prejudice \u2014 Jane Austen copy",
+      "jpg": "Input Covers/27. Pride and Prejudice \u2014 Jane Austen copy/Pride and Prejudice \u2014 Jane Austen.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9718996441908196,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 28,
+      "folder": "28. Laughter_ An Essay on the Meaning of the Comic \u2014 Henri Bergson copy",
+      "jpg": "Input Covers/28. Laughter_ An Essay on the Meaning of the Comic \u2014 Henri Bergson copy/Laughter An Essay on the Meaning of the Comic \u2014 Henri Bergson.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9668872778510178,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 29,
+      "folder": "29. Eve_s Diary, Complete \u2014 Mark Twain copy",
+      "jpg": "Input Covers/29. Eve_s Diary, Complete \u2014 Mark Twain copy/Eve_s Diary, Complete \u2014 Mark Twain.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.965661278693001,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 30,
+      "folder": "30. The Sky Trap \u2014 Frank Belknap Long copy",
+      "jpg": "Input Covers/30. The Sky Trap \u2014 Frank Belknap Long copy/The Sky Trap \u2014 Frank Belknap Long.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9707385622474317,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 31,
+      "folder": "31. The Picture of Dorian Gray \u2014 Oscar Wilde copy",
+      "jpg": "Input Covers/31. The Picture of Dorian Gray \u2014 Oscar Wilde copy/The Picture of Dorian Gray \u2014 Oscar Wilde.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.965777329139846,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 32,
+      "folder": "32. The Blue Castle_ a novel \u2014 L. M. Montgomery copy",
+      "jpg": "Input Covers/32. The Blue Castle_ a novel \u2014 L. M. Montgomery copy/The Blue Castle a novel - L. M. Montgomery.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9706476454131943,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 33,
+      "folder": "33. Twenty Thousand Leagues under the Sea \u2014 Jules Verne copy",
+      "jpg": "Input Covers/33. Twenty Thousand Leagues under the Sea \u2014 Jules Verne copy/Twenty Thousand Leagues under the Sea - Jules Verne.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9537753422934673,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 34,
+      "folder": "34. The Adventures of Ferdinand Count Fathom \u2014 Complete \u2014 T. Smollett copy",
+      "jpg": "Input Covers/34. The Adventures of Ferdinand Count Fathom \u2014 Complete \u2014 T. Smollett copy/The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9495600223546155,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 35,
+      "folder": "35. Three Men in a Boat (To Say Nothing of the Dog) \u2014 Jerome K. Jerome copy",
+      "jpg": "Input Covers/35. Three Men in a Boat (To Say Nothing of the Dog) \u2014 Jerome K. Jerome copy/Three Men in a Boat (To Say Nothing of the Dog) - Jerome K. Jerome.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9664650863018257,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 36,
+      "folder": "36. A Doll_s House_ A Play \u2014 Henrik Ibsen copy",
+      "jpg": "Input Covers/36. A Doll_s House_ A Play \u2014 Henrik Ibsen copy/A Doll_s House A Play \u2014 Henrik Ibsen.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9574684932350852,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 37,
+      "folder": "37. The Adventures of Roderick Random \u2014 T. Smollett copy",
+      "jpg": "Input Covers/37. The Adventures of Roderick Random \u2014 T. Smollett copy/The Adventures of Roderick Random \u2014 T. Smollett.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9642483217195017,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 38,
+      "folder": "38. The Call of the Wild \u2014 Jack London copy",
+      "jpg": "Input Covers/38. The Call of the Wild \u2014 Jack London copy/The Call of the Wild \u2014 Jack London.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9490639717676819,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 39,
+      "folder": "39. The Adventures of Tom Sawyer, Complete \u2014 Mark Twain copy",
+      "jpg": "Input Covers/39. The Adventures of Tom Sawyer, Complete \u2014 Mark Twain copy/The Adventures of Tom Sawyer, Complete \u2014 Mark Twain.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9641866333674999,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 40,
+      "folder": "40. Twenty Years After \u2014 Alexandre Dumas and Auguste Maquet copy",
+      "jpg": "Input Covers/40. Twenty Years After \u2014 Alexandre Dumas and Auguste Maquet copy/Twenty Years After \u2014 Alexandre Dumas Auguste Maquet.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9702573358478147,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 41,
+      "folder": "41. Lady Chatterley_s Lover \u2014 D. H. Lawrence copy",
+      "jpg": "Input Covers/41. Lady Chatterley_s Lover \u2014 D. H. Lawrence copy/Lady Chatterley_s Lover \u2014 D. H. Lawrence.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9714840802615855,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 42,
+      "folder": "42. She Stoops to Conquer_ Or, The Mistakes of a Night_ A Comedy \u2014 Oliver Goldsmith copy",
+      "jpg": "Input Covers/42. She Stoops to Conquer_ Or, The Mistakes of a Night_ A Comedy \u2014 Oliver Goldsmith copy/She Stoops to Conquer_ Or, The Mistakes of a Night A Comedy \u2014 Oliver Goldsmith.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9639845800588251,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 43,
+      "folder": "43. Sketches New and Old \u2014 Mark Twain copy",
+      "jpg": "Input Covers/43. Sketches New and Old \u2014 Mark Twain copy/Sketches New and Old \u2014 Mark Twain.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9702544175676123,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 44,
+      "folder": "44. Der Struwwelpeter \u2014 Heinrich Hoffmann copy",
+      "jpg": "Input Covers/44. Der Struwwelpeter \u2014 Heinrich Hoffmann copy/Der Struwwelpeter \u2014 Heinrich Hoffmann.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9679426114995822,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 45,
+      "folder": "45. The History of John Bull \u2014 John Arbuthnot copy",
+      "jpg": "Input Covers/45. The History of John Bull \u2014 John Arbuthnot copy/The History of John Bull \u2014 John Arbuthnot.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9587662446943782,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 46,
+      "folder": "46. The Reign of Greed \u2014 Jose\u0301 Rizal copy",
+      "jpg": "Input Covers/46. The Reign of Greed \u2014 Jose\u0301 Rizal copy/The Reign of Greed \u2014 Jose\u0301 Rizal.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9738207798284305,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 47,
+      "folder": "47. Anthem \u2014 Ayn Rand copy",
+      "jpg": "Input Covers/47. Anthem \u2014 Ayn Rand copy/Anthem \u2014 Ayn Rand.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9258302969318016,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 48,
+      "folder": "48. La\u0300-bas \u2014 J.-K. Huysmans copy",
+      "jpg": "Input Covers/48. La\u0300-bas \u2014 J.-K. Huysmans copy/La\u0300-bas \u2014 J.-K. Huysmans.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9375872680469594,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 49,
+      "folder": "49. 2 B R 0 2 B \u2014 Kurt Vonnegut copy",
+      "jpg": "Input Covers/49. 2 B R 0 2 B \u2014 Kurt Vonnegut copy/2 B R 0 2 B \u2014 Kurt Vonnegut.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9544799480038773,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 50,
+      "folder": "50. The Man from Time \u2014 Frank Belknap Long copy",
+      "jpg": "Input Covers/50. The Man from Time \u2014 Frank Belknap Long copy/The Man from Time \u2014 Frank Belknap Long.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.957487546348543,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 51,
+      "folder": "51. The Vibration Wasps \u2014 Frank Belknap Long copy",
+      "jpg": "Input Covers/51. The Vibration Wasps \u2014 Frank Belknap Long copy/The Vibration Wasps \u2014 Frank Belknap Long.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9375073954586238,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 52,
+      "folder": "52. Dracula \u2014 Bram Stoker copy",
+      "jpg": "Input Covers/52. Dracula \u2014 Bram Stoker copy/Dracula \u2014 Bram Stoker.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9733221007139244,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 53,
+      "folder": "53. Frankenstein_ Or, The Modern Prometheus \u2014 Mary Wollstonecraft Shelley copy",
+      "jpg": "Input Covers/53. Frankenstein_ Or, The Modern Prometheus \u2014 Mary Wollstonecraft Shelley copy/Frankenstein_ Or, The Modern Prometheus \u2014 Mary Wollstonecraft Shelley 2.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9647075516845431,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 54,
+      "folder": "54. Les Mise\u0301rables Tome I_ Fantine \u2014 Victor Hugo copy",
+      "jpg": "Input Covers/54. Les Mise\u0301rables Tome I_ Fantine \u2014 Victor Hugo copy/Les Mise\u0301rables Tome I Fantine \u2014 Victor Hugo.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9512558266960081,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 55,
+      "folder": "55. David Copperfield \u2014 Charles Dickens copy",
+      "jpg": "Input Covers/55. David Copperfield \u2014 Charles Dickens copy/David Copperfield \u2014 Charles Dickens.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9590652406353055,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 56,
+      "folder": "56. The Murder of Roger Ackroyd \u2014 Agatha Christie copy",
+      "jpg": "Input Covers/56. The Murder of Roger Ackroyd \u2014 Agatha Christie copy/The Murder of Roger Ackroyd \u2014 Agatha Christie.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9626593916417647,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 57,
+      "folder": "57. The Life and Adventures of Robinson Crusoe \u2014 Daniel Defoe copy",
+      "jpg": "Input Covers/57. The Life and Adventures of Robinson Crusoe \u2014 Daniel Defoe copy/The Life and Adventures of Robinson Crusoe \u2014 Daniel Defoe.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9681440263004337,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 58,
+      "folder": "58. Project Gutenberg Compilation of Short Stories by Chekhov \u2014 Anton Chekhov copy",
+      "jpg": "Input Covers/58. Project Gutenberg Compilation of Short Stories by Chekhov \u2014 Anton Chekhov copy/Project Gutenberg Compilation of Short Stories \u2014 Anton Chekhov.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9606794531263743,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 59,
+      "folder": "59. Memoirs of Fanny Hill \u2014 John Cleland copy",
+      "jpg": "Input Covers/59. Memoirs of Fanny Hill \u2014 John Cleland copy/Memoirs of Fanny Hill \u2014 John Cleland.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.961952184535023,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 60,
+      "folder": "60. The Jungle Book \u2014 Rudyard Kipling copy",
+      "jpg": "Input Covers/60. The Jungle Book \u2014 Rudyard Kipling copy/The Jungle Book \u2014 Rudyard Kipling.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9647013166086823,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 61,
+      "folder": "61. Oedipus King of Thebes \u2014 Sophocles copy",
+      "jpg": "Input Covers/61. Oedipus King of Thebes \u2014 Sophocles copy/Oedipus King of Thebes \u2014 Sophocles.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9689692198168749,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 62,
+      "folder": "62. The Idiot \u2014 Fyodor Dostoyevsky copy",
+      "jpg": "Input Covers/62. The Idiot \u2014 Fyodor Dostoyevsky copy/The Idiot - Fyodor Dostoyevsky.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9833752041804732,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 63,
+      "folder": "63. The Time Machine \u2014 H. G. Wells copy",
+      "jpg": "Input Covers/63. The Time Machine \u2014 H. G. Wells copy/The Time Machine \u2014 H. G. Wells.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9659207942697591,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 64,
+      "folder": "64. Justice \u2014 John Galsworthy copy",
+      "jpg": "Input Covers/64. Justice \u2014 John Galsworthy copy/Justice \u2014 John Galsworthy.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9423537069821065,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 65,
+      "folder": "65. Noli Me Tangere \u2014 Jose\u0301 Rizal copy",
+      "jpg": "Input Covers/65. Noli Me Tangere \u2014 Jose\u0301 Rizal copy/Noli Me Tangere \u2014 Jose\u0301 Rizal.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9615177237426129,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 66,
+      "folder": "66. The Beautiful and Damned \u2014 F. Scott Fitzgerald copy",
+      "jpg": "Input Covers/66. The Beautiful and Damned \u2014 F. Scott Fitzgerald copy/The Beautiful and Damned \u2014 F. Scott Fitzgerald.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9611751565213171,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 67,
+      "folder": "67. Vanity Fair \u2014 William Makepeace Thackeray copy",
+      "jpg": "Input Covers/67. Vanity Fair \u2014 William Makepeace Thackeray copy/Vanity Fair \u2014 William Makepeace Thackeray.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9586300061444681,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 68,
+      "folder": "68. Second Variety \u2014 Philip K. Dick copy",
+      "jpg": "Input Covers/68. Second Variety \u2014 Philip K. Dick copy/Second Variety \u2014 Philip K. Dick.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9520479210920471,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 69,
+      "folder": "69. The Prince and the Pauper \u2014 Mark Twain copy",
+      "jpg": "Input Covers/69. The Prince and the Pauper \u2014 Mark Twain copy/The Prince and the Pauper \u2014 Mark Twain.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9598275638028533,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 70,
+      "folder": "70. Around the World in Eighty Days \u2014 Jules Verne copy",
+      "jpg": "Input Covers/70. Around the World in Eighty Days \u2014 Jules Verne copy/Around the World in Eighty Days \u2014 Jules Verne.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9675910116597504,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 71,
+      "folder": "71. The Sign of the Four \u2014 Arthur Conan Doyle copy",
+      "jpg": "Input Covers/71. The Sign of the Four \u2014 Arthur Conan Doyle copy/The Sign of the Four \u2014 Arthur Conan Doyle.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9609973483405654,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 72,
+      "folder": "72. The Works of Edgar Allan Poe \u2014 Volume 1 \u2014 Edgar Allan Poe copy",
+      "jpg": "Input Covers/72. The Works of Edgar Allan Poe \u2014 Volume 1 \u2014 Edgar Allan Poe copy/The Works of Edgar Allan Poe \u2014 Volume 1 \u2014 Edgar Allan Poe.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.962721651857305,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 73,
+      "folder": "73. Mansfield Park \u2014 Jane Austen copy",
+      "jpg": "Input Covers/73. Mansfield Park \u2014 Jane Austen copy/Mansfield Park \u2014 Jane Austen.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9569367737625802,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 74,
+      "folder": "74. The Return of Sherlock Holmes \u2014 Arthur Conan Doyle copy",
+      "jpg": "Input Covers/74. The Return of Sherlock Holmes \u2014 Arthur Conan Doyle copy/The Return of Sherlock Holmes \u2014 Arthur Conan Doyle.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9359649959326674,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 75,
+      "folder": "75. The Railway Children \u2014 E. Nesbit copy",
+      "jpg": "Input Covers/75. The Railway Children \u2014 E. Nesbit copy/The Railway Children \u2014 E. Nesbit.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9672273427805017,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 76,
+      "folder": "76. A Connecticut Yankee in King Arthur_s Court \u2014 Mark Twain copy",
+      "jpg": "Input Covers/76. A Connecticut Yankee in King Arthur_s Court \u2014 Mark Twain copy/A Connecticut Yankee in King Arthur_s Court \u2014 Mark Twain.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9722883669901651,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 77,
+      "folder": "77. Hamlet, Prince of Denmark \u2014 William Shakespeare copy",
+      "jpg": "Input Covers/77. Hamlet, Prince of Denmark \u2014 William Shakespeare copy/Hamlet, Prince of Denmark - William Shakespeare.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9633152393136968,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 78,
+      "folder": "78. The Turn of the Screw \u2014 Henry James copy",
+      "jpg": "Input Covers/78. The Turn of the Screw \u2014 Henry James copy/The Turn of the Screw - Henry James.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9614782641020073,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 79,
+      "folder": "79. The Sorrows of Young Werther \u2014 Johann Wolfgang von Goethe copy",
+      "jpg": "Input Covers/79. The Sorrows of Young Werther \u2014 Johann Wolfgang von Goethe copy/The Sorrows of Young Werther - Johann Wolfgang von Goethe.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9713698403889024,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 80,
+      "folder": "80. Swann_s Way \u2014 Marcel Proust copy",
+      "jpg": "Input Covers/80. Swann_s Way \u2014 Marcel Proust copy/Swann_s Way - Marcel Proust.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.934516878228523,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 81,
+      "folder": "81. Rip Van Winkle \u2014 Washington Irving copy",
+      "jpg": "Input Covers/81. Rip Van Winkle \u2014 Washington Irving copy/Rip Van Winkle \u2014 Washington Irving.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.965758912868571,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 82,
+      "folder": "82. Plays \u2014 Susan Glaspell copy",
+      "jpg": "Input Covers/82. Plays \u2014 Susan Glaspell copy/Plays \u2014 Susan Glaspell.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9456391539668041,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 83,
+      "folder": "83. Northanger Abbey \u2014 Jane Austen copy",
+      "jpg": "Input Covers/83. Northanger Abbey \u2014 Jane Austen copy/Northanger Abbey \u2014 Jane Austen.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9610222889343376,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 84,
+      "folder": "84. Lysistrata \u2014 Aristophanes copy",
+      "jpg": "Input Covers/84. Lysistrata \u2014 Aristophanes copy/Lysistrata \u2014 Aristophanes.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9695457418667786,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 85,
+      "folder": "85. Anne of Avonlea \u2014 L. M. Montgomery copy",
+      "jpg": "Input Covers/85. Anne of Avonlea \u2014 L. M. Montgomery copy/Anne of Avonlea \u2014 L. M. Montgomery.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9714183956475563,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 86,
+      "folder": "86. Pygmalion \u2014 Bernard Shaw copy",
+      "jpg": "Input Covers/86. Pygmalion \u2014 Bernard Shaw copy/Pygmalion \u2014 Bernard Shaw.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9733185428478122,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 87,
+      "folder": "87. We \u2014 Evgenii Ivanovich Zamiatin copy",
+      "jpg": "Input Covers/87. We \u2014 Evgenii Ivanovich Zamiatin copy/We \u2014 Evgenii Ivanovich Zamiatin.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9308381246680997,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 88,
+      "folder": "88. The Best American Humorous Short Stories \u2014 Alexander Jessup et al. copy",
+      "jpg": "Input Covers/88. The Best American Humorous Short Stories \u2014 Alexander Jessup et al. copy/The Best American Humorous Short Stories \u2014 Alexander Jessup et al..jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9642660608629006,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 89,
+      "folder": "89. A Christmas Carol \u2014 Charles Dickens copy",
+      "jpg": "Input Covers/89. A Christmas Carol \u2014 Charles Dickens copy/A Christmas Carol \u2014 Charles Dickens.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9458743335479787,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 90,
+      "folder": "90. The Happy Prince, and Other Tales \u2014 Oscar Wilde copy",
+      "jpg": "Input Covers/90. The Happy Prince, and Other Tales \u2014 Oscar Wilde copy/The Happy Prince, and Other Tales \u2014 Oscar Wilde.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.956685729956787,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 91,
+      "folder": "91. Ivanhoe_ A Romance \u2014 Walter Scott copy",
+      "jpg": "Input Covers/91. Ivanhoe_ A Romance \u2014 Walter Scott copy/Ivanhoe A Romance \u2014 Walter Scott.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9707934018304685,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 92,
+      "folder": "92. A Princess of Mars \u2014 Edgar Rice Burroughs copy",
+      "jpg": "Input Covers/92. A Princess of Mars \u2014 Edgar Rice Burroughs copy/A Princess of Mars \u2014 Edgar Rice Burroughs.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9559807863538399,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 93,
+      "folder": "93. The Invisible Man_ A Grotesque Romance \u2014 H. G. Wells copy",
+      "jpg": "Input Covers/93. The Invisible Man_ A Grotesque Romance \u2014 H. G. Wells copy/The Invisible Man A Grotesque Romance \u2014 H. G. Wells.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9662874583328602,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 94,
+      "folder": "94. The Awakening, and Selected Short Stories \u2014 Kate Chopin copy",
+      "jpg": "Input Covers/94. The Awakening, and Selected Short Stories \u2014 Kate Chopin copy/The Awakening, and Selected Short Stories \u2014 Kate Chopin.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9652062934768846,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 95,
+      "folder": "95. The Alchemist \u2014 Ben Jonson copy",
+      "jpg": "Input Covers/95. The Alchemist \u2014 Ben Jonson copy/The Alchemist \u2014 Ben Jonson.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9654657200781634,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 96,
+      "folder": "96. The Life and Opinions of Tristram Shandy, Gentleman \u2014 Laurence Sterne copy",
+      "jpg": "Input Covers/96. The Life and Opinions of Tristram Shandy, Gentleman \u2014 Laurence Sterne copy/The Life and Opinions of Tristram Shandy, Gentleman \u2014 Laurence Sterne.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9661629221786905,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 97,
+      "folder": "97. Gargantua and Pantagruel \u2014 Franc\u0327ois Rabelais copy",
+      "jpg": "Input Covers/97. Gargantua and Pantagruel \u2014 Franc\u0327ois Rabelais copy/Gargantua and Pantagruel \u2014 Franc\u0327ois Rabelais.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9704861358948417,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 98,
+      "folder": "98. Space Station 1 \u2014 Frank Belknap Long copy",
+      "jpg": "Input Covers/98. Space Station 1 \u2014 Frank Belknap Long copy/Space Station 1 \u2014 Frank Belknap Long.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9559103284752422,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 99,
+      "folder": "99. Frankenstein_ Or, The Modern Prometheus \u2014 Mary Wollstonecraft Shelley copy",
+      "jpg": "Input Covers/99. Frankenstein_ Or, The Modern Prometheus \u2014 Mary Wollstonecraft Shelley copy/Frankenstein_ Or, The Modern Prometheus \u2014 Mary Wollstonecraft Shelley 3.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9340123504904573,
+      "is_outlier": false
+    },
+    {
+      "cover_id": 100,
+      "folder": "100. The Extraordinary Adventures of Arse\u0300ne Lupin, Gentleman-Burglar \u2014 Maurice Leblanc copy",
+      "jpg": "Input Covers/100. The Extraordinary Adventures of Arse\u0300ne Lupin, Gentleman-Burglar \u2014 Maurice Leblanc copy/The Extraordinary Adventures of Arse\u0300ne Lupin, Gentleman-Burglar \u2014 Maurice Leblanc.jpg",
+      "center_x": 2864,
+      "center_y": 1620,
+      "radius": 500,
+      "frame_bbox": [
+        2269,
+        1025,
+        3459,
+        2215
+      ],
+      "confidence": 0.9727620983647075,
+      "is_outlier": false
+    }
+  ]
+}
