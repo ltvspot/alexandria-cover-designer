@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alexandria Iterate</title>
+  <style>
+    :root { --bg:#0f2449; --panel:#f8f3e4; --ink:#1b2740; --gold:#d6b25f; }
+    body { margin:0; font-family: Georgia, "Times New Roman", serif; background: radial-gradient(circle at top, #17376c, #0c1f40); color:#f6ecd5; }
+    header { padding:20px 26px; border-bottom:1px solid rgba(255,255,255,.18); }
+    h1 { margin:0; color:var(--gold); }
+    .layout { display:grid; grid-template-columns: 360px 1fr; gap:18px; padding:18px; }
+    .panel { background: rgba(248,243,228,.96); color:var(--ink); border-radius:16px; padding:14px; }
+    .panel h2 { margin:4px 0 10px; font-size:20px; }
+    label { display:block; font-size:13px; margin:8px 0 4px; font-weight:700; }
+    textarea, select, input[type="text"], input[type="number"] { width:100%; box-sizing:border-box; border:1px solid #d5c7a2; border-radius:10px; padding:8px; font-family:inherit; }
+    .row { display:flex; gap:8px; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .chip { border:1px solid #bc9b4c; border-radius:999px; padding:6px 10px; cursor:pointer; background:#fff5dd; font-size:12px; }
+    .chip.active { background:#d9b765; color:#10213d; }
+    button { border:none; border-radius:10px; padding:10px 12px; background:var(--gold); color:#10213d; font-weight:700; cursor:pointer; }
+    .models { display:grid; grid-template-columns:1fr 1fr; gap:6px; max-height:130px; overflow:auto; border:1px solid #d7c89f; border-radius:10px; padding:8px; background:#fff; }
+    .history, .library, .compare { max-height:220px; overflow:auto; border:1px solid #d7c89f; border-radius:10px; padding:8px; background:#fff; }
+    .results { display:grid; gap:12px; }
+    .model-group { background:rgba(255,255,255,.95); border-radius:12px; padding:10px; }
+    .images { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:8px; }
+    .img-card img { width:100%; border-radius:8px; cursor:zoom-in; }
+    .image-stack { position:relative; }
+    .image-stack .overlay { position:absolute; inset:0; opacity:.62; display:none; pointer-events:none; }
+    .image-stack.show-overlay .overlay { display:block; }
+    .compare-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
+    .status { font-size:13px; color:#2e3e5d; }
+    #zoom { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.85); }
+    #zoom img { max-width:92vw; max-height:92vh; border-radius:10px; }
+    @media (max-width: 1100px) { .layout { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Single-Cover Iteration Lab</h1>
+    <div class="status" id="status">Loading iteration data...</div>
+  </header>
+  <div class="layout">
+    <aside class="panel">
+      <h2>Controls</h2>
+      <label>Book</label>
+      <select id="bookSelect"></select>
+
+      <label>Models</label>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="selectAllModels" type="button">Select All</button>
+        <button id="clearModels" type="button">Clear</button>
+      </div>
+      <div class="models" id="modelsBox"></div>
+
+      <label>Variations per model (D22)</label>
+      <select id="variationCount">
+        <option>1</option><option>3</option><option selected>5</option><option>10</option><option>20</option>
+      </select>
+
+      <label>Prompt Editor</label>
+      <textarea id="promptEditor" rows="7"></textarea>
+
+      <label>Style Anchors</label>
+      <div class="chips" id="anchorChips"></div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="generateBtn" type="button">Generate</button>
+        <button id="savePromptBtn" type="button">Save Prompt</button>
+      </div>
+
+      <label style="margin-top:14px;">Prompt Library</label>
+      <input id="libraryFilter" type="text" placeholder="Filter tags or names" />
+      <div class="library" id="libraryList"></div>
+
+      <label style="margin-top:14px;">History</label>
+      <div class="history" id="historyList"></div>
+    </aside>
+
+    <section class="panel">
+      <h2>Live Results</h2>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="toggleOverlayBtn" type="button">Show Fit Overlay</button>
+      </div>
+      <div class="status" id="resultStatus">No generation started.</div>
+      <div class="results" id="results"></div>
+
+      <h2 style="margin-top:16px;">Side-by-Side Compare</h2>
+      <div class="compare" id="compareList"></div>
+      <div class="compare-grid" id="compareGrid"></div>
+    </section>
+  </div>
+
+  <div id="zoom"><img id="zoomImg" alt="zoom" /></div>
+
+  <script>
+    const app = {
+      books: [],
+      models: [],
+      anchors: [],
+      promptLibrary: [],
+      selectedAnchors: new Set(),
+      latestResults: [],
+      history: [],
+      fitOverlayEnabled: false,
+    };
+
+    async function init() {
+      const res = await fetch('/api/iterate-data');
+      const data = await res.json();
+      app.books = data.books || [];
+      app.models = data.models || [];
+      app.anchors = data.style_anchors || [];
+      app.promptLibrary = data.prompt_library || [];
+
+      renderBooks();
+      renderModels();
+      renderAnchors();
+      renderLibrary();
+      bindEvents();
+      onBookChange();
+      setStatus('Ready. Choose a book and generate.');
+    }
+
+    function setStatus(text) { document.getElementById('status').textContent = text; }
+
+    function renderBooks() {
+      const select = document.getElementById('bookSelect');
+      select.innerHTML = app.books.map(book => `<option value="${book.number}">${book.number}. ${book.title}</option>`).join('');
+    }
+
+    function renderModels() {
+      const box = document.getElementById('modelsBox');
+      box.innerHTML = app.models.map(model => `
+        <label><input type="checkbox" value="${model}" checked /> ${model}</label>
+      `).join('');
+    }
+
+    function renderAnchors() {
+      const wrap = document.getElementById('anchorChips');
+      wrap.innerHTML = app.anchors.map(anchor => `<div class="chip" data-name="${anchor.name}" title="${anchor.description}">${anchor.name}</div>`).join('');
+      wrap.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const name = chip.dataset.name;
+          if (app.selectedAnchors.has(name)) app.selectedAnchors.delete(name);
+          else app.selectedAnchors.add(name);
+          chip.classList.toggle('active');
+          rebuildPromptFromAnchors();
+        });
+      });
+    }
+
+    function renderLibrary() {
+      const filter = (document.getElementById('libraryFilter').value || '').toLowerCase();
+      const list = document.getElementById('libraryList');
+      const filtered = app.promptLibrary.filter(p => (`${p.name} ${p.tags.join(' ')}`).toLowerCase().includes(filter));
+      list.innerHTML = filtered.map(prompt => `
+        <div style="padding:8px;border-bottom:1px solid #eee;">
+          <strong>${prompt.name}</strong><br>
+          <small>score: ${prompt.quality_score} | model: ${prompt.source_model}</small><br>
+          <button data-id="${prompt.id}" style="margin-top:6px;">Load</button>
+        </div>
+      `).join('');
+      list.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item = app.promptLibrary.find(p => p.id === btn.dataset.id);
+          if (!item) return;
+          const book = currentBook();
+          document.getElementById('promptEditor').value = item.prompt_template.replace('{title}', book.title);
+        });
+      });
+    }
+
+    function currentBook() {
+      const id = Number(document.getElementById('bookSelect').value);
+      return app.books.find(book => Number(book.number) === id) || app.books[0];
+    }
+
+    function onBookChange() {
+      const book = currentBook();
+      document.getElementById('promptEditor').value = book.default_prompt || `Classical circular illustration of iconic scene from ${book.title}`;
+      loadHistory(book.number);
+    }
+
+    async function loadHistory(bookNumber) {
+      const res = await fetch(`/api/history?book=${bookNumber}`);
+      const data = await res.json();
+      app.history = data.items || [];
+      const list = document.getElementById('historyList');
+      list.innerHTML = app.history.length ? app.history.map(item => `
+        <div style="padding:7px;border-bottom:1px solid #eee;">
+          <strong>${escapeHtml(item.model || 'unknown')}</strong> · variant ${item.variant_id || item.variant || 1}<br>
+          <small>${escapeHtml(item.timestamp || '')} · $${Number(item.cost || 0).toFixed(3)}</small><br>
+          <small>${escapeHtml(shortPrompt(item.prompt || ''))}</small><br>
+          ${historyCompareCheckbox(item)}
+        </div>
+      `).join('') : '<em>No history for this book yet.</em>';
+      document.querySelectorAll('[data-history-compare-path]').forEach(box => {
+        box.addEventListener('change', renderCompare);
+      });
+      renderCompare();
+    }
+
+    function selectedModels() {
+      return Array.from(document.querySelectorAll('#modelsBox input[type="checkbox"]:checked')).map(el => el.value);
+    }
+
+    function rebuildPromptFromAnchors() {
+      if (!app.selectedAnchors.size) return;
+      const book = currentBook();
+      const text = Array.from(app.selectedAnchors).map(name => {
+        const anchor = app.anchors.find(a => a.name === name);
+        return anchor ? anchor.style_text : '';
+      }).filter(Boolean).join(', ');
+      document.getElementById('promptEditor').value = `Create a circular medallion illustration for ${book.title}. ${text}`;
+    }
+
+    async function generate() {
+      const book = currentBook();
+      const payload = {
+        book: Number(book.number),
+        models: selectedModels(),
+        variants: Number(document.getElementById('variationCount').value),
+        prompt: document.getElementById('promptEditor').value,
+      };
+
+      document.getElementById('resultStatus').textContent = 'Generating...';
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      app.latestResults = data.results || [];
+
+      renderResults();
+      loadHistory(book.number);
+      document.getElementById('resultStatus').textContent = data.message || 'Generation complete';
+    }
+
+    function renderResults() {
+      const root = document.getElementById('results');
+      root.innerHTML = '';
+      const grouped = {};
+      app.latestResults.forEach(item => {
+        const key = item.model || 'unknown';
+        grouped[key] = grouped[key] || [];
+        grouped[key].push(item);
+      });
+
+      Object.keys(grouped).sort().forEach(model => {
+        const section = document.createElement('div');
+        section.className = 'model-group';
+        section.innerHTML = `<h3>${model}</h3><div class="images"></div>`;
+        const images = section.querySelector('.images');
+
+        grouped[model].forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'img-card';
+          const imagePath = item.composited_path || item.image_path;
+          const overlayPath = item.fit_overlay_path || '';
+          const stackClass = app.fitOverlayEnabled && overlayPath ? 'image-stack show-overlay' : 'image-stack';
+          card.innerHTML = `
+            <div class="${stackClass}">
+              <img src="/${imagePath}" alt="${model}" />
+              ${overlayPath ? `<img class="overlay" src="/${overlayPath}" alt="fit overlay" />` : ''}
+            </div>
+            <label><input type="checkbox" data-compare-path="${imagePath}" data-compare-model="${model}" /> compare</label>
+            <div style="font-size:12px;">cost: $${Number(item.cost || 0).toFixed(3)} · ${Number(item.generation_time || 0).toFixed(2)}s</div>
+          `;
+          card.querySelector('img').addEventListener('click', (e) => {
+            document.getElementById('zoomImg').src = e.target.src;
+            document.getElementById('zoom').style.display = 'flex';
+          });
+          images.appendChild(card);
+        });
+
+        root.appendChild(section);
+      });
+
+      document.querySelectorAll('[data-compare-path]').forEach(box => {
+        box.addEventListener('change', renderCompare);
+      });
+      renderCompare();
+    }
+
+    function renderCompare() {
+      const selected = [];
+      document.querySelectorAll('[data-compare-path]:checked, [data-history-compare-path]:checked').forEach(box => {
+        if (selected.length >= 6) return;
+        selected.push({ path: box.dataset.comparePath, model: box.dataset.compareModel || 'unknown' });
+      });
+      const list = document.getElementById('compareList');
+      const grid = document.getElementById('compareGrid');
+      if (selected.length < 2) {
+        list.textContent = 'Select 2-6 images from results or history to compare.';
+      } else {
+        const byModel = {};
+        selected.forEach(row => {
+          byModel[row.model] = (byModel[row.model] || 0) + 1;
+        });
+        list.textContent = Object.keys(byModel).sort().map(model => `${model}: ${byModel[model]}`).join(' | ');
+      }
+      grid.innerHTML = selected.map(row => `
+        <div>
+          <div style="font-size:12px;margin-bottom:4px;"><strong>${escapeHtml(row.model)}</strong></div>
+          <img src="/${row.path}" style="width:100%;border-radius:8px;" alt="compare" />
+        </div>
+      `).join('');
+    }
+
+    async function savePromptToLibrary() {
+      const book = currentBook();
+      const payload = {
+        name: `Iterate ${book.number}`,
+        prompt_template: document.getElementById('promptEditor').value.replace(book.title, '{title}'),
+        tags: ['iterative'],
+        style_anchors: Array.from(app.selectedAnchors),
+      };
+      await fetch('/api/save-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      alert('Prompt saved to library. Reload page to refresh list.');
+    }
+
+    function bindEvents() {
+      document.getElementById('bookSelect').addEventListener('change', onBookChange);
+      document.getElementById('selectAllModels').addEventListener('click', () => {
+        document.querySelectorAll('#modelsBox input[type="checkbox"]').forEach(i => i.checked = true);
+      });
+      document.getElementById('clearModels').addEventListener('click', () => {
+        document.querySelectorAll('#modelsBox input[type="checkbox"]').forEach(i => i.checked = false);
+      });
+      document.getElementById('generateBtn').addEventListener('click', generate);
+      document.getElementById('savePromptBtn').addEventListener('click', savePromptToLibrary);
+      document.getElementById('toggleOverlayBtn').addEventListener('click', () => {
+        app.fitOverlayEnabled = !app.fitOverlayEnabled;
+        document.getElementById('toggleOverlayBtn').textContent = app.fitOverlayEnabled ? 'Hide Fit Overlay' : 'Show Fit Overlay';
+        renderResults();
+      });
+      document.getElementById('libraryFilter').addEventListener('input', renderLibrary);
+      document.getElementById('zoom').addEventListener('click', () => document.getElementById('zoom').style.display = 'none');
+    }
+
+    function historyCompareCheckbox(item) {
+      const imagePath = item.composited_path || item.image_path;
+      if (!imagePath) return '';
+      return `<label><input type="checkbox" data-history-compare-path="${imagePath}" data-compare-model="${escapeHtml(item.model || 'unknown')}" /> compare</label>`;
+    }
+
+    function shortPrompt(prompt) {
+      if (!prompt) return '';
+      return prompt.length > 90 ? `${prompt.slice(0, 90)}...` : prompt;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    init();
+  </script>
+</body>
+</html>

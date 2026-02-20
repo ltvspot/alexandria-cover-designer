@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alexandria Review Grid</title>
+  <style>
+    :root {
+      --bg: #0f2449;
+      --panel: #f8f5ea;
+      --ink: #18233a;
+      --gold: #d8b15a;
+      --muted: #7d8596;
+    }
+    body { margin: 0; font-family: Georgia, "Times New Roman", serif; background: linear-gradient(140deg, #0d2142, #0f2d58); color: #f5efe2; }
+    header { padding: 20px 28px; border-bottom: 1px solid rgba(255,255,255,.15); position: sticky; top: 0; background: rgba(12,30,58,.95); z-index: 5; }
+    h1 { margin: 0 0 8px; color: var(--gold); font-size: 30px; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .controls input, .controls select, .controls button { border: none; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+    .controls button { background: var(--gold); color: #10213d; font-weight: 700; cursor: pointer; }
+    .progress-wrap { margin-top: 10px; }
+    .progress-bar { width: 100%; height: 10px; background: rgba(255,255,255,.2); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #e5c375, #ffd98f); }
+    .progress-label { font-size: 13px; margin-top: 6px; color: #ece1c8; }
+    main { padding: 24px; display: grid; gap: 20px; }
+    .book { background: rgba(250,244,228,.95); color: var(--ink); border-radius: 18px; padding: 16px; box-shadow: 0 12px 30px rgba(0,0,0,.25); }
+    .book h2 { margin: 0 0 8px; font-size: 20px; }
+    .book .meta { color: #4f5566; margin-bottom: 12px; font-size: 14px; }
+    .images { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .thumb { background: #fff; border-radius: 12px; padding: 8px; border: 2px solid transparent; }
+    .thumb.selected { border-color: #bc8d2e; }
+    .thumb img { width: 100%; border-radius: 8px; display: block; cursor: zoom-in; }
+    .thumb .label { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; }
+    .thumb input { transform: scale(1.15); }
+    .hidden { display: none !important; }
+    #zoomModal { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 20; }
+    #zoomModal img { max-width: 92vw; max-height: 92vh; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Review Winners</h1>
+    <div class="controls">
+      <input id="search" type="text" placeholder="Search title or author" />
+      <input id="bookFilter" type="text" placeholder="Book # or range (e.g. 1-20)" />
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="reviewed">Reviewed</option>
+        <option value="unreviewed">Unreviewed</option>
+      </select>
+      <select id="qualityFilter">
+        <option value="0">Any quality</option>
+        <option value="0.6">Quality ≥ 0.60</option>
+        <option value="0.7">Quality ≥ 0.70</option>
+        <option value="0.8">Quality ≥ 0.80</option>
+      </select>
+      <button id="saveBtn">Save Selections</button>
+      <button id="exportBtn">Export JSON</button>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">0 / 0 reviewed</div>
+    </div>
+  </header>
+  <main id="grid"></main>
+
+  <div id="zoomModal"><img id="zoomImg" alt="zoom" /></div>
+
+  <script>
+    const state = { books: [], selections: loadSelections() };
+
+    async function init() {
+      const response = await fetch('/api/review-data');
+      const payload = await response.json();
+      state.books = payload.books || [];
+      render();
+      bindEvents();
+    }
+
+    function bindEvents() {
+      document.getElementById('search').addEventListener('input', render);
+      document.getElementById('bookFilter').addEventListener('input', render);
+      document.getElementById('statusFilter').addEventListener('change', render);
+      document.getElementById('qualityFilter').addEventListener('change', render);
+      document.getElementById('saveBtn').addEventListener('click', saveSelectionsRemote);
+      document.getElementById('exportBtn').addEventListener('click', exportSelections);
+      document.getElementById('zoomModal').addEventListener('click', () => {
+        document.getElementById('zoomModal').style.display = 'none';
+      });
+    }
+
+    function loadSelections() {
+      try {
+        return JSON.parse(localStorage.getItem('variantSelections') || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function saveSelectionsLocal() {
+      localStorage.setItem('variantSelections', JSON.stringify(state.selections));
+      updateProgress();
+    }
+
+    async function saveSelectionsRemote() {
+      saveSelectionsLocal();
+      try {
+        await fetch('/api/save-selections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state.selections),
+        });
+        alert('Selections saved to data/variant_selections.json');
+      } catch {
+        alert('Selections saved locally. Server save unavailable.');
+      }
+    }
+
+    function exportSelections() {
+      const blob = new Blob([JSON.stringify(state.selections, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'variant_selections.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function render() {
+      const root = document.getElementById('grid');
+      const query = document.getElementById('search').value.toLowerCase().trim();
+      const bookFilter = parseBookFilter(document.getElementById('bookFilter').value);
+      const statusFilter = document.getElementById('statusFilter').value;
+      const qualityFloor = Number(document.getElementById('qualityFilter').value || 0);
+      root.innerHTML = '';
+
+      state.books.forEach(book => {
+        const selected = state.selections[String(book.number)] || 0;
+        const searchable = `${book.title} ${book.author}`.toLowerCase();
+        const isReviewed = selected > 0;
+        const bestQuality = Number(book.best_quality_score || 0);
+
+        if (query && !searchable.includes(query)) return;
+        if (bookFilter && !bookFilter.has(Number(book.number))) return;
+        if (statusFilter === 'reviewed' && !isReviewed) return;
+        if (statusFilter === 'unreviewed' && isReviewed) return;
+        if (qualityFloor > 0 && bestQuality < qualityFloor) return;
+
+        const card = document.createElement('section');
+        card.className = 'book';
+        card.innerHTML = `
+          <h2>${book.number}. ${book.title}</h2>
+          <div class="meta">${book.author}</div>
+          <div class="images"></div>
+        `;
+
+        const images = card.querySelector('.images');
+        const allItems = [{ variant: 0, label: 'Original', image: book.original }].concat(book.variants || []);
+
+        allItems.forEach(item => {
+          if (!item.image) return;
+          const wrapper = document.createElement('div');
+          wrapper.className = 'thumb';
+          if (item.variant === selected) wrapper.classList.add('selected');
+          const disabled = item.variant === 0 ? 'disabled' : '';
+          const checked = item.variant === selected ? 'checked' : '';
+
+          wrapper.innerHTML = `
+            <img src="/${item.image}" alt="${book.title} variant ${item.variant}" />
+            <div class="label">
+              <span>${item.label || `Variant ${item.variant}`}</span>
+              <input type="checkbox" data-book="${book.number}" data-variant="${item.variant}" ${checked} ${disabled} />
+            </div>
+          `;
+
+          wrapper.querySelector('img').addEventListener('click', (e) => {
+            const zoom = document.getElementById('zoomImg');
+            zoom.src = e.target.src;
+            document.getElementById('zoomModal').style.display = 'flex';
+          });
+
+          const box = wrapper.querySelector('input');
+          if (!box.disabled) {
+            box.addEventListener('change', () => {
+              const key = String(book.number);
+              if (box.checked) {
+                state.selections[key] = item.variant;
+              } else if (state.selections[key] === item.variant) {
+                state.selections[key] = 0;
+              }
+              saveSelectionsLocal();
+              render();
+            });
+          }
+
+          images.appendChild(wrapper);
+        });
+
+        root.appendChild(card);
+      });
+
+      updateProgress();
+    }
+
+    function parseBookFilter(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return null;
+      const values = new Set();
+      text.split(',').forEach(part => {
+        const token = part.trim();
+        if (!token) return;
+        if (token.includes('-')) {
+          const [a, b] = token.split('-', 2).map(x => Number(x.trim()));
+          if (Number.isFinite(a) && Number.isFinite(b)) {
+            const start = Math.min(a, b);
+            const end = Math.max(a, b);
+            for (let n = start; n <= end; n += 1) values.add(n);
+          }
+        } else {
+          const value = Number(token);
+          if (Number.isFinite(value)) values.add(value);
+        }
+      });
+      return values.size ? values : null;
+    }
+
+    function updateProgress() {
+      const total = state.books.length;
+      const reviewed = state.books.filter(book => (state.selections[String(book.number)] || 0) > 0).length;
+      const pct = total ? (reviewed / total) * 100 : 0;
+      document.getElementById('progressFill').style.width = `${pct}%`;
+      document.getElementById('progressLabel').textContent = `${reviewed} / ${total} reviewed`;
+    }
+
+    init();
+  </script>
+</body>
+</html>
