@@ -1,0 +1,41 @@
+{
+  "style_anchors": "classical oil painting, masterpiece quality, warm golden lighting, renaissance art style, detailed brushwork, gallery-quality illustration, circular vignette composition, rich color palette, dramatic chiaroscuro, no text, no letters, no words, no watermarks",
+
+  "negative_prompt": "text, letters, words, watermark, signature, photorealistic, 3d render, cartoon, anime, comic, digital art, modern, neon, flat colors, low quality, blurry, deformed, ugly, bad anatomy, distorted hands, extra fingers, mutated",
+
+  "variants": {
+    "1_iconic_scene": {
+      "name": "Iconic Scene",
+      "description": "The single most famous and recognizable scene or moment from the book",
+      "template": "Oil painting of {scene_description}, {style_anchors}"
+    },
+    "2_character_portrait": {
+      "name": "Character Portrait",
+      "description": "The main character in a period-appropriate setting that reflects their story",
+      "template": "Classical portrait painting of {character_description}, {style_anchors}"
+    },
+    "3_symbolic": {
+      "name": "Symbolic / Allegorical",
+      "description": "An abstract or symbolic representation of the book's central themes",
+      "template": "Allegorical oil painting symbolizing {theme_description}, {style_anchors}"
+    },
+    "4_setting": {
+      "name": "Setting / Landscape",
+      "description": "The key location or environment from the story",
+      "template": "Oil painting landscape of {setting_description}, {style_anchors}"
+    },
+    "5_dramatic_moment": {
+      "name": "Dramatic Moment",
+      "description": "A pivotal, climactic, or emotionally charged scene",
+      "template": "Dramatic oil painting of {moment_description}, {style_anchors}"
+    }
+  },
+
+  "generation_params": {
+    "width": 1024,
+    "height": 1024,
+    "guidance_scale": 7.5,
+    "num_inference_steps": 28,
+    "output_format": "png"
+  }
+}

@@ -1,0 +1,29 @@
+# Alexandria Cover Designer — Python Dependencies
+
+# Image processing
+Pillow>=10.0
+opencv-python-headless>=4.8
+numpy>=1.24
+
+# AI image generation
+replicate>=0.25
+httpx>=0.25
+
+# PDF handling
+reportlab>=4.0
+pypdf>=3.15
+
+# Configuration
+python-dotenv>=1.0
+
+# Utilities
+tqdm>=4.65
+pathlib2>=2.3; python_version < "3.6"
+
+# Google Drive sync
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.1
+google-auth-httplib2>=0.1
+
+# Testing
+pytest>=7.4

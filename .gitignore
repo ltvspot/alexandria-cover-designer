@@ -1,0 +1,42 @@
+# Output covers (large, stored in Google Drive)
+Output Covers/
+
+# Input covers (large, stored locally / Google Drive)
+Input Covers/
+
+# Sample output (reference only)
+Sample Output style covers/
+
+# Environment / secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data
+data/
+tmp/
+logs/
+
+# Codex development status
+.codex-status/
+
+# Generated reports
+reports/
+
+# Editor swap files
+~$*
+
+# Large AI model files (if downloaded locally)
+models/
+*.safetensors
+*.ckpt
+*.bin
