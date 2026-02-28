@@ -708,23 +708,6 @@ body.iterate-page .tabs button.active:hover:not(:disabled):not(.btn-loading) {
   gap: 8px;
 }
 
-.tour-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  background: rgba(0, 0, 0, 0.65);
-  display: grid;
-  place-items: center;
-}
-.tour-card {
-  width: min(560px, 92vw);
-}
-.tour-highlight {
-  outline: 3px solid rgba(196, 163, 82, 0.85);
-  outline-offset: 3px;
-  border-radius: 8px;
-}
-
 body.iterate-page.iterate-quick-mode #advancedControlsWrap {
   display: none;
 }

@@ -236,19 +236,6 @@
     </div>
   </div>
 
-  <div id="tourModal" class="tour-modal picker-hidden">
-    <div class="modal-card tour-card">
-      <div class="row u-row-between-center">
-        <strong class="u-title-gold-18" id="tourTitle">Quick Start</strong>
-        <button id="tourSkipBtn" class="secondary" type="button">Skip</button>
-      </div>
-      <div id="tourBody" class="u-mt-10"></div>
-      <div class="row u-mt-10">
-        <button id="tourNextBtn" type="button">Next</button>
-      </div>
-    </div>
-  </div>
-
   <div id="notificationPanel" class="notification-panel picker-hidden">
     <div class="row u-row-between-center">
       <strong class="u-title-gold-18">Notifications</strong>
@@ -330,7 +317,6 @@
       notifications: [],
       resultsByKey: new Map(),
       zoomCache: new Map(),
-      tourStepIndex: -1,
       dismissedResults: new Set(),
     };
 
@@ -627,7 +613,6 @@
             applyModeRecommendations();
           });
 
-        maybeStartTour();
       } catch (error) {
         const message = (error && error.message) ? error.message : String(error || 'unknown error');
         qs('status').textContent = `Failed to initialize iterate page: ${message}`;
@@ -763,40 +748,6 @@
       const url = new URL(window.location.href);
       url.searchParams.set('mode', app.uiMode);
       window.history.replaceState({}, '', url.toString());
-    }
-
-    function maybeStartTour() {
-      const flag = localStorage.getItem('iterateTourCompletedV2');
-      if (flag === '1') return;
-      app.tourStepIndex = 0;
-      renderTourStep();
-      qs('tourModal').classList.remove('picker-hidden');
-    }
-
-    function closeTour(markDone = true) {
-      qs('tourModal').classList.add('picker-hidden');
-      document.querySelectorAll('.tour-highlight').forEach(node => node.classList.remove('tour-highlight'));
-      if (markDone) localStorage.setItem('iterateTourCompletedV2', '1');
-      app.tourStepIndex = -1;
-    }
-
-    function renderTourStep() {
-      const steps = [
-        { title: 'Step 1: Select A Book', body: 'Pick a title here. Quick mode is optimized for first-run generation speed.', target: '#quickBookSelect' },
-        { title: 'Step 2: Choose Models', body: 'Select one or more recommended models. Each selected model will run in the same job.', target: '#quickModelsBox' },
-        { title: 'Step 3: Generate', body: 'Start generation. Progress, per-model status, and costs appear live in the results panel.', target: '#quickGenerateBtn' },
-        { title: 'Step 4: Review Results', body: 'Use result cards to zoom, compare, mark winner, regenerate, or download source/composite outputs.', target: '#resultsPanel' },
-      ];
-      const step = steps[Math.max(0, Math.min(steps.length - 1, app.tourStepIndex))];
-      qs('tourTitle').textContent = step.title;
-      qs('tourBody').textContent = step.body;
-      document.querySelectorAll('.tour-highlight').forEach(node => node.classList.remove('tour-highlight'));
-      const target = document.querySelector(step.target);
-      if (target) {
-        target.classList.add('tour-highlight');
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      qs('tourNextBtn').textContent = app.tourStepIndex >= steps.length - 1 ? 'Finish' : 'Next';
     }
 
     function renderCoverPickers() {
@@ -2815,15 +2766,6 @@
         onBookChange();
       });
       qs('quickGenerateBtn').addEventListener('click', () => generate(qs('quickGenerateBtn')));
-      qs('tourSkipBtn').addEventListener('click', () => closeTour(true));
-      qs('tourNextBtn').addEventListener('click', () => {
-        if (app.tourStepIndex >= 3) {
-          closeTour(true);
-          return;
-        }
-        app.tourStepIndex += 1;
-        renderTourStep();
-      });
       qs('notificationBell').addEventListener('click', () => toggleNotifications());
       qs('notificationCloseBtn').addEventListener('click', () => toggleNotifications(false));
       qs('catalogSelect').addEventListener('change', (event) => {
