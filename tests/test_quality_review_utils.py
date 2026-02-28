@@ -160,6 +160,23 @@ def test_validate_drive_cover_request_uses_hint_and_rejects_mismatch(monkeypatch
     assert called["list"] == 0
 
 
+def test_validate_drive_cover_request_allows_auto_resolution_without_selected_cover():
+    runtime = SimpleNamespace()
+    ok, error = qr._validate_drive_cover_request(
+        runtime=runtime,  # type: ignore[arg-type]
+        book=1,
+        cover_source="drive",
+        selected_cover_id="",
+        selected_cover=None,
+        selected_cover_book_number=0,
+        drive_folder_id="",
+        input_folder_id="",
+        credentials_path_token="",
+    )
+    assert ok is True
+    assert error == ""
+
+
 def test_validate_catalog_cover_request_rejects_missing_local_cover(monkeypatch: pytest.MonkeyPatch):
     runtime = SimpleNamespace()
     monkeypatch.setattr(qr, "_local_cover_available", lambda **_kwargs: False)

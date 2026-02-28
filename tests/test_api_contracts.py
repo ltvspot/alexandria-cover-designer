@@ -164,6 +164,31 @@ def test_api_contract_cover_source_default_endpoint_shape():
         _stop_server(process)
 
 
+def test_api_contract_generate_drive_without_selected_cover_is_accepted():
+    process, base_url = _start_server()
+    try:
+        status, payload, content_type = _request_json(
+            base_url,
+            "/api/generate?catalog=classics",
+            method="POST",
+            payload={
+                "book": 1,
+                "models": ["openrouter/google/gemini-2.5-flash-image"],
+                "variants": 1,
+                "prompt": "contract smoke",
+                "provider": "all",
+                "cover_source": "drive",
+                "dry_run": True,
+            },
+        )
+        assert status == 200
+        assert "application/json" in content_type.lower()
+        assert payload.get("ok") is True
+        assert isinstance(payload.get("job"), dict)
+    finally:
+        _stop_server(process)
+
+
 def test_api_contract_pagination_shape():
     process, base_url = _start_server()
     try:

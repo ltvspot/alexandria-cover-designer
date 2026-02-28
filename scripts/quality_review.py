@@ -9224,7 +9224,8 @@ def _validate_drive_cover_request(
     if not selected_id and isinstance(selected_cover, dict):
         selected_id = str(selected_cover.get("id", "")).strip()
     if not selected_id:
-        return False, "selected_cover_id is required when cover_source is 'drive'."
+        # Drive-first mode auto-resolves the source cover in the execution pipeline.
+        return True, ""
 
     mapped_book = int(selected_cover_book_number or 0)
     if mapped_book <= 0 and isinstance(selected_cover, dict):
