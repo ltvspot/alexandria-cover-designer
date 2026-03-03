@@ -2,7 +2,7 @@
 
 Last updated: `2026-03-03`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `3c46a363-8aa6-4316-abd3-0eb62b229c15`
+Deployment ID: `5498fa8f-01d9-4f4a-b4dc-d0c269357693`
 
 ## 0. PROMPT-07B Hotfix Snapshot (2026-03-03)
 - Deployed with compositor detection window widened (15%), safety inset `14px`, expanded radius scan bounds, and relaxed offset guard.
@@ -58,6 +58,24 @@ Deployment ID: `3c46a363-8aa6-4316-abd3-0eb62b229c15`
 - Live verification:
   - deployed `compositor.js` includes `OPENING_RATIO = 0.96`, `OPENING_SAFETY_INSET = 0`, `punchRadius = geo.openingRadius + 4`, and `[Compositor v12]`
   - region registry still loads correctly for known geometry (`book 1/9 -> 2864|2862,1620,500`)
+
+## 0.4 PROMPT-07F PNG Template Compositor (2026-03-03)
+- Added batch template generator script:
+  - `src/create_png_templates.py`
+  - CLI: `python -m src.create_png_templates --source-dir 'Input Covers'`
+- Local generation result:
+  - `99` templates created in `config/templates/`
+  - all sampled templates are `3784x2777 RGBA`
+  - sample transparent area ratio ~`6.47%`
+- Backend compositor pipeline update in `src/cover_compositor.py`:
+  - medallion branch now uses three-layer template pipeline (`canvas + art + template`)
+  - added `_find_template_for_cover()`, `_simple_center_crop()`, and `_legacy_medallion_composite()` fallback
+  - added on-demand template creation helper for missing templates (`_create_template_for_cover`)
+  - logs now show `Using PNG template: ...` when template path is active
+- Runtime verification (local compositor run for books 1/9/25):
+  - `Compositor using known geometry ... opening=480`
+  - `Using PNG template: ...`
+  - no `No PNG template found` warnings in successful path
 
 ## 1. Test Proof
 - Full suite run: `pytest -q`.
@@ -150,6 +168,17 @@ Deployment ID: `3c46a363-8aa6-4316-abd3-0eb62b229c15`
 - `/Users/timzengerink/proofs/proof-07e-book25-medallion.png`
 - `/Users/timzengerink/proofs/proof-07e-medallion-triptych.png`
 - `/Users/timzengerink/proofs/proof-07e-summary.json`
+
+### 3.0.4 PROMPT-07F Inline-Proof Assets (PNG template pipeline)
+- `/Users/timzengerink/proofs/proof-07f-live-iterate.png`
+- `/Users/timzengerink/proofs/proof-07f-book1-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07f-book1-medallion.png`
+- `/Users/timzengerink/proofs/proof-07f-book9-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07f-book9-medallion.png`
+- `/Users/timzengerink/proofs/proof-07f-book25-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07f-book25-medallion.png`
+- `/Users/timzengerink/proofs/proof-07f-medallion-triptych.png`
+- `/Users/timzengerink/proofs/proof-07f-summary.json`
 
 ### 3.1 Live UI Screenshots
 - `tmp/proof-live-iterate-20260302-prompt06.png`

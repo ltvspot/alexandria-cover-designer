@@ -13,7 +13,7 @@ Quick status snapshot:
 - In-memory DB + CGI-compatible persistence layer is active (`src/static/js/db.js`, `/cgi-bin/settings.py`, `/cgi-bin/catalog.py` route handlers).
 - UI shell is locked to the new sidebar design with anti-stale controls (`Cache-Control: no-store` + `?v=20260302-designlock`).
 - CSP now allows required frontend dependencies (`fonts.googleapis.com`, `fonts.gstatic.com`, `cdn.jsdelivr.net`, `cdnjs.cloudflare.com`) so Chart.js/JSZip/Inter load correctly.
-- PROMPT-07E/07F PNG Template approach is now in progress: PROMPT-07E creates `src/create_png_templates.py` (batch-generates PNG templates with transparent medallion centers at r=465). PROMPT-07F replaces the medallion branch of `composite_single()` with a three-layer pipeline (canvas + art + template). Previous parameter-tuning approach (07A-07D) abandoned — architectural fix required. See `Alexandria-PNG-Template-Compositor-Fix-Report.pdf` for full technical specification.
+- PROMPT-07E/07F PNG Template approach is now active: `src/create_png_templates.py` exists and local run generated 99 templates; `src/cover_compositor.py` medallion branch now uses three-layer template compositing with legacy fallback + on-demand template generation. Previous parameter-tuning approach (07A-07D) is abandoned.
 - Prompt assembly is hardened against malformed constraints and duplicated provider/model signatures.
 - Dashboard recent cards are prompt-aware/style-tag-aware and backfill from filesystem when persisted rows are sparse.
 - Required model inventory is force-enforced at runtime (15 OpenRouter production models + Gemini direct IDs), even when `ALL_MODELS` env is stale.

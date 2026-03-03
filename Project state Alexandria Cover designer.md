@@ -40,23 +40,21 @@ Serving layer:
 - `src/static/shared.css` contains a design-lock block with `!important` sidebar/layout rules so legacy page CSS cannot revert to the old top-nav layout.
 
 ### 3.2 Medallion Safety (Art Behind Ornaments)
-**PNG Template approach is now in progress (2026-03-03).**
+**PNG Template approach is now active (2026-03-03).**
 
 Previous parameter-tuning approaches (07A–07D) all failed because two independent masking systems (`compositing_mask.png` + geometric circles) contradict each other. The fix is architectural: pre-process covers into PNG templates with transparent medallion centers, then composite as a simple three-layer stack.
 
 **PROMPT-07E** — Batch Preprocessing Script:
-- Creates `src/create_png_templates.py`
-- Converts all 99 source cover JPGs into PNG templates
-- Punches transparent circle at (2864, 1620) with r=465
-- 4x supersampled anti-aliased edges
-- Output: `config/templates/cover_XXX_template.png` (x99)
+- Added `src/create_png_templates.py`
+- Local run: `python -m src.create_png_templates --source-dir 'Input Covers'`
+- Result: `99 created, 0 skipped, 0 failed`
+- Produces RGBA PNG templates with transparent medallion centers (r=465, 4x supersampling)
 
 **PROMPT-07F** — Compositor Pipeline Replacement:
-- Modifies `src/cover_compositor.py` medallion branch only
-- New three-layer pipeline: canvas + art + template (frame always on top)
-- Adds `_simple_center_crop()` (replaces `_smart_square_crop()` in medallion path)
-- Adds `_find_template_for_cover()` for template lookup
-- Falls back to legacy pipeline if template missing
+- Updated `src/cover_compositor.py` medallion branch to three-layer pipeline: canvas + art + template
+- Added `_simple_center_crop()` and `_find_template_for_cover()`
+- Added `_legacy_medallion_composite()` fallback for template-missing cases
+- Added on-demand template generation helper (`_create_template_for_cover()`) so deployment does not require bundling 99 PNG binaries
 - Rectangle and custom_mask branches remain UNCHANGED
 
 Resulting architecture:
@@ -184,6 +182,10 @@ Completed in this workspace session:
    - `config/compositing_mask.png` disabled (renamed to `.disabled`),
    - deployed bundle contains `OPENING_RATIO = 0.96`, `OPENING_SAFETY_INSET = 0`, `punchRadius = geo.openingRadius + 4`, and `[Compositor v12]`,
    - backend runtime logs show known geometry + `opening=480` on canonical covers.
+15. PROMPT-07F template compositor verified:
+   - local compositor runs for books `1`, `9`, `25` log `Using PNG template: ...`,
+   - on-demand template generation path verified (`Generated PNG template: ...`),
+   - composite summary remains successful (`processed_books=3`, `failed_books=0`).
 
 ## 7. Known Constraints / Honest Caveats
 - In production, direct Google provider is currently failing key validation (`Your API key was reported as leaked`); these models are disabled in UI connectivity state until key replacement.
@@ -193,6 +195,7 @@ Completed in this workspace session:
 1. Run a live canary (10-book sample) with active provider keys and capture fresh composited proofs.
 2. Add a dedicated visual regression check for medallion edge consistency (books 1/9/25 baseline triptych).
 3. Keep the revision token centralized in one constant to avoid accidental per-page drift.
+4. Optional: pre-generate templates on deploy for faster first composite latency.
 
 ## 9. Mandatory Delivery Protocol
 For every user-facing completion message:
