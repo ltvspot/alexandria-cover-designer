@@ -26,11 +26,12 @@ logger = get_logger(__name__)
 DETECTION_ANALYSIS_W = 420
 DETECTION_COARSE_STEP = 4
 DETECTION_FINE_STEP = 1
+DETECTION_SEARCH_RATIO = 0.15
 DETECTION_OPENING_RATIO = 0.965
 DETECTION_OPENING_MIN = 360
 DETECTION_OPENING_MAX = 530
 DETECTION_CONFIDENCE_MIN = 4.0
-OPENING_SAFETY_INSET_PX = 16
+OPENING_SAFETY_INSET_PX = 18
 OVERLAY_PUNCH_INSET_PX = 20
 INNER_FEATHER_PX = 8
 RING_WIDTH_PX = 14
@@ -219,10 +220,10 @@ def _detect_medallion_geometry(*, cover: Image.Image, region: Region) -> dict[st
     cy0 = float((region.center_y or int(round(h * 0.58))) * scale)
     r0 = float((region.radius or int(round(min(w, h) * 0.19))) * scale)
 
-    search_x = max(18, int(round(scan_w * 0.045)))
-    search_y = max(18, int(round(scan_h * 0.045)))
-    coarse_r_min = max(24, int(round(r0 * 0.84)))
-    coarse_r_max = min(int(round(min(scan_w, scan_h) * 0.49)), int(round(r0 * 1.18)))
+    search_x = max(30, int(round(scan_w * DETECTION_SEARCH_RATIO)))
+    search_y = max(30, int(round(scan_h * DETECTION_SEARCH_RATIO)))
+    coarse_r_min = max(24, int(round(r0 * 0.65)))
+    coarse_r_max = min(int(round(min(scan_w, scan_h) * 0.49)), int(round(r0 * 1.40)))
     if coarse_r_max <= coarse_r_min:
         coarse_r_max = coarse_r_min + 24
 
@@ -244,10 +245,10 @@ def _detect_medallion_geometry(*, cover: Image.Image, region: Region) -> dict[st
                     best = {"score": score, "cx": cx, "cy": cy, "r": radius}
 
     fine_best = dict(best)
-    fine_r_min = max(20, int(best["r"]) - 14)
-    fine_r_max = min(int(round(min(scan_w, scan_h) * 0.50)), int(best["r"]) + 14)
-    for cy in range(max(10, int(best["cy"]) - 8), min(scan_h - 10, int(best["cy"]) + 9), DETECTION_FINE_STEP):
-        for cx in range(max(10, int(best["cx"]) - 8), min(scan_w - 10, int(best["cx"]) + 9), DETECTION_FINE_STEP):
+    fine_r_min = max(20, int(best["r"]) - 16)
+    fine_r_max = min(int(round(min(scan_w, scan_h) * 0.50)), int(best["r"]) + 16)
+    for cy in range(max(10, int(best["cy"]) - 16), min(scan_h - 10, int(best["cy"]) + 17), DETECTION_FINE_STEP):
+        for cx in range(max(10, int(best["cx"]) - 16), min(scan_w - 10, int(best["cx"]) + 17), DETECTION_FINE_STEP):
             for radius in range(fine_r_min, fine_r_max + 1, DETECTION_FINE_STEP):
                 score = _score_ring(
                     warm_map=warm_map,
@@ -303,7 +304,7 @@ def _resolve_medallion_geometry(*, cover: Image.Image, cover_path: Path, region:
         use_detected = bool(np.isfinite(confidence) and confidence >= DETECTION_CONFIDENCE_MIN and np.isfinite(score))
         if region.center_x > 0 and region.center_y > 0 and region.radius > 0:
             offset = float(np.sqrt(((detected_cx - region.center_x) ** 2) + ((detected_cy - region.center_y) ** 2)))
-            max_offset = max(32.0, float(region.radius) * 0.34)
+            max_offset = max(80.0, float(region.radius) * 0.55)
             if offset > max_offset:
                 use_detected = False
 
@@ -332,6 +333,13 @@ def _resolve_medallion_geometry(*, cover: Image.Image, cover_path: Path, region:
                 "score": round(score, 4),
                 "fallback_used": bool(not use_detected),
             },
+        )
+        logger.info(
+            "Compositor detected: cx=%d cy=%d outer=%d opening=%d",
+            payload["center_x"],
+            payload["center_y"],
+            payload["outer_radius"],
+            payload["opening_radius"],
         )
         return payload
     except Exception as exc:
@@ -369,6 +377,44 @@ def _sample_cover_background(*, cover: Image.Image, center_x: int, center_y: int
     )
     med = np.median(edge_strip, axis=0)
     return (int(np.clip(med[0], 0, 255)), int(np.clip(med[1], 0, 255)), int(np.clip(med[2], 0, 255)))
+
+
+def _geometry_from_strict_mask(mask: Image.Image | None) -> dict[str, int] | None:
+    if mask is None:
+        return None
+    arr = np.array(mask.convert("L"), dtype=np.uint8)
+    if arr.size <= 0:
+        return None
+    active = arr > 8
+    if not np.any(active):
+        return None
+
+    ys, xs = np.where(active)
+    weights = arr[active].astype(np.float64)
+    wsum = float(weights.sum())
+    if wsum <= 1e-6:
+        return None
+
+    center_x = int(round(float((xs * weights).sum() / wsum)))
+    center_y = int(round(float((ys * weights).sum() / wsum)))
+    area = float(np.count_nonzero(active))
+    equiv_radius = float(np.sqrt(area / np.pi))
+
+    min_x = int(xs.min())
+    max_x = int(xs.max())
+    min_y = int(ys.min())
+    max_y = int(ys.max())
+    bbox_radius = 0.5 * float(min(max_x - min_x + 1, max_y - min_y + 1))
+
+    opening_radius = int(round(max(20.0, min(bbox_radius, equiv_radius))))
+    outer_radius = int(max(opening_radius + MIN_OPENING_MARGIN_PX, round(opening_radius * 1.06)))
+
+    return {
+        "center_x": int(center_x),
+        "center_y": int(center_y),
+        "opening_radius": int(opening_radius),
+        "outer_radius": int(outer_radius),
+    }
 
 
 def _find_energy_center(image: Image.Image) -> tuple[float, float]:
@@ -453,9 +499,34 @@ def _smart_square_crop(image: Image.Image) -> Image.Image:
     if img_w <= 1 or img_h <= 1:
         return src
     side = min(img_w, img_h)
-    left = max(0, (img_w - side) // 2)
-    top = max(0, (img_h - side) // 2)
-    return src.crop((left, top, left + side, top + side))
+    center_x = float(img_w) * 0.5
+    center_y = float(img_h) * 0.5
+    crop_side = int(side)
+
+    bbox = _detect_foreground_bbox_norm(src)
+    if bbox:
+        center_x = float((bbox["x"] + (bbox["w"] * 0.5)) * img_w)
+        center_y = float((bbox["y"] + (bbox["h"] * 0.5)) * img_h)
+        span = float(max(bbox["w"], bbox["h"]))
+        if float(bbox.get("box_area", 1.0)) <= 0.60 and span <= 0.82:
+            zoom = float(np.clip(span * 1.75, 0.58, 0.96))
+            crop_side = int(max(64, min(side, round(side * zoom))))
+        edge_limited_side = int(round(2.0 * min(center_x, float(img_w) - center_x, center_y, float(img_h) - center_y)))
+        if edge_limited_side >= 64:
+            crop_side = int(min(crop_side, edge_limited_side))
+    else:
+        energy_x, energy_y = _find_energy_center(src)
+        center_x = float(energy_x * img_w)
+        center_y = float(energy_y * img_h)
+
+    half = crop_side / 2.0
+    left = int(round(center_x - half))
+    top = int(round(center_y - half))
+    max_left = max(0, img_w - crop_side)
+    max_top = max(0, img_h - crop_side)
+    left = int(np.clip(left, 0, max_left))
+    top = int(np.clip(top, 0, max_top))
+    return src.crop((left, top, left + crop_side, top + crop_side))
 
 
 def _prepare_circle_illustration(*, illustration: Image.Image, target_diameter: int, fill_rgb: tuple[int, int, int]) -> Image.Image:
@@ -513,8 +584,24 @@ def _draw_gold_ring_pil(
     return layer
 
 
-def _build_cover_overlay_with_punch(*, cover: Image.Image, center_x: int, center_y: int, punch_radius: int) -> Image.Image:
+def _build_cover_overlay_with_punch(
+    *,
+    cover: Image.Image,
+    center_x: int,
+    center_y: int,
+    punch_radius: int,
+    punch_mask: Image.Image | None = None,
+) -> Image.Image:
     overlay = cover.convert("RGBA").copy()
+    if punch_mask is not None:
+        mask = punch_mask.convert("L")
+        if mask.size != cover.size:
+            mask = mask.resize(cover.size, Image.LANCZOS)
+        mask_arr = np.array(mask, dtype=np.uint8)
+        alpha = Image.fromarray((255 - mask_arr).astype(np.uint8), mode="L")
+        overlay.putalpha(alpha)
+        return overlay
+
     alpha = Image.new("L", cover.size, 255)
     draw = ImageDraw.Draw(alpha)
     r = max(4, int(punch_radius))
@@ -623,7 +710,8 @@ def composite_single(
         full_overlay.putalpha(mask)
         composited_rgb = Image.alpha_composite(cover.convert("RGBA"), full_overlay).convert("RGB")
     else:
-        geometry = _resolve_medallion_geometry(cover=cover, cover_path=cover_path, region=region_obj)
+        mask_geometry = _geometry_from_strict_mask(strict_window_mask)
+        geometry = mask_geometry or _resolve_medallion_geometry(cover=cover, cover_path=cover_path, region=region_obj)
         opening_radius = max(20, int(geometry["opening_radius"]))
         clip_radius = max(14, opening_radius - OPENING_SAFETY_INSET_PX)
         fill_rgb = _sample_cover_background(
@@ -664,6 +752,7 @@ def composite_single(
             center_x=int(geometry["center_x"]),
             center_y=int(geometry["center_y"]),
             punch_radius=max(12, opening_radius - OVERLAY_PUNCH_INSET_PX),
+            punch_mask=strict_window_mask if mask_geometry is not None else None,
         )
         composited_rgb = Image.alpha_composite(composited, overlay).convert("RGB")
         validation_region = Region(

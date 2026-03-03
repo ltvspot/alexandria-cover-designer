@@ -313,6 +313,34 @@ def test_combine_masks_uses_stricter_alpha():
     assert arr.max() == 120
 
 
+def test_geometry_from_strict_mask_uses_mask_center():
+    mask = Image.new("L", (700, 500), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((356, 204, 484, 332), fill=255)
+    geometry = cc._geometry_from_strict_mask(mask)
+    assert geometry is not None
+    assert abs(int(geometry["center_x"]) - 420) <= 2
+    assert abs(int(geometry["center_y"]) - 268) <= 2
+    assert 60 <= int(geometry["opening_radius"]) <= 66
+
+
+def test_overlay_punch_can_use_mask_shape():
+    cover = Image.new("RGB", (200, 200), (12, 24, 36))
+    mask = Image.new("L", (200, 200), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((60, 50, 150, 140), fill=255)
+    overlay = cc._build_cover_overlay_with_punch(
+        cover=cover,
+        center_x=100,
+        center_y=95,
+        punch_radius=60,
+        punch_mask=mask,
+    )
+    alpha = np.array(overlay.split()[-1], dtype=np.uint8)
+    assert alpha[95, 100] == 0
+    assert alpha[10, 10] == 255
+
+
 def test_composite_single_respects_strict_window_mask(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     cover = tmp_path / "cover.jpg"
     ill = tmp_path / "ill.png"

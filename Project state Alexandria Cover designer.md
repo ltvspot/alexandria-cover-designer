@@ -1,6 +1,6 @@
 # Alexandria Cover Designer — Project State
 
-Last updated: `2026-03-02`
+Last updated: `2026-03-03`
 Version track: `v2.1.x` (current runtime reports `2.1.1`)
 
 ## 1. Current Goal (Production)
@@ -179,3 +179,13 @@ For every user-facing completion message:
 2. Include visual proof report artifact path(s) (screenshots + key endpoint checks).
 3. Do not claim deployment completeness without both items.
 4. Update `VISUAL-PROOF-REPORT.md` for each deployment.
+
+## 10. Chat Proof Rendering Rule (Critical)
+- Inline visual proofs in chat must use Markdown image tags with absolute local filesystem paths.
+- To avoid renderer failures, publish proof images from a no-space directory: `/Users/timzengerink/proofs/`.
+- Standard proof filenames:
+  - `/Users/timzengerink/proofs/proof-results-grid.png`
+  - `/Users/timzengerink/proofs/proof-modal-composite.png`
+  - `/Users/timzengerink/proofs/proof-iterate-page.png`
+  - `/Users/timzengerink/proofs/proof-medallion-closeup.png`
+- Do not use relative paths for inline chat proofs.

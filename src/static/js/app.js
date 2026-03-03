@@ -535,8 +535,12 @@ async function fetchImageBlob(src, signal, options = {}) {
         const blob = await response.blob();
         const blobType = String(blob.type || '').toLowerCase();
         const isImage = blobType.startsWith('image/');
-        const likelyImage = !blobType && !contentType && looksLikeImagePath;
-        if (isImage || likelyImage) return blob;
+        const likelyImage = looksLikeImagePath && (!blobType || blobType === 'application/octet-stream');
+        const headerSuggestsImage = contentType.startsWith('image/');
+        if (headerSuggestsImage && !blob.type) {
+          return new Blob([blob], { type: contentType.split(';', 1)[0] || 'image/jpeg' });
+        }
+        if (isImage || likelyImage || headerSuggestsImage) return blob;
       }
     } catch {
       // Ignore transient network errors; retry loop handles backoff.

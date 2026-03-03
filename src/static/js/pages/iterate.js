@@ -61,6 +61,18 @@ function resolvePreviewSources(job, keyPrefix = 'display', preferRaw = false) {
     if (!src || seen.has(src)) return;
     seen.add(src);
     sources.push(src);
+    if (typeof value === 'string') {
+      const normalized = src || '';
+      const isDirectPath = normalized.startsWith('/') && !normalized.startsWith('//');
+      if (isDirectPath && !normalized.startsWith('/api/thumbnail')) {
+        const rel = normalized.replace(/^\/+/, '');
+        const thumb = `/api/thumbnail?path=${encodeURIComponent(rel)}&size=large`;
+        if (!seen.has(thumb)) {
+          seen.add(thumb);
+          sources.push(thumb);
+        }
+      }
+    }
   };
 
   if (preferRaw) {
@@ -97,6 +109,18 @@ function resolveCompositePreviewSources(job, keyPrefix = 'display-composite') {
     if (!src || seen.has(src)) return;
     seen.add(src);
     sources.push(src);
+    if (typeof value === 'string') {
+      const normalized = src || '';
+      const isDirectPath = normalized.startsWith('/') && !normalized.startsWith('//');
+      if (isDirectPath && !normalized.startsWith('/api/thumbnail')) {
+        const rel = normalized.replace(/^\/+/, '');
+        const thumb = `/api/thumbnail?path=${encodeURIComponent(rel)}&size=large`;
+        if (!seen.has(thumb)) {
+          seen.add(thumb);
+          sources.push(thumb);
+        }
+      }
+    }
   };
   pushSource(job.composited_image_blob, 'composite');
   try {
@@ -182,7 +206,7 @@ window.Pages.iterate = {
         <div id="iterAdvanced">
           <div class="form-group">
             <label class="form-label">Models (best → budget, top → bottom)</label>
-            <div class="checkbox-group">${renderModelCheckboxes()}</div>
+            <div class="model-grid">${renderModelCheckboxes()}</div>
           </div>
           <div class="form-row">
             <div class="form-group">

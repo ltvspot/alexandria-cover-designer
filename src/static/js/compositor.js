@@ -6,7 +6,7 @@ const OPENING_MIN = 360;
 const OPENING_MAX = 530;
 const CONFIDENCE_MIN = 4.0;
 const OPENING_MARGIN = 6;
-const OPENING_SAFETY_INSET = 6;
+const OPENING_SAFETY_INSET = 18;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, Number(value)));
@@ -227,10 +227,10 @@ function detectMedallionGeometry(coverImg, hints = {}) {
   const cy0 = (Number.isFinite(hintCy) ? hintCy : 1350) * scale;
   const r0 = Math.max(20, (Number.isFinite(hintRadius) ? hintRadius : 520) * scale);
 
-  const searchX = Math.max(18, Math.round(scanW * 0.045));
-  const searchY = Math.max(18, Math.round(scanH * 0.045));
-  const coarseRMin = Math.max(24, Math.round(r0 * 0.84));
-  let coarseRMax = Math.min(Math.round(Math.min(scanW, scanH) * 0.49), Math.round(r0 * 1.18));
+  const searchX = Math.max(30, Math.round(scanW * 0.15));
+  const searchY = Math.max(30, Math.round(scanH * 0.15));
+  const coarseRMin = Math.max(24, Math.round(r0 * 0.65));
+  let coarseRMax = Math.min(Math.round(Math.min(scanW, scanH) * 0.49), Math.round(r0 * 1.40));
   if (coarseRMax <= coarseRMin) coarseRMax = coarseRMin + 24;
 
   let best = {
@@ -268,11 +268,11 @@ function detectMedallionGeometry(coverImg, hints = {}) {
   }
 
   let fineBest = { ...best };
-  const fineRMin = Math.max(20, best.r - 14);
-  const fineRMax = Math.min(Math.round(Math.min(scanW, scanH) * 0.50), best.r + 14);
+  const fineRMin = Math.max(20, best.r - 16);
+  const fineRMax = Math.min(Math.round(Math.min(scanW, scanH) * 0.50), best.r + 16);
 
-  for (let cy = Math.max(10, best.cy - 8); cy < Math.min(scanH - 10, best.cy + 9); cy += FINE_STEP) {
-    for (let cx = Math.max(10, best.cx - 8); cx < Math.min(scanW - 10, best.cx + 9); cx += FINE_STEP) {
+  for (let cy = Math.max(10, best.cy - 16); cy < Math.min(scanH - 10, best.cy + 17); cy += FINE_STEP) {
+    for (let cx = Math.max(10, best.cx - 16); cx < Math.min(scanW - 10, best.cx + 17); cx += FINE_STEP) {
       for (let radius = fineRMin; radius <= fineRMax; radius += FINE_STEP) {
         const score = scoreRing({
           warm,
@@ -321,7 +321,7 @@ function detectMedallionGeometry(coverImg, hints = {}) {
     const dx = centerX - hintCx;
     const dy = centerY - hintCy;
     const offset = Math.sqrt((dx * dx) + (dy * dy));
-    const maxOffset = Math.max(32, hintRadius * 0.34);
+    const maxOffset = Math.max(80, hintRadius * 0.55);
     if (offset > maxOffset) useDetected = false;
   }
 
@@ -334,7 +334,7 @@ function detectMedallionGeometry(coverImg, hints = {}) {
     Math.max(20, outer - OPENING_MARGIN),
   );
 
-  return {
+  const result = {
     cx: Math.round(cx),
     cy: Math.round(cy),
     outerRadius: Math.round(outer),
@@ -343,6 +343,10 @@ function detectMedallionGeometry(coverImg, hints = {}) {
     score: Number(fineBest.score || 0),
     fallbackUsed: !useDetected,
   };
+  console.log(
+    `[Compositor v9] Detection: cx=${result.cx}, cy=${result.cy}, outer=${result.outerRadius}, opening=${result.openingRadius}, confidence=${result.confidence.toFixed(2)}, fallback=${result.fallbackUsed}`,
+  );
+  return result;
 }
 
 function sampleCoverBackground({ coverImg, geo }) {
@@ -571,6 +575,10 @@ window.Compositor = {
     const sparseInfo = this.detectSparseContent(generatedImg);
     const crop = sourceCropForGenerated(generatedImg, sparseInfo);
     const clipRadius = Math.max(14, geo.openingRadius - OPENING_SAFETY_INSET);
+    console.log(
+      `[Compositor v9] Detected: cx=${geo.cx}, cy=${geo.cy}, outer=${geo.outerRadius}, opening=${geo.openingRadius}, confidence=${geo.confidence?.toFixed(2)}, fallback=${geo.fallbackUsed}`,
+    );
+    console.log(`[Compositor v9] Clip radius used: ${clipRadius}`);
 
     ctx.save();
     ctx.beginPath();
@@ -592,7 +600,6 @@ window.Compositor = {
     const coverTemplate = await this.buildCoverTemplate(coverImg, geo);
     ctx.drawImage(coverTemplate, 0, 0, width, height);
 
-    console.info('[Compositor v9] Medallion geometry detected', geo);
     canvas.__compositorMeta = geo;
     return canvas;
   },

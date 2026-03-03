@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-03-02T11:35:27.459456+00:00",
+  "updated_at": "2026-03-03T06:27:23.391127+00:00",
   "style_anchors": [
     {
       "name": "allegorical_symbolic",
@@ -119,6 +119,162 @@
     }
   ],
   "prompts": [
+    {
+      "id": "28bdb662-a6e3-41ce-afda-b73b51bb6c28",
+      "name": "Venetian Renaissance",
+      "prompt_template": "full-bleed narrative scene, circular medallion vignette, centered focal subject, edge-to-edge narrative detail, no text, no letters, no words, no typography, no logos, no labels, no title treatment, no watermark, no inscriptions, no calligraphy, vivid, high-saturation painterly color palette, colorful, richly colored, rich contrast, no empty space, no plain backgrounds, Create a vivid, highly detailed illustration for the classic book \"{title}\" by {author}. Identify the story's most iconic scene, central character, or symbolic turning point, then depict that moment as a cinematic narrative scene. Style direction: Venetian Renaissance. Render in the sumptuous Venetian, no border, no frame",
+      "style_anchors": [
+        "venetian-renaissance"
+      ],
+      "negative_prompt": "text, letters, words, typography, logos, labels, watermark, signature, ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 0.82,
+      "saved_by": "startup",
+      "created_at": "2026-03-03T06:27:23.329981+00:00",
+      "notes": "Seeded from Alexandria models/prompt report (v2).",
+      "tags": [
+        "builtin",
+        "builtin_v2",
+        "builtin_v2:venetian-renaissance"
+      ],
+      "category": "builtin",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-03T06:27:23.334875+00:00"
+    },
+    {
+      "id": "38ea0ace-932f-4ec3-821f-95f2f407fca1",
+      "name": "Dutch Golden Age",
+      "prompt_template": "full-bleed narrative scene, circular medallion vignette, centered focal subject, edge-to-edge narrative detail, no text, no letters, no words, no typography, no logos, no labels, no title treatment, no watermark, no inscriptions, no calligraphy, vivid, high-saturation painterly color palette, colorful, richly colored, rich contrast, no empty space, no plain backgrounds, Create a vivid, highly detailed illustration for the classic book \"{title}\" by {author}. Identify the story's most iconic scene, central character, or symbolic turning point, then depict that moment as a cinematic narrative scene. Style direction: Dutch Golden Age. Paint in the intimate, no border, no frame",
+      "style_anchors": [
+        "dutch-golden-age"
+      ],
+      "negative_prompt": "text, letters, words, typography, logos, labels, watermark, signature, ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 0.82,
+      "saved_by": "startup",
+      "created_at": "2026-03-03T06:27:23.329981+00:00",
+      "notes": "Seeded from Alexandria models/prompt report (v2).",
+      "tags": [
+        "builtin",
+        "builtin_v2",
+        "builtin_v2:dutch-golden-age"
+      ],
+      "category": "builtin",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-03T06:27:23.346276+00:00"
+    },
+    {
+      "id": "970e9e69-867b-408e-aa63-2fe8816b107f",
+      "name": "Pre-Raphaelite",
+      "prompt_template": "full-bleed narrative scene, circular medallion vignette, centered focal subject, edge-to-edge narrative detail, no text, no letters, no words, no typography, no logos, no labels, no title treatment, no watermark, no inscriptions, no calligraphy, vivid, high-saturation painterly color palette, colorful, richly colored, rich contrast, no empty space, no plain backgrounds, Create a vivid, highly detailed illustration for the classic book \"{title}\" by {author}. Identify the story's most iconic scene, central character, or symbolic turning point, then depict that moment as a cinematic narrative scene. Style direction: Pre-Raphaelite. Render in the lush, hyper-detailed Pre-Raphaelite, no border, no frame",
+      "style_anchors": [
+        "pre-raphaelite-v2"
+      ],
+      "negative_prompt": "text, letters, words, typography, logos, labels, watermark, signature, ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 0.82,
+      "saved_by": "startup",
+      "created_at": "2026-03-03T06:27:23.329981+00:00",
+      "notes": "Seeded from Alexandria models/prompt report (v2).",
+      "tags": [
+        "builtin",
+        "builtin_v2",
+        "builtin_v2:pre-raphaelite-v2"
+      ],
+      "category": "builtin",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-03T06:27:23.357485+00:00"
+    },
+    {
+      "id": "dd107073-d57c-4afc-93fd-c3df99237b48",
+      "name": "Art Nouveau",
+      "prompt_template": "full-bleed narrative scene, circular medallion vignette, centered focal subject, edge-to-edge narrative detail, no text, no letters, no words, no typography, no logos, no labels, no title treatment, no watermark, no inscriptions, no calligraphy, vivid, high-saturation painterly color palette, colorful, richly colored, rich contrast, no empty space, no plain backgrounds, Create a vivid, highly detailed illustration for the classic book \"{title}\" by {author}. Identify the story's most iconic scene, central character, or symbolic turning point, then depict that moment as a cinematic narrative scene. Style direction: Art Nouveau. Create in the brilliance of, no border, no frame",
+      "style_anchors": [
+        "art-nouveau-v2"
+      ],
+      "negative_prompt": "text, letters, words, typography, logos, labels, watermark, signature, ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 0.82,
+      "saved_by": "startup",
+      "created_at": "2026-03-03T06:27:23.329981+00:00",
+      "notes": "Seeded from Alexandria models/prompt report (v2).",
+      "tags": [
+        "builtin",
+        "builtin_v2",
+        "builtin_v2:art-nouveau-v2"
+      ],
+      "category": "builtin",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-03T06:27:23.368630+00:00"
+    },
+    {
+      "id": "0575ea4a-37ae-455c-9e78-cbf8c37e3e53",
+      "name": "Ukiyo-e Woodblock",
+      "prompt_template": "full-bleed narrative scene, circular medallion vignette, centered focal subject, edge-to-edge narrative detail, no text, no letters, no words, no typography, no logos, no labels, no title treatment, no watermark, no inscriptions, no calligraphy, vivid, high-saturation painterly color palette, colorful, richly colored, rich contrast, no empty space, no plain backgrounds, Create a vivid, highly detailed illustration for the classic book \"{title}\" by {author}. Identify the story's most iconic scene, central character, or symbolic turning point, then depict that moment as a cinematic narrative scene. Style direction: Ukiyo-e Woodblock. Reimagine as a Japanese ukiyo-e, no border, no frame",
+      "style_anchors": [
+        "ukiyo-e-v2"
+      ],
+      "negative_prompt": "text, letters, words, typography, logos, labels, watermark, signature, ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 0.82,
+      "saved_by": "startup",
+      "created_at": "2026-03-03T06:27:23.329981+00:00",
+      "notes": "Seeded from Alexandria models/prompt report (v2).",
+      "tags": [
+        "builtin",
+        "builtin_v2",
+        "builtin_v2:ukiyo-e-v2"
+      ],
+      "category": "builtin",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-03T06:27:23.380099+00:00"
+    },
+    {
+      "id": "162b72e9-08bb-4053-9ab2-e14edaffa4cf",
+      "name": "Film Noir",
+      "prompt_template": "full-bleed narrative scene, circular medallion vignette, centered focal subject, edge-to-edge narrative detail, no text, no letters, no words, no typography, no logos, no labels, no title treatment, no watermark, no inscriptions, no calligraphy, vivid, high-saturation painterly color palette, colorful, richly colored, rich contrast, no empty space, no plain backgrounds, Create a vivid, highly detailed illustration for the classic book \"{title}\" by {author}. Identify the story's most iconic scene, central character, or symbolic turning point, then depict that moment as a cinematic narrative scene. Style direction: Film Noir. Depict as a high-contrast film, no border, no frame",
+      "style_anchors": [
+        "noir-v2"
+      ],
+      "negative_prompt": "text, letters, words, typography, logos, labels, watermark, signature, ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 0.82,
+      "saved_by": "startup",
+      "created_at": "2026-03-03T06:27:23.329981+00:00",
+      "notes": "Seeded from Alexandria models/prompt report (v2).",
+      "tags": [
+        "builtin",
+        "builtin_v2",
+        "builtin_v2:noir-v2"
+      ],
+      "category": "builtin",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-03T06:27:23.391124+00:00"
+    },
     {
       "id": "c3cf5e15-46c3-4eb1-a7ed-c0b7856bc2d7",
       "name": "Sevastopol / Dramatic Conflict",

@@ -1,8 +1,29 @@
 # Visual Proof Report
 
-Last updated: `2026-03-02`
+Last updated: `2026-03-03`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `addf1b1c-2d44-495c-b1d2-19b16cb0a393`
+Deployment ID: `98526dd5-584f-4498-a7dd-80020c1208e2`
+
+## 0. PROMPT-07B Hotfix Snapshot (2026-03-03)
+- Deployed with compositor detection window widened (15%), safety inset `14px`, expanded radius scan bounds, and relaxed offset guard.
+- Iterate model list now renders as structured grid cards, with selected-model highlight.
+- Frontend image preview fallback now attempts `/api/thumbnail` for direct path payloads so cards recover from MIME/path edge cases.
+- Verified on live iterate page:
+  - header shows `999 books`;
+  - `Nano Banana Pro` is pre-selected on first load;
+  - running-job heartbeat text explicitly shows backend staleness and queue wait status.
+- Provider-side queue contention was observed during live run (jobs remained queued >30s). This is surfaced clearly in UI and no longer looks frozen.
+
+## 0.1 PROMPT-07B Parameter Tightening (2026-03-03)
+- `src/static/js/compositor.js` now matches strict 07B compositor values:
+  - `OPENING_SAFETY_INSET = 18`
+  - `searchX/searchY = max(30, scan*0.15)`
+  - `coarse radius = 0.65x .. 1.40x`
+  - fine window expanded to `±16`
+  - `maxOffset = max(80, hintRadius*0.55)`
+  - explicit logs: `[Compositor v9] Detected...` and clip radius.
+- `src/cover_compositor.py` is aligned to the same values and now logs:
+  - `Compositor detected: cx=... cy=... outer=... opening=...`
 
 ## 1. Test Proof
 - Full suite run: `pytest -q`.
@@ -55,6 +76,25 @@ Deployment ID: `addf1b1c-2d44-495c-b1d2-19b16cb0a393`
   - card present under “Latest Generated Covers”
 
 ## 3. Visual Proof Artifacts
+
+### 3.0 PROMPT-07B Inline-Proof Assets (chat-safe absolute paths)
+- `/Users/timzengerink/proofs/proof-iterate-page-live-20260303.png`
+- `/Users/timzengerink/proofs/proof-iterate-heartbeat-queue-20260303.png`
+- `/Users/timzengerink/proofs/proof-07b-book1-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07b-book1-medallion.png`
+- `/Users/timzengerink/proofs/proof-07b-book9-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07b-book9-medallion.png`
+- `/Users/timzengerink/proofs/proof-07b-book25-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07b-book25-medallion.png`
+
+### 3.0.1 PROMPT-07B2 Inline-Proof Assets (strict parameters)
+- `/Users/timzengerink/proofs/proof-07b2-book1-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07b2-book1-medallion.png`
+- `/Users/timzengerink/proofs/proof-07b2-book9-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07b2-book9-medallion.png`
+- `/Users/timzengerink/proofs/proof-07b2-book25-composite-full.png`
+- `/Users/timzengerink/proofs/proof-07b2-book25-medallion.png`
+- `/Users/timzengerink/proofs/proof-07b2-summary.json`
 
 ### 3.1 Live UI Screenshots
 - `tmp/proof-live-iterate-20260302-prompt06.png`

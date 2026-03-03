@@ -133,6 +133,7 @@ window.StyleDiversifier = {
       `Create a breathtaking, richly colored illustration for the classic book "${title}" by ${author}.`,
       'Identify the single most iconic, dramatic, and visually striking scene from this specific story — the moment readers remember most vividly.',
       'Depict that scene as a luminous circular medallion illustration for a luxury leather-bound edition.',
+      'Adapt all motifs, costumes, architecture, and symbols strictly to this specific book; avoid cross-book visual clichés.',
       'Fill the entire circular composition with rich detail and vivid color — no empty space, no plain backgrounds.',
       'The artwork must feel like a museum-quality painting that captures the emotional heart of the story.',
       styleModifier,
