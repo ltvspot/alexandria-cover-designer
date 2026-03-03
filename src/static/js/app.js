@@ -370,7 +370,7 @@ window.JobQueue = {
       job.compositor_geometry = null;
 
       try {
-        if (window.Compositor && img) {
+        if (window.Compositor && img && !backendCompositedBlob) {
           setStatus('compositing', 'browser smart composite');
           const coverEntry = await CoverCache.load(job.book_id);
           if (coverEntry?.img) {
