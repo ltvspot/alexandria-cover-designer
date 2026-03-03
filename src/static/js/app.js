@@ -360,7 +360,7 @@ window.JobQueue = {
       setStatus('compositing');
       const rawBlob = await fetchImageBlob(rawSource, abortController.signal);
       const backendCompositedBlob = best.compositedPath
-        ? await fetchImageBlob(best.compositedPath, abortController.signal)
+        ? await fetchImageBlob(best.compositedPath, abortController.signal, { retries: 4, delayMs: 400 })
         : null;
       job.generated_image_blob = rawBlob || rawSource;
       job.composited_image_blob = backendCompositedBlob || rawBlob || best.compositedPath || rawSource;
@@ -465,15 +465,22 @@ async function loadImage(src) {
   });
 }
 
-async function fetchImageBlob(src, signal) {
+async function fetchImageBlob(src, signal, options = {}) {
   if (!src || typeof src !== 'string') return null;
-  try {
-    const response = await fetch(src, { cache: 'no-store', signal });
-    if (!response.ok) return null;
-    return await response.blob();
-  } catch {
-    return null;
+  const retries = Math.max(0, Number(options.retries || 0));
+  const delayMs = Math.max(0, Number(options.delayMs || 0));
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(src, { cache: 'no-store', signal });
+      if (response.ok) return await response.blob();
+    } catch {
+      // Ignore transient network errors; retry loop handles backoff.
+    }
+    if (attempt < retries && delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
+  return null;
 }
 
 async function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
