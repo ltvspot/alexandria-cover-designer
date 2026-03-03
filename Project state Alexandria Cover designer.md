@@ -41,34 +41,25 @@ Serving layer:
 
 ### 3.2 Medallion Safety (Art Behind Ornaments)
 
-**STATUS: BROKEN — PROMPT-07D pending implementation.**
+**STATUS: BROKEN — PROMPT-07E pending implementation.**
 
-Three rounds of fixes have failed (07B parameter tuning x2, 07C known geometry). Root cause finally identified:
+Four rounds of fixes have failed:
+- 07B (x2): Parameter tuning on detection — wrong coordinates
+- 07C: Known geometry from cover_regions.json — clip radius too large for irregular frame
+- 07D: Pixel-perfect mask — mask was TOO RESTRICTIVE (15px erosion + 0.74 ratio = art at ~380px, way too small). Original cover artwork visible everywhere.
 
-**The gold frame is NOT a perfect circle.** Decorative scrollwork creates an irregular opening:
-- Minimum opening radius: ~380px (tightest scrollwork)
-- Maximum opening radius: ~460px (widest points)
-- Previous `OPENING_RATIO=0.965` produced clipRadius=464px — exceeding the actual opening at most angles
-
-**PROMPT-07D fix:** Pixel-perfect frame mask (`config/compositing_mask.png`) + conservative circular clip (`OPENING_RATIO=0.74`, clipRadius=366px).
-
-Current behavior (PROMPT-07C, still deployed):
-- frontend compositor loads `/api/cover-regions` on startup via `Compositor.loadRegions()`,
-- frontend `smartComposite` resolves `bookId -> {cx, cy, radius}` from registry/consensus and does not call detection,
-- backend `_resolve_medallion_geometry()` uses `region.center_x/center_y/radius` directly,
-- **BUT circular clip at 464px still bleeds past the irregular frame opening**
+**PROMPT-07E approach:** Simplest possible fix:
+1. Disable compositing_mask.png (rename to .disabled) — it restricts art to ~380px
+2. DETECTION_OPENING_RATIO = 0.92 → opening_radius = 460
+3. OPENING_SAFETY_INSET_PX = 2 → clip_radius = 458 (art fills generously)
+4. OVERLAY_PUNCH_INSET_PX = -2 → punch_radius = 462 (cover transparent BEYOND art edge)
+5. Result: art at 458px, punch at 462px, no gap, no original cover visible
+6. Outer 38px frame ring preserved (462-500px), inner scrollwork replaced by art
 
 Known consensus defaults:
 - `cx = 2864`
 - `cy = 1620`
 - `radius = 500`
-
-Pending PROMPT-07D changes:
-- `config/compositing_mask.png` already updated with pixel-perfect mask (RGBA, alpha=255 for opening, alpha=0 for frame)
-- `src/static/img/frame_mask.png` already in place (grayscale L mode, 0=opening, 255=frame)
-- Python backend already has `_load_global_compositing_mask()` infrastructure to use the mask
-- JS compositor needs mask loading + pixel-level clipping (v11)
-- Both compositors get conservative `OPENING_RATIO=0.74` as belt-and-suspenders
 
 ### 3.3 Prompt/Generation Hardening
 `src/image_generator.py` + `src/prompt_generator.py` enforce:
@@ -187,7 +178,7 @@ Completed in this workspace session:
 - Provider-side image models can still occasionally emit pseudo-typography; current guardrails and retry hardening reduce this risk but cannot mathematically guarantee zero artifact probability from upstream model outputs.
 
 ## 8. Next Recommended Work
-1. **CRITICAL:** Implement PROMPT-07D (pixel-perfect frame mask compositor fix). Paste `Codex Prompts/CODEX-MESSAGE-PROMPT-07D.md` into a new Codex conversation.
+1. **CRITICAL:** Implement PROMPT-07E (simple matching circles compositor fix). Paste `Codex Prompts/CODEX-MESSAGE-PROMPT-07E.md` into a new Codex conversation.
 2. Run a live canary (10-book sample) with active provider keys and capture fresh composited proofs.
 3. Add a dedicated visual regression check for ornament-overdraw using the composited output set.
 4. Keep the revision token centralized in one constant to avoid accidental per-page drift.
