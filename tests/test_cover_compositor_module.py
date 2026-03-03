@@ -351,6 +351,13 @@ def test_composite_single_respects_strict_window_mask(tmp_path: Path, monkeypatc
     draw = ImageDraw.Draw(strict)
     draw.ellipse((290, 190, 410, 310), fill=255)
     monkeypatch.setattr(cc, "_load_global_compositing_mask", lambda _size: strict)
+    # Force legacy fallback path so strict window behavior is exercised.
+    monkeypatch.setattr(cc, "_find_template_for_cover", lambda _cover_path: None)
+    monkeypatch.setattr(
+        cc,
+        "_create_template_for_cover",
+        lambda **_kwargs: None,
+    )
 
     cc.composite_single(
         cover_path=cover,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +43,8 @@ FALLBACK_COVER_HEIGHT = 2777
 FALLBACK_CENTER_X = 2864
 FALLBACK_CENTER_Y = 1620
 FALLBACK_RADIUS = 500
+TEMPLATE_PUNCH_RADIUS = 465
+TEMPLATE_SUPERSAMPLE_FACTOR = 4
 
 _GEOMETRY_CACHE: dict[str, dict[str, int]] = {}
 
@@ -432,6 +435,65 @@ def _smart_square_crop(image: Image.Image) -> Image.Image:
     return src.crop((left, top, left + side, top + side))
 
 
+def _simple_center_crop(image: Image.Image) -> Image.Image:
+    """Center crop to square. No foreground detection."""
+    src = image.convert("RGBA")
+    w, h = src.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top = (h - side) // 2
+    return src.crop((left, top, left + side, top + side))
+
+
+def _find_template_for_cover(cover_path: Path) -> Path | None:
+    """Find the PNG template matching a cover source file."""
+    stem = cover_path.stem
+    template_dir = config.CONFIG_DIR / "templates"
+    candidate = template_dir / f"{stem}_template.png"
+    if candidate.exists():
+        return candidate
+    nums = re.findall(r"\d+", stem)
+    if nums:
+        target = nums[-1]
+        for file_path in sorted(template_dir.glob("*_template.png")):
+            found = re.findall(r"\d+", file_path.stem)
+            if found and found[-1] == target:
+                return file_path
+    return None
+
+
+def _create_template_for_cover(
+    *,
+    cover: Image.Image,
+    cover_path: Path,
+    center_x: int,
+    center_y: int,
+    punch_radius: int = TEMPLATE_PUNCH_RADIUS,
+) -> Path | None:
+    """Create a PNG template for a cover on demand."""
+    template_dir = config.CONFIG_DIR / "templates"
+    template_dir.mkdir(parents=True, exist_ok=True)
+    output_path = template_dir / f"{cover_path.stem}_template.png"
+    try:
+        cover_rgba = cover.convert("RGBA")
+        width, height = cover_rgba.size
+        scale = max(1, int(TEMPLATE_SUPERSAMPLE_FACTOR))
+        mask_large = Image.new("L", (width * scale, height * scale), 255)
+        draw = ImageDraw.Draw(mask_large)
+        cx = int(center_x) * scale
+        cy = int(center_y) * scale
+        r = int(punch_radius) * scale
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=0)
+        mask = mask_large.resize((width, height), Image.LANCZOS)
+        cover_rgba.putalpha(mask)
+        cover_rgba.save(output_path, format="PNG")
+        logger.info("Generated PNG template: %s", output_path.name)
+        return output_path
+    except Exception as exc:
+        logger.warning("Failed to generate PNG template for %s: %s", cover_path.name, exc)
+        return None
+
+
 def _prepare_circle_illustration(*, illustration: Image.Image, target_diameter: int, fill_rgb: tuple[int, int, int]) -> Image.Image:
     cropped = _smart_square_crop(illustration)
     if cropped.mode != "RGBA":
@@ -511,6 +573,70 @@ def _build_cover_overlay_with_punch(
     draw.ellipse((center_x - r, center_y - r, center_x + r, center_y + r), fill=0)
     overlay.putalpha(alpha)
     return overlay
+
+
+def _legacy_medallion_composite(
+    *,
+    cover: Image.Image,
+    illustration: Image.Image,
+    region_obj: "Region",
+    cover_w: int,
+    cover_h: int,
+    geometry: dict[str, int],
+    strict_window_mask: Image.Image | None,
+) -> tuple[Image.Image, "Region"]:
+    """Legacy medallion compositing pipeline kept as runtime fallback."""
+    opening_radius = max(20, int(geometry["opening_radius"]))
+    clip_radius = max(14, opening_radius - OPENING_SAFETY_INSET_PX)
+    fill_rgb = _sample_cover_background(
+        cover=cover,
+        center_x=int(geometry["center_x"]),
+        center_y=int(geometry["center_y"]),
+        outer_radius=int(geometry["outer_radius"]),
+    )
+
+    canvas = Image.new("RGBA", (cover_w, cover_h), (*fill_rgb, 255))
+    prepared = _prepare_circle_illustration(
+        illustration=illustration,
+        target_diameter=clip_radius * 2,
+        fill_rgb=fill_rgb,
+    )
+    art_layer = Image.new("RGBA", (cover_w, cover_h), (0, 0, 0, 0))
+    _paste_centered(
+        canvas=art_layer,
+        overlay=prepared,
+        center_x=int(geometry["center_x"]),
+        center_y=int(geometry["center_y"]),
+    )
+    clip_mask = _build_circle_feather_mask(
+        width=cover_w,
+        height=cover_h,
+        center_x=int(geometry["center_x"]),
+        center_y=int(geometry["center_y"]),
+        radius=clip_radius,
+        feather_px=INNER_FEATHER_PX,
+    )
+    if strict_window_mask is not None:
+        clip_mask = _combine_masks(clip_mask, strict_window_mask)
+    art_layer.putalpha(clip_mask)
+    composited = Image.alpha_composite(canvas, art_layer)
+
+    overlay = _build_cover_overlay_with_punch(
+        cover=cover,
+        center_x=int(geometry["center_x"]),
+        center_y=int(geometry["center_y"]),
+        punch_radius=max(12, opening_radius - OVERLAY_PUNCH_INSET_PX),
+        punch_mask=strict_window_mask,
+    )
+    composited_rgb = Image.alpha_composite(composited, overlay).convert("RGB")
+    validation_region = Region(
+        center_x=int(geometry["center_x"]),
+        center_y=int(geometry["center_y"]),
+        radius=opening_radius,
+        frame_bbox=region_obj.frame_bbox,
+        region_type="circle",
+    )
+    return composited_rgb, validation_region
 
 
 @dataclass(slots=True)
@@ -613,57 +739,68 @@ def composite_single(
         full_overlay.putalpha(mask)
         composited_rgb = Image.alpha_composite(cover.convert("RGBA"), full_overlay).convert("RGB")
     else:
+        # New medallion compositing pipeline: canvas + art + PNG template.
         geometry = _resolve_medallion_geometry(cover=cover, cover_path=cover_path, region=region_obj)
-        opening_radius = max(20, int(geometry["opening_radius"]))
-        clip_radius = max(14, opening_radius - OPENING_SAFETY_INSET_PX)
-        fill_rgb = _sample_cover_background(
-            cover=cover,
-            center_x=int(geometry["center_x"]),
-            center_y=int(geometry["center_y"]),
-            outer_radius=int(geometry["outer_radius"]),
-        )
+        template_path = _find_template_for_cover(cover_path)
+        if template_path is None:
+            template_path = _create_template_for_cover(
+                cover=cover,
+                cover_path=cover_path,
+                center_x=int(geometry["center_x"]),
+                center_y=int(geometry["center_y"]),
+                punch_radius=TEMPLATE_PUNCH_RADIUS,
+            )
+        if template_path is None:
+            logger.warning(
+                "No PNG template found for %s. Falling back to legacy compositor pipeline.",
+                cover_path.name,
+            )
+            composited_rgb, validation_region = _legacy_medallion_composite(
+                cover=cover,
+                illustration=illustration,
+                region_obj=region_obj,
+                cover_w=cover_w,
+                cover_h=cover_h,
+                geometry=geometry,
+                strict_window_mask=strict_window_mask,
+            )
+        else:
+            logger.info("Using PNG template: %s", template_path.name)
+            with Image.open(template_path) as template_raw:
+                template = template_raw.convert("RGBA")
+            if template.size != (cover_w, cover_h):
+                template = template.resize((cover_w, cover_h), Image.LANCZOS)
 
-        canvas = Image.new("RGBA", (cover_w, cover_h), (*fill_rgb, 255))
-        prepared = _prepare_circle_illustration(
-            illustration=illustration,
-            target_diameter=clip_radius * 2,
-            fill_rgb=fill_rgb,
-        )
-        art_layer = Image.new("RGBA", (cover_w, cover_h), (0, 0, 0, 0))
-        _paste_centered(
-            canvas=art_layer,
-            overlay=prepared,
-            center_x=int(geometry["center_x"]),
-            center_y=int(geometry["center_y"]),
-        )
-        clip_mask = _build_circle_feather_mask(
-            width=cover_w,
-            height=cover_h,
-            center_x=int(geometry["center_x"]),
-            center_y=int(geometry["center_y"]),
-            radius=clip_radius,
-            feather_px=INNER_FEATHER_PX,
-        )
-        if strict_window_mask is not None:
-            clip_mask = _combine_masks(clip_mask, strict_window_mask)
-        art_layer.putalpha(clip_mask)
-        composited = Image.alpha_composite(canvas, art_layer)
+            center_x = int(geometry["center_x"])
+            center_y = int(geometry["center_y"])
+            outer_radius = int(geometry["outer_radius"])
+            fill_rgb = _sample_cover_background(
+                cover=cover,
+                center_x=center_x,
+                center_y=center_y,
+                outer_radius=outer_radius,
+            )
+            canvas = Image.new("RGBA", (cover_w, cover_h), (*fill_rgb, 255))
 
-        overlay = _build_cover_overlay_with_punch(
-            cover=cover,
-            center_x=int(geometry["center_x"]),
-            center_y=int(geometry["center_y"]),
-            punch_radius=max(12, opening_radius - OVERLAY_PUNCH_INSET_PX),
-            punch_mask=strict_window_mask,
-        )
-        composited_rgb = Image.alpha_composite(composited, overlay).convert("RGB")
-        validation_region = Region(
-            center_x=int(geometry["center_x"]),
-            center_y=int(geometry["center_y"]),
-            radius=opening_radius,
-            frame_bbox=region_obj.frame_bbox,
-            region_type="circle",
-        )
+            art_diameter = (TEMPLATE_PUNCH_RADIUS * 2) + 20
+            art = _simple_center_crop(illustration)
+            art = art.resize((art_diameter, art_diameter), Image.LANCZOS)
+
+            art_layer = Image.new("RGBA", (cover_w, cover_h), (0, 0, 0, 0))
+            paste_x = center_x - (art_diameter // 2)
+            paste_y = center_y - (art_diameter // 2)
+            art_layer.alpha_composite(art, (paste_x, paste_y))
+
+            result = Image.alpha_composite(canvas, art_layer)
+            result = Image.alpha_composite(result, template)
+            composited_rgb = result.convert("RGB")
+            validation_region = Region(
+                center_x=center_x,
+                center_y=center_y,
+                radius=max(20, int(geometry["opening_radius"])),
+                frame_bbox=region_obj.frame_bbox,
+                region_type="circle",
+            )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     composited_rgb.save(output_path, format="JPEG", quality=100, subsampling=0, dpi=(300, 300))
