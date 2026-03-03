@@ -2,6 +2,9 @@ window.Pages = window.Pages || {};
 
 let _selectedBookId = null;
 let _unsubscribe = null;
+let _selectedModelIds = new Set();
+let _defaultModelId = null;
+let _lastVisibleModelIds = [];
 const PREFERRED_DEFAULT_MODELS = [
   'openrouter/google/gemini-2.5-flash-image',
   'google/gemini-2.5-flash-image',
@@ -148,15 +151,119 @@ function resolvePrompt(templateObj, book, customPrompt) {
   return `${applyPromptPlaceholders(base, book)} No text, no letters, no logos, no border, no frame, colorful and richly detailed, no empty space.`.trim();
 }
 
-function renderModelCheckboxes() {
-  const preferred = PREFERRED_DEFAULT_MODELS.find((id) => OpenRouter.MODELS.some((model) => String(model.id) === id));
-  return OpenRouter.MODELS.map((model, idx) => `
-    <label class="checkbox-item">
-      <input type="checkbox" class="iter-model-check" value="${model.id}" ${(preferred ? String(model.id) === preferred : idx === 0) ? 'checked' : ''} />
-      <span>${model.label}</span>
-      <span class="tag tag-gold">$${Number(model.cost || 0).toFixed(3)}</span>
-    </label>
-  `).join('');
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function normalizedModelId(model) {
+  return String(model?.id || '').trim();
+}
+
+function providerFromModel(modelId) {
+  const token = String(modelId || '').trim().toLowerCase();
+  if (!token) return 'unknown';
+  if (token.startsWith('openrouter/')) return 'openrouter';
+  if (token.startsWith('google/')) return 'google';
+  if (token.startsWith('openai/')) return 'openai';
+  if (token.startsWith('fal/')) return 'fal';
+  return token.split('/')[0] || 'unknown';
+}
+
+function isGeminiModel(model) {
+  return normalizedModelId(model).toLowerCase().includes('gemini');
+}
+
+function isNanoModel(model) {
+  const token = normalizedModelId(model).toLowerCase();
+  return token.includes('nano-banana') || token.includes('gemini-2.5-flash-image');
+}
+
+function modelCapabilities(model) {
+  const modality = String(model?.modality || '').toLowerCase();
+  const token = normalizedModelId(model).toLowerCase();
+  if (modality.includes('both') || token.includes('gpt-5-image') || token.includes('gpt-image-1') || token.includes('image-preview')) {
+    return 'image + text';
+  }
+  return 'image';
+}
+
+function modelDescription(model) {
+  const token = normalizedModelId(model).toLowerCase();
+  if (isNanoModel(model)) return 'Best Nano Banana quality tier (recommended default).';
+  if (token.includes('gpt-5-image-mini')) return 'Lower-cost GPT-5 image generation.';
+  if (token.includes('gpt-5-image') || token.includes('gpt-image-1')) return 'Premium multimodal image + text output.';
+  if (token.includes('riverflow') && token.includes('fast-preview')) return 'Fast draft variant for quick iteration.';
+  if (token.includes('riverflow') && token.includes('max')) return 'High-fidelity preview-tier Riverflow output.';
+  if (token.includes('flux') && token.includes('klein')) return 'Lightweight FLUX variant for cheaper drafts.';
+  if (token.includes('flux')) return 'Efficient high-quality FLUX generation model.';
+  if (token.includes('seedream')) return 'Expressive painterly and illustrative styling.';
+  return 'Balanced quality and cost for iterative cover generation.';
+}
+
+function getRecommendedModelIds(models) {
+  const top = models.slice(0, Math.min(15, models.length)).map((model) => normalizedModelId(model));
+  const preferred = PREFERRED_DEFAULT_MODELS.find((id) => models.some((model) => normalizedModelId(model) === id));
+  if (!preferred) return Array.from(new Set(top));
+  return [preferred].concat(top.filter((id) => id !== preferred));
+}
+
+function filterModelList(models, filterName) {
+  if (filterName === 'all') return models;
+  if (filterName === 'openrouter') return models.filter((model) => providerFromModel(model.id) === 'openrouter');
+  if (filterName === 'gemini') return models.filter((model) => isGeminiModel(model));
+  if (filterName === 'nano') return models.filter((model) => isNanoModel(model));
+  const byId = new Map(models.map((model) => [normalizedModelId(model), model]));
+  return getRecommendedModelIds(models)
+    .map((modelId) => byId.get(modelId))
+    .filter(Boolean);
+}
+
+function renderModelCards({ models, selectedIds, activeFilter, searchText }) {
+  const search = String(searchText || '').trim().toLowerCase();
+  const filteredByChip = filterModelList(models, activeFilter);
+  const visible = filteredByChip.filter((model) => {
+    if (!search) return true;
+    const id = normalizedModelId(model).toLowerCase();
+    const label = String(model.label || '').toLowerCase();
+    const provider = providerFromModel(model.id);
+    return id.includes(search) || label.includes(search) || provider.includes(search);
+  });
+  const orderedVisible = visible.slice().sort((left, right) => {
+    const leftSelected = selectedIds.has(normalizedModelId(left));
+    const rightSelected = selectedIds.has(normalizedModelId(right));
+    if (leftSelected === rightSelected) return 0;
+    return leftSelected ? -1 : 1;
+  });
+  const visibleIds = orderedVisible.map((model) => normalizedModelId(model));
+  const html = orderedVisible.map((model) => {
+    const modelId = normalizedModelId(model);
+    const checked = selectedIds.has(modelId);
+    const provider = providerFromModel(modelId);
+    const capability = modelCapabilities(model);
+    return `
+      <label class="model-card ${checked ? 'selected' : ''}">
+        <div class="model-card-head">
+          <div class="model-card-titlewrap">
+            <input type="checkbox" class="iter-model-check" value="${escapeHtml(modelId)}" ${checked ? 'checked' : ''} />
+            <span class="model-card-title">${escapeHtml(model.label || modelId)}</span>
+          </div>
+          <span class="tag tag-gold">$${Number(model.cost || 0).toFixed(3)}</span>
+        </div>
+        <div class="model-card-id">${escapeHtml(modelId)}</div>
+        <div class="model-card-desc">${escapeHtml(modelDescription(model))}</div>
+        <div class="model-card-tags">
+          <span class="tag tag-provider">${escapeHtml(provider)}</span>
+          <span class="tag tag-style">${escapeHtml(capability)}</span>
+        </div>
+      </label>
+    `;
+  }).join('');
+  return { html, visibleIds, visibleCount: orderedVisible.length, filteredCount: filteredByChip.length };
 }
 
 window.Pages.iterate = {
@@ -194,19 +301,30 @@ window.Pages.iterate = {
         <div class="form-group">
           <div class="flex justify-between items-center">
             <label class="form-label">Book</label>
-            <button class="btn btn-secondary btn-sm" id="iterSyncBooksBtn">🔄 Sync books</button>
+            <button class="btn btn-secondary btn-sm" id="iterSyncBooksBtn">Sync</button>
           </div>
           <select class="form-select" id="iterBookSelect">
             <option value="">— Select a book —</option>
             ${options}
           </select>
-          <p class="text-xs text-muted mt-8" id="iterBookSyncStatus">${books.length ? `${books.length} book(s) loaded` : 'No books loaded yet'}</p>
+          <p class="text-xs text-muted mt-8" id="iterBookSyncStatus">${books.length ? `${books.length} books loaded (catalog).` : 'No books loaded yet'}</p>
         </div>
 
         <div id="iterAdvanced">
           <div class="form-group">
             <label class="form-label">Models (best → budget, top → bottom)</label>
-            <div class="model-grid">${renderModelCheckboxes()}</div>
+            <input class="form-input model-search-input" id="iterModelSearch" placeholder="Search model name / provider / id..." />
+            <div class="model-toolbar mt-8">
+              <button class="filter-chip active" data-model-filter="recommended">Recommended</button>
+              <button class="filter-chip" data-model-filter="all">All</button>
+              <button class="filter-chip" data-model-filter="openrouter">OpenRouter</button>
+              <button class="filter-chip" data-model-filter="gemini">Gemini</button>
+              <button class="filter-chip" data-model-filter="nano">Nano Pro only</button>
+              <button class="filter-chip" data-model-action="select-visible">Select visible</button>
+              <button class="filter-chip" data-model-action="clear">Clear</button>
+            </div>
+            <p class="text-xs text-muted mt-8" id="iterModelSummary"></p>
+            <div class="model-card-grid" id="iterModelGrid"></div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -255,6 +373,18 @@ window.Pages.iterate = {
     const variantsEl = document.getElementById('iterVariants');
     const promptSelEl = document.getElementById('iterPromptSel');
     const customPromptEl = document.getElementById('iterPrompt');
+    const modelSearchEl = document.getElementById('iterModelSearch');
+    const modelGridEl = document.getElementById('iterModelGrid');
+    const modelSummaryEl = document.getElementById('iterModelSummary');
+    const modelFilterButtons = Array.from(content.querySelectorAll('[data-model-filter]'));
+    const modelActionButtons = Array.from(content.querySelectorAll('[data-model-action]'));
+
+    const preferred = PREFERRED_DEFAULT_MODELS.find((id) => OpenRouter.MODELS.some((model) => normalizedModelId(model) === id));
+    _defaultModelId = preferred || normalizedModelId(OpenRouter.MODELS[0] || null) || null;
+    _selectedModelIds = new Set(_defaultModelId ? [_defaultModelId] : []);
+    _lastVisibleModelIds = [];
+    let activeModelFilter = 'recommended';
+    let modelSearchText = '';
 
     modeToggle?.addEventListener('change', () => {
       advanced.classList.toggle('hidden', !modeToggle.checked);
@@ -282,7 +412,7 @@ window.Pages.iterate = {
             selectEl.value = String(current);
           }
         }
-        if (syncStatus) syncStatus.textContent = `${sorted.length} book(s) loaded`;
+        if (syncStatus) syncStatus.textContent = `${sorted.length} books loaded (catalog).`;
         updateHeader();
         Toast.success(`Catalog synced: ${sorted.length} books`);
       } catch (err) {
@@ -290,19 +420,78 @@ window.Pages.iterate = {
         Toast.error(`Sync failed: ${err.message || err}`);
       } finally {
         syncBtn.disabled = false;
-        syncBtn.textContent = previous || '🔄 Sync books';
+        syncBtn.textContent = previous || 'Sync';
       }
     });
 
     const updateCost = () => {
-      const selected = Array.from(document.querySelectorAll('.iter-model-check:checked')).map((el) => el.value);
       const variants = Number(variantsEl?.value || 1);
+      const selected = Array.from(_selectedModelIds);
       const total = selected.reduce((sum, modelId) => sum + Number(OpenRouter.MODEL_COSTS[modelId] || 0) * variants, 0);
       const est = document.getElementById('iterCostEst');
-      if (est) est.textContent = `Est. cost: $${total.toFixed(3)}`;
+      if (est) {
+        const worst = total * 3;
+        est.textContent = `Est. cost: $${total.toFixed(3)} · worst-case $${worst.toFixed(3)}`;
+      }
     };
 
-    document.querySelectorAll('.iter-model-check').forEach((el) => el.addEventListener('change', updateCost));
+    const renderModels = () => {
+      if (!modelGridEl || !modelSummaryEl) return;
+      const rendered = renderModelCards({
+        models: OpenRouter.MODELS,
+        selectedIds: _selectedModelIds,
+        activeFilter: activeModelFilter,
+        searchText: modelSearchText,
+      });
+      _lastVisibleModelIds = rendered.visibleIds;
+      modelGridEl.innerHTML = rendered.html || '<div class="text-muted text-sm">No models match this filter.</div>';
+      const selectedLabels = Array.from(_selectedModelIds)
+        .map((id) => modelIdToLabel(id))
+        .slice(0, 4)
+        .join(', ');
+      const remaining = Math.max(0, _selectedModelIds.size - 4);
+      const selectedSuffix = remaining > 0 ? ` +${remaining} more` : '';
+      const defaultLabel = _defaultModelId ? modelIdToLabel(_defaultModelId) : 'first model';
+      modelSummaryEl.textContent = `${_selectedModelIds.size} model selected · showing ${rendered.visibleCount}/${OpenRouter.MODELS.length}. Default: ${defaultLabel} only. Selected: ${selectedLabels || 'none'}${selectedSuffix}.`;
+      updateCost();
+    };
+
+    modelSearchEl?.addEventListener('input', () => {
+      modelSearchText = String(modelSearchEl.value || '');
+      renderModels();
+    });
+
+    modelFilterButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeModelFilter = String(btn.dataset.modelFilter || 'recommended');
+        modelFilterButtons.forEach((node) => node.classList.toggle('active', node === btn));
+        renderModels();
+      });
+    });
+
+    modelActionButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const action = String(btn.dataset.modelAction || '');
+        if (action === 'select-visible') {
+          _lastVisibleModelIds.forEach((id) => _selectedModelIds.add(id));
+        } else if (action === 'clear') {
+          _selectedModelIds.clear();
+        }
+        renderModels();
+      });
+    });
+
+    modelGridEl?.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (!target.classList.contains('iter-model-check')) return;
+      const modelId = String(target.value || '').trim();
+      if (!modelId) return;
+      if (target.checked) _selectedModelIds.add(modelId);
+      else _selectedModelIds.delete(modelId);
+      renderModels();
+    });
+
     variantsEl?.addEventListener('change', updateCost);
     promptSelEl?.addEventListener('change', () => {
       if (!customPromptEl) return;
@@ -316,7 +505,7 @@ window.Pages.iterate = {
         customPromptEl.value = String(selected.prompt_template);
       }
     });
-    updateCost();
+    renderModels();
 
     document.getElementById('iterCancelBtn')?.addEventListener('click', () => JobQueue.cancelAll());
     document.getElementById('iterGenBtn')?.addEventListener('click', () => this.handleGenerate());
@@ -341,7 +530,7 @@ window.Pages.iterate = {
       Toast.warning('Select a book first.');
       return;
     }
-    const selectedModels = Array.from(document.querySelectorAll('.iter-model-check:checked')).map((el) => el.value);
+    const selectedModels = Array.from(_selectedModelIds);
     if (!selectedModels.length) {
       Toast.warning('Select at least one model.');
       return;

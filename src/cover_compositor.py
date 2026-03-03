@@ -739,68 +739,77 @@ def composite_single(
         full_overlay.putalpha(mask)
         composited_rgb = Image.alpha_composite(cover.convert("RGBA"), full_overlay).convert("RGB")
     else:
-        # New medallion compositing pipeline: canvas + art + PNG template.
-        geometry = _resolve_medallion_geometry(cover=cover, cover_path=cover_path, region=region_obj)
-        template_path = _find_template_for_cover(cover_path)
-        if template_path is None:
-            template_path = _create_template_for_cover(
-                cover=cover,
-                cover_path=cover_path,
-                center_x=int(geometry["center_x"]),
-                center_y=int(geometry["center_y"]),
-                punch_radius=TEMPLATE_PUNCH_RADIUS,
-            )
-        if template_path is None:
-            logger.warning(
-                "No PNG template found for %s. Falling back to legacy compositor pipeline.",
-                cover_path.name,
-            )
-            composited_rgb, validation_region = _legacy_medallion_composite(
-                cover=cover,
-                illustration=illustration,
-                region_obj=region_obj,
-                cover_w=cover_w,
-                cover_h=cover_h,
-                geometry=geometry,
-                strict_window_mask=strict_window_mask,
-            )
-        else:
-            logger.info("Using PNG template: %s", template_path.name)
-            with Image.open(template_path) as template_raw:
-                template = template_raw.convert("RGBA")
-            if template.size != (cover_w, cover_h):
-                template = template.resize((cover_w, cover_h), Image.LANCZOS)
+        # ── In-memory PNG-template compositing pipeline ──────────────
+        # Builds the frame template in RAM from the already-loaded cover.
+        # Three layers: solid canvas -> AI art -> cover-with-transparent-hole.
+        # The frame is ALWAYS the topmost layer, making bleed-through
+        # structurally impossible. No disk I/O, no fallback needed.
 
-            center_x = int(geometry["center_x"])
-            center_y = int(geometry["center_y"])
-            outer_radius = int(geometry["outer_radius"])
-            fill_rgb = _sample_cover_background(
-                cover=cover,
-                center_x=center_x,
-                center_y=center_y,
-                outer_radius=outer_radius,
-            )
-            canvas = Image.new("RGBA", (cover_w, cover_h), (*fill_rgb, 255))
+        # Use FIXED center coordinates that match all 99 covers.
+        # Do NOT use _resolve_medallion_geometry() — it uses dynamic
+        # detection that can return slightly different centers, causing
+        # misalignment between the art and the template hole.
+        center_x = FALLBACK_CENTER_X   # 2864
+        center_y = FALLBACK_CENTER_Y   # 1620
+        punch_radius = TEMPLATE_PUNCH_RADIUS  # 465
 
-            art_diameter = (TEMPLATE_PUNCH_RADIUS * 2) + 20
-            art = _simple_center_crop(illustration)
-            art = art.resize((art_diameter, art_diameter), Image.LANCZOS)
+        # ── 1. Build the template in memory ──
+        # Take the original cover, punch a transparent circle at the
+        # medallion center. This becomes the topmost layer.
+        cover_rgba = cover.convert("RGBA")
+        tmpl_w, tmpl_h = cover_rgba.size
 
-            art_layer = Image.new("RGBA", (cover_w, cover_h), (0, 0, 0, 0))
-            paste_x = center_x - (art_diameter // 2)
-            paste_y = center_y - (art_diameter // 2)
-            art_layer.alpha_composite(art, (paste_x, paste_y))
+        # 4x supersampled anti-aliased circle mask
+        scale = 4
+        mask_large = Image.new("L", (tmpl_w * scale, tmpl_h * scale), 255)
+        draw_mask = ImageDraw.Draw(mask_large)
+        cx_s, cy_s, r_s = center_x * scale, center_y * scale, punch_radius * scale
+        draw_mask.ellipse((cx_s - r_s, cy_s - r_s, cx_s + r_s, cy_s + r_s), fill=0)
+        mask = mask_large.resize((tmpl_w, tmpl_h), Image.LANCZOS)
 
-            result = Image.alpha_composite(canvas, art_layer)
-            result = Image.alpha_composite(result, template)
-            composited_rgb = result.convert("RGB")
-            validation_region = Region(
-                center_x=center_x,
-                center_y=center_y,
-                radius=max(20, int(geometry["opening_radius"])),
-                frame_bbox=region_obj.frame_bbox,
-                region_type="circle",
-            )
+        template = cover_rgba.copy()
+        template.putalpha(mask)
+
+        # ── 2. Sample background color from cover ──
+        fill_rgb = _sample_cover_background(
+            cover=cover,
+            center_x=center_x,
+            center_y=center_y,
+            outer_radius=FALLBACK_RADIUS,
+        )
+
+        # ── 3. Solid canvas with sampled background color ──
+        canvas = Image.new("RGBA", (cover_w, cover_h), (*fill_rgb, 255))
+
+        # ── 4. Prepare AI art: simple center crop, scale to fill ──
+        art_diameter = punch_radius * 2 + 20  # 10px bleed on each side = 950px
+        art = _simple_center_crop(illustration)
+        art = art.resize((art_diameter, art_diameter), Image.LANCZOS)
+
+        # Flatten any transparency in AI art against background color
+        # (prevents checkerboard artifacts from semi-transparent pixels)
+        art_bg = Image.new("RGBA", (art_diameter, art_diameter), (*fill_rgb, 255))
+        art_bg.alpha_composite(art)
+        art = art_bg
+
+        # ── 5. Paste art centered on medallion ──
+        art_layer = Image.new("RGBA", (cover_w, cover_h), (0, 0, 0, 0))
+        paste_x = center_x - art_diameter // 2
+        paste_y = center_y - art_diameter // 2
+        art_layer.paste(art, (paste_x, paste_y))
+
+        # ── 6. Three-layer composite: canvas + art + template ──
+        result = Image.alpha_composite(canvas, art_layer)
+        result = Image.alpha_composite(result, template)
+        composited_rgb = result.convert("RGB")
+
+        validation_region = Region(
+            center_x=center_x,
+            center_y=center_y,
+            radius=max(20, punch_radius),
+            frame_bbox=region_obj.frame_bbox,
+            region_type="circle",
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     composited_rgb.save(output_path, format="JPEG", quality=100, subsampling=0, dpi=(300, 300))

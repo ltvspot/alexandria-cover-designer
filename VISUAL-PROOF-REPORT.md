@@ -2,7 +2,7 @@
 
 Last updated: `2026-03-03`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `5498fa8f-01d9-4f4a-b4dc-d0c269357693`
+Deployment ID: `90071cb7-9f2d-4941-935f-efc9089164d1`
 
 ## 0. PROMPT-07B Hotfix Snapshot (2026-03-03)
 - Deployed with compositor detection window widened (15%), safety inset `14px`, expanded radius scan bounds, and relaxed offset guard.
@@ -77,6 +77,25 @@ Deployment ID: `5498fa8f-01d9-4f4a-b4dc-d0c269357693`
   - `Using PNG template: ...`
   - no `No PNG template found` warnings in successful path
 
+## 0.5 Iterate UX/UI Model Picker Refresh (2026-03-03)
+- Implemented screenshot-matched Iterate model selection UX:
+  - model search input;
+  - filter chips (`Recommended`, `All`, `OpenRouter`, `Gemini`, `Nano Pro only`);
+  - action chips (`Select visible`, `Clear`);
+  - model cards with title, provider/id line, description, modality/provider tags, and cost pill;
+  - selected card highlighting.
+- Selection behavior:
+  - `Nano Banana Pro` pre-selected by default;
+  - selected model card pinned to the start of the visible grid for fast scanning.
+- Cost line now shows both estimate and worst-case:
+  - `Est. cost: $X · worst-case $Y`.
+- Cache-busting token bumped in SPA shell to force fresh JS/CSS on deploy:
+  - `20260303-designlock-uiux08`.
+- Live verification:
+  - deployed page loads new tokened assets;
+  - model cards render with `Nano Banana Pro` selected and shown first;
+  - top header shows `999 books`, and catalog sync status text remains visible in Iterate form.
+
 ## 1. Test Proof
 - Full suite run: `pytest -q`.
 - Result: `100% passed`.
@@ -98,7 +117,7 @@ Deployment ID: `5498fa8f-01d9-4f4a-b4dc-d0c269357693`
 ### 2.2 New Design Token + Cache Control
 - `GET /iterate` includes:
   - `/src/static/shared.css?v=20260302-designlock`
-  - `/static/css/style.css?v=20260302-designlock-uiux06`
+  - `/static/css/style.css?v=20260303-designlock-uiux08`
 - `GET /review` headers include:
   - `cache-control: no-store`
 - `Content-Security-Policy` now allows:
@@ -185,11 +204,13 @@ Deployment ID: `5498fa8f-01d9-4f4a-b4dc-d0c269357693`
 - `tmp/proof-live-dashboard-20260302-prompt06.png`
 - `tmp/proof-live-review-20260302-prompt06.png`
 - `tmp/proof-live-prompts-20260302-prompt06.png`
+- `tmp/proof-live-iterate-ui-redesign-20260303.png`
 
 ### 3.2 Local Validation Screenshots
 - `tmp/proof-local-iterate-20260302-fix.png`
 - `tmp/proof-local-dashboard-20260302-fix.png`
 - `tmp/proof-local-review-20260302-fix.png`
+- `tmp/proof-local-iterate-ui-redesign-final-20260303.png`
 
 ### 3.3 PROMPT-06 UI/UX Rebuild Proof (Latest)
 - `tmp/proof-local-iterate-20260302-uiux-cspfixed.png`
@@ -203,6 +224,7 @@ Deployment ID: `5498fa8f-01d9-4f4a-b4dc-d0c269357693`
 ## 4. Design-Lock Enforcement
 - Global sidebar-first UX lock remains in `src/static/shared.css` (`DESIGN LOCK` block).
 - Static revision token remains `20260302-designlock` across all pages.
+- SPA asset revision token for JS/CSS cache busting is now `20260303-designlock-uiux08`.
 - Static hygiene tests enforce token + design lock markers.
 - CSP now explicitly allows required frontend assets:
   - `style-src` includes `https://fonts.googleapis.com`

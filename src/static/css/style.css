@@ -416,6 +416,99 @@ a {
   background: rgba(196, 164, 105, 0.1);
 }
 
+.model-search-input {
+  margin-bottom: 10px;
+}
+
+.model-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.model-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.model-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 12px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.model-card:hover {
+  border-color: #a7b2c2;
+  background: #fafcff;
+}
+
+.model-card.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(197, 165, 90, 0.22);
+  background: rgba(197, 165, 90, 0.06);
+}
+
+.model-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.model-card-titlewrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.model-card-titlewrap input {
+  margin-top: 2px;
+}
+
+.model-card-title {
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #1e2b4d;
+  letter-spacing: -0.01em;
+}
+
+.model-card-id {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #63779a;
+  word-break: break-word;
+}
+
+.model-card-desc {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #556a8d;
+  min-height: 38px;
+}
+
+.model-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag-provider {
+  background: #e7ecf3;
+  color: #5a6f93;
+}
+
 .checkbox-item {
   display: flex;
   align-items: center;
@@ -831,7 +924,7 @@ tr:hover td {
   color: var(--muted);
   border-radius: 999px;
   font-size: 12px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   cursor: pointer;
 }
 
@@ -1094,5 +1187,9 @@ tr:hover td {
   .pipeline-row {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .model-card-grid {
+    grid-template-columns: 1fr;
   }
 }
