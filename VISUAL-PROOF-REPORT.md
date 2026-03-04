@@ -1,8 +1,8 @@
 # Visual Proof Report
 
-Last updated: `2026-03-03`
+Last updated: `2026-03-04`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `145a15cc-0eb6-4422-94f0-f9a23f3cfc97`
+Deployment ID: `2051f68e-83e3-4568-b503-039e458d8144`
 
 ## 0. PROMPT-07B Hotfix Snapshot (2026-03-03)
 - Deployed with compositor detection window widened (15%), safety inset `14px`, expanded radius scan bounds, and relaxed offset guard.
@@ -117,6 +117,29 @@ Deployment ID: `145a15cc-0eb6-4422-94f0-f9a23f3cfc97`
   - `/cgi-bin/catalog.py` returns `count: 99`.
   - generated composite verifies as `3784x2777` at `300 DPI`.
 
+## 0.7 PROMPT-07I + 07I-B (2026-03-04)
+- Implemented diff-based frame-mask compositing pipeline and download naming fix.
+- Added script:
+  - `scripts/generate_frame_mask.py`
+  - run completed successfully; mask generated from two Drive covers.
+- Updated compositor:
+  - added `FRAME_MASK_PATH` and `_load_frame_mask()`
+  - medallion `else` branch now prefers `config/frame_mask.png` and logs explicit usage
+  - fallback circle punch retained for resilience
+  - art diameter now expands to `1120px` when frame mask is active
+- Updated iterate downloads:
+  - naming now prefers catalog `file_base` over title/author synthesis
+  - ZIP structure now mirrors source folder naming (`{number}. {file_base}/...`)
+  - raw single-file download now includes book-number prefix
+- Production packaging fixes:
+  - Docker now copies `config/frame_mask.png`
+  - Railway upload allowlist now includes `!config/frame_mask.png`
+- Live verification:
+  - `/config/frame_mask.png` returns `HTTP 200` on production
+  - compositor runtime log confirms mask usage:
+    - `Using pixel-perfect frame mask from /app/config/frame_mask.png`
+  - generated composite output remains full-resolution (`3784x2777 @ 300 DPI`)
+
 ## 1. Test Proof
 - Full suite run: `pytest -q`.
 - Result: `100% passed`.
@@ -224,6 +247,11 @@ Deployment ID: `145a15cc-0eb6-4422-94f0-f9a23f3cfc97`
 - `/Users/timzengerink/proofs/07h-live-iterate-overview.png`
 - `/Users/timzengerink/proofs/07h-live-recent-result-card.png`
 - `/Users/timzengerink/proofs/07h-live-composite-fullres.jpg`
+
+### 3.0.6 PROMPT-07I Inline-Proof Assets (frame mask + naming)
+- `/Users/timzengerink/proofs/07i-live-recent-result-card.png`
+- `/Users/timzengerink/proofs/07i-live-composite-fullres.jpg`
+- `/Users/timzengerink/proofs/07i-live-medallion-crop.jpg`
 
 ### 3.1 Live UI Screenshots
 - `tmp/proof-live-iterate-20260302-prompt06.png`
