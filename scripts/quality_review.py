@@ -51,6 +51,7 @@ try:
     from src import config
     from src import cost_tracker
     from src import cover_compositor
+    from src import pdf_compositor
     from src import disaster_recovery
     from src import delivery_pipeline
     from src import drive_manager
@@ -89,6 +90,7 @@ except ModuleNotFoundError:  # pragma: no cover
     import config  # type: ignore
     import cost_tracker  # type: ignore
     import cover_compositor  # type: ignore
+    import pdf_compositor  # type: ignore
     import disaster_recovery  # type: ignore
     import delivery_pipeline  # type: ignore
     import drive_manager  # type: ignore
@@ -1749,6 +1751,8 @@ def _serialize_generation_results(
                 "prompt": row.prompt,
                 "image_path": image_rel,
                 "composited_path": composed,
+                "composited_pdf_path": None,
+                "composited_ai_path": None,
                 "success": row.success,
                 "error": row.error,
                 "generation_time": row.generation_time,
@@ -1776,6 +1780,21 @@ def _hydrate_serialized_result_paths(*, runtime: config.Config, rows: list[dict[
             candidate = _resolve_composited_candidate(image_path, runtime=runtime)
             if candidate and candidate.exists():
                 payload["composited_path"] = _to_project_relative(candidate)
+                pdf_candidate = _resolve_composited_companion(candidate, ".pdf")
+                if pdf_candidate and pdf_candidate.exists():
+                    payload["composited_pdf_path"] = _to_project_relative(pdf_candidate)
+                ai_candidate = _resolve_composited_companion(candidate, ".ai")
+                if ai_candidate and ai_candidate.exists():
+                    payload["composited_ai_path"] = _to_project_relative(ai_candidate)
+            else:
+                existing_composite = _project_path_if_exists(payload.get("composited_path"))
+                if existing_composite is not None:
+                    pdf_candidate = _resolve_composited_companion(existing_composite, ".pdf")
+                    if pdf_candidate and pdf_candidate.exists():
+                        payload["composited_pdf_path"] = _to_project_relative(pdf_candidate)
+                    ai_candidate = _resolve_composited_companion(existing_composite, ".ai")
+                    if ai_candidate and ai_candidate.exists():
+                        payload["composited_ai_path"] = _to_project_relative(ai_candidate)
         hydrated.append(payload)
     return hydrated
 
@@ -2197,15 +2216,45 @@ def _execute_generation_payload(
                     ),
                     0.15,
                 )
-            _emit_stage("composite", "Compositing generated variants onto source cover...", 0.78)
-            cover_compositor.composite_all_variants(
-                book_number=book,
+            used_pdf_mode = False
+            source_pdf = pdf_compositor.find_source_pdf_for_book(
                 input_dir=runtime.input_dir,
-                generated_dir=runtime.tmp_dir / "generated",
-                output_dir=runtime.tmp_dir / "composited",
-                regions=regions,
+                book_number=book,
                 catalog_path=runtime.book_catalog_path,
             )
+            if source_pdf is not None:
+                _emit_stage("composite", "Compositing generated variants via source PDF...", 0.78)
+                try:
+                    pdf_compositor.composite_all_variants(
+                        book_number=book,
+                        input_dir=runtime.input_dir,
+                        generated_dir=runtime.tmp_dir / "generated",
+                        output_dir=runtime.tmp_dir / "composited",
+                        catalog_path=runtime.book_catalog_path,
+                    )
+                    used_pdf_mode = True
+                except Exception as pdf_exc:
+                    logger.warning(
+                        "PDF compositor failed for book %s; falling back to JPG compositor: %s",
+                        book,
+                        pdf_exc,
+                    )
+
+            if not used_pdf_mode:
+                _emit_stage("composite", "Compositing generated variants via JPG fallback...", 0.78)
+                cover_compositor.composite_all_variants(
+                    book_number=book,
+                    input_dir=runtime.input_dir,
+                    generated_dir=runtime.tmp_dir / "generated",
+                    output_dir=runtime.tmp_dir / "composited",
+                    regions=regions,
+                    catalog_path=runtime.book_catalog_path,
+                )
+
+            for row in serialized:
+                if not isinstance(row, dict):
+                    continue
+                row["compositor_mode"] = "pdf" if used_pdf_mode else "jpg_fallback"
             _assert_composite_validation_within_limits(runtime=runtime, book_number=book)
         except Exception as exc:
             if checkpoint:
@@ -10232,6 +10281,13 @@ def _resolve_composited_candidate(image_path: Path, *, runtime: config.Config | 
         return runtime_cfg.tmp_dir / "composited" / book / model / f"variant_{variant}.jpg"
 
     return None
+
+
+def _resolve_composited_companion(composite_path: Path, suffix: str) -> Path | None:
+    token = str(suffix or "").strip().lower()
+    if token not in {".pdf", ".ai"}:
+        return None
+    return composite_path.with_suffix(token)
 
 
 def _parse_variant(stem: str) -> int:

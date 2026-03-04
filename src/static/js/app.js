@@ -380,6 +380,12 @@ window.JobQueue = {
         const row = result.result || {};
         const imagePath = row.image_path ? `/${String(row.image_path).replace(/^\/+/, '')}` : '';
         const compositedPath = row.composited_path ? `/${String(row.composited_path).replace(/^\/+/, '')}` : '';
+        const compositedPdfPath = row.composited_pdf_path
+          ? `/${String(row.composited_pdf_path).replace(/^\/+/, '')}`
+          : (row.composite_pdf_url ? `/${String(row.composite_pdf_url).replace(/^\/+/, '')}` : '');
+        const compositedAiPath = row.composited_ai_path
+          ? `/${String(row.composited_ai_path).replace(/^\/+/, '')}`
+          : (row.composite_ai_url ? `/${String(row.composite_ai_url).replace(/^\/+/, '')}` : '');
         const dryRun = Boolean(row.dry_run);
         if (dryRun || (!imagePath && !compositedPath)) {
           const reason = dryRun
@@ -390,7 +396,7 @@ window.JobQueue = {
         const score = Number(row.quality_score || row.distinctiveness_score || 0);
         if (score > bestScore) {
           bestScore = score;
-          best = { row, imagePath, compositedPath, score };
+          best = { row, imagePath, compositedPath, compositedPdfPath, compositedAiPath, score };
         }
 
         job.cost_usd += Number(row.cost || OpenRouter.MODEL_COSTS[job.model] || 0);
@@ -429,6 +435,11 @@ window.JobQueue = {
       if (backendCompositedBlob) warnIfSuspiciousCompositeBlob(backendCompositedBlob, fullResCompositeSource);
       job.generated_image_blob = rawBlob || rawSource;
       job.composited_image_blob = backendCompositedBlob || fullResCompositeSource || null;
+      job.composite_pdf_url = best.compositedPdfPath || '';
+      job.composite_ai_url = best.compositedAiPath || '';
+      job.pdf_url = best.compositedPdfPath || '';
+      job.ai_url = best.compositedAiPath || '';
+      job.compositor_mode = String(best.row?.compositor_mode || '').trim() || '';
       job._compositeFailed = false;
       job._compositeError = null;
       if (backendCompositedBlob) job._compositeSource = 'backend-blob';

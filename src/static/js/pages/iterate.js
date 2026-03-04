@@ -192,6 +192,26 @@ async function fetchDownloadBlob(source) {
   }
 }
 
+function resolveJobArtifactHref(job, keys = []) {
+  const candidates = [];
+  const append = (value) => {
+    if (!value) return;
+    const normalized = window.normalizeAssetUrl ? window.normalizeAssetUrl(value) : String(value || '').trim();
+    if (normalized) candidates.push(normalized);
+  };
+
+  keys.forEach((key) => append(job?.[key]));
+  try {
+    const parsed = JSON.parse(String(job?.results_json || '{}'));
+    const row = parsed?.result || {};
+    keys.forEach((key) => append(row?.[key]));
+  } catch {
+    // ignore malformed historical rows
+  }
+
+  return candidates[0] || '';
+}
+
 function applyPromptPlaceholders(promptText, book) {
   return String(promptText || '')
     .replaceAll('{title}', String(book?.title || ''))
@@ -858,8 +878,10 @@ window.Pages.iterate = {
     const zipName = `${folderName}.zip`;
     const compositeHref = pickFullResolutionSource(job, 'download-composite', false);
     const rawHref = pickFullResolutionSource(job, 'download-raw', true);
+    const pdfHref = resolveJobArtifactHref(job, ['composite_pdf_url', 'pdf_url', 'composited_pdf_path', 'pdf_path']);
+    const aiHref = resolveJobArtifactHref(job, ['composite_ai_url', 'ai_url', 'composited_ai_path', 'ai_path']);
 
-    if (!compositeHref && !rawHref) return;
+    if (!compositeHref && !rawHref && !pdfHref && !aiHref) return;
 
     try {
       const JSZip = await ensureJSZip();
@@ -876,6 +898,20 @@ window.Pages.iterate = {
         const rawBlob = await fetchDownloadBlob(rawHref);
         if (rawBlob) {
           zip.file(`${folderName}/${baseName} (illustration).jpg`, rawBlob);
+        }
+      }
+
+      if (pdfHref) {
+        const pdfBlob = await fetchDownloadBlob(pdfHref);
+        if (pdfBlob) {
+          zip.file(`${folderName}/${baseName}.pdf`, pdfBlob);
+        }
+      }
+
+      if (aiHref) {
+        const aiBlob = await fetchDownloadBlob(aiHref);
+        if (aiBlob) {
+          zip.file(`${folderName}/${baseName}.ai`, aiBlob);
         }
       }
 

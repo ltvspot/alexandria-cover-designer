@@ -365,6 +365,7 @@ def get_status(
 
 
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+_PDF_SUFFIXES = {".pdf", ".ai"}
 _DRIVE_COVER_LIST_CACHE_TTL_SECONDS = max(60, int(os.getenv("DRIVE_COVER_LIST_CACHE_TTL_SECONDS", "3600")))
 _DRIVE_COVER_LIST_CACHE: dict[str, tuple[float, list[dict[str, Any]], str]] = {}
 _DRIVE_COVER_LIST_CACHE_LOCK = threading.Lock()
@@ -571,7 +572,7 @@ def _drive_child_folder_id(*, service: Any, parent_id: str, folder_name: str) ->
 def _drive_children(*, service: Any, parent_id: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     page_token: str | None = None
-    fields = "nextPageToken,files(id,name,mimeType,modifiedTime,size,webViewLink,thumbnailLink)"
+    fields = "nextPageToken,files(id,name,mimeType,modifiedTime,size,webViewLink,thumbnailLink,parents)"
     while True:
         request = service.files().list(
             q=f"'{parent_id}' in parents and trashed=false",
@@ -628,6 +629,7 @@ def _iter_drive_cover_entries(
                 "modified_time": str(row.get("modifiedTime", "")).strip(),
                 "web_view_link": str(row.get("webViewLink", "")).strip(),
                 "thumbnail_link": str(row.get("thumbnailLink", "")).strip(),
+                "parents": list(row.get("parents", [])) if isinstance(row.get("parents"), list) else [],
             }
         )
     entries.sort(key=_entry_sort_key)
@@ -720,6 +722,31 @@ def _pick_drive_image_from_folder(*, service: Any, folder_id: str) -> dict[str, 
     return None
 
 
+def _pick_drive_pdf_from_folder(*, service: Any, folder_id: str) -> dict[str, Any] | None:
+    candidates: list[dict[str, Any]] = []
+    for row in _drive_children(service=service, parent_id=folder_id):
+        name = str(row.get("name", "")).strip().lower()
+        suffix = Path(name).suffix.lower()
+        if suffix not in _PDF_SUFFIXES:
+            continue
+        candidates.append(row)
+    if not candidates:
+        return None
+    pdfs = [row for row in candidates if Path(str(row.get("name", ""))).suffix.lower() == ".pdf"]
+    if pdfs:
+        return pdfs[0]
+    return candidates[0]
+
+
+def _download_drive_file_bytes(*, service: Any, file_id: str) -> bytes:
+    media = service.files().get_media(fileId=file_id).execute()
+    if isinstance(media, bytes):
+        return media
+    if hasattr(media, "read"):
+        return media.read()  # type: ignore[return-value]
+    raise RuntimeError(f"Unexpected Drive media payload for file {file_id}")
+
+
 def ensure_local_input_cover(
     *,
     drive_folder_id: str,
@@ -730,7 +757,7 @@ def ensure_local_input_cover(
     book_number: int,
     selected_cover_id: str = "",
 ) -> dict[str, Any]:
-    """Ensure a local JPG exists for the requested book by pulling from Drive when needed."""
+    """Ensure a local source cover exists; download JPG + PDF companion when available."""
     folder_name = _catalog_folder_name_for_book(catalog_path=catalog_path, book_number=book_number)
     if not folder_name:
         return {
@@ -741,7 +768,8 @@ def ensure_local_input_cover(
 
     target_folder = input_root / folder_name
     target_folder.mkdir(parents=True, exist_ok=True)
-    existing = sorted(target_folder.glob("*.jpg"))
+    existing = sorted([path for path in target_folder.iterdir() if path.is_file() and path.suffix.lower() in _IMAGE_SUFFIXES])
+    existing_pdfs = sorted([path for path in target_folder.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"])
     selected_id = str(selected_cover_id or "").strip()
     if existing and not selected_id:
         return {
@@ -749,6 +777,7 @@ def ensure_local_input_cover(
             "downloaded": False,
             "source": "local",
             "path": str(existing[0]),
+            "pdf_path": str(existing_pdfs[0]) if existing_pdfs else "",
             "folder_name": folder_name,
         }
 
@@ -758,6 +787,7 @@ def ensure_local_input_cover(
             source_root = _mirror_root(drive_folder_id) / "Input Covers"
         if source_root.exists():
             candidates: list[Path] = []
+            candidate_folders: list[Path] = []
             for row in _iter_local_cover_entries(root=source_root, title_by_book={}, book_by_title={}):
                 if int(row.get("book_number", 0) or 0) != int(book_number):
                     continue
@@ -765,16 +795,34 @@ def ensure_local_input_cover(
                 src = source_root / rel
                 if src.exists() and src.is_file():
                     candidates.append(src)
+                elif src.exists() and src.is_dir():
+                    candidate_folders.append(src)
+            if not candidates and candidate_folders:
+                for folder in candidate_folders:
+                    for file_path in sorted(folder.iterdir(), key=lambda p: p.name.lower()):
+                        if file_path.is_file() and file_path.suffix.lower() in _IMAGE_SUFFIXES:
+                            candidates.append(file_path)
             if candidates:
                 source = candidates[0]
                 suffix = source.suffix.lower() or ".jpg"
                 destination = target_folder / f"cover_from_drive{suffix}"
                 shutil.copy2(source, destination)
+                copied_pdf = ""
+                for sibling in sorted(source.parent.iterdir(), key=lambda p: p.name.lower()):
+                    if not sibling.is_file():
+                        continue
+                    if sibling.suffix.lower() not in _PDF_SUFFIXES:
+                        continue
+                    pdf_dest = target_folder / "cover_from_drive.pdf"
+                    shutil.copy2(sibling, pdf_dest)
+                    copied_pdf = str(pdf_dest)
+                    break
                 return {
                     "ok": True,
                     "downloaded": True,
                     "source": "local_mirror",
                     "path": str(destination),
+                    "pdf_path": copied_pdf,
                     "folder_name": folder_name,
                 }
         return {
@@ -827,12 +875,29 @@ def ensure_local_input_cover(
         }
 
     image_file: dict[str, Any] | None = None
+    pdf_file: dict[str, Any] | None = None
     if str(candidate_entry.get("kind", "")).strip().lower() == "file":
         image_file = candidate_entry
+        parent_ids = candidate_entry.get("parents", [])
+        parent_id = ""
+        if isinstance(parent_ids, list) and parent_ids:
+            parent_id = str(parent_ids[0] or "").strip()
+        file_id_token = str(candidate_entry.get("id", "")).strip()
+        if not parent_id and file_id_token:
+            try:
+                row = service.files().get(fileId=file_id_token, fields="parents").execute()
+                parent_values = row.get("parents", []) if isinstance(row, dict) else []
+                if isinstance(parent_values, list) and parent_values:
+                    parent_id = str(parent_values[0] or "").strip()
+            except Exception:
+                parent_id = ""
+        if parent_id:
+            pdf_file = _pick_drive_pdf_from_folder(service=service, folder_id=parent_id)
     else:
         folder_id = str(candidate_entry.get("id", "")).strip()
         if folder_id:
             image_file = _pick_drive_image_from_folder(service=service, folder_id=folder_id)
+            pdf_file = _pick_drive_pdf_from_folder(service=service, folder_id=folder_id)
     if not image_file:
         return {
             "ok": False,
@@ -849,24 +914,30 @@ def ensure_local_input_cover(
             "error": f"Drive image id missing for book {book_number}",
         }
 
-    media = service.files().get_media(fileId=file_id).execute()
-    if isinstance(media, bytes):
-        content = media
-    elif hasattr(media, "read"):
-        content = media.read()  # type: ignore[assignment]
-    else:
-        raise RuntimeError(f"Unexpected Drive media payload for file {file_id}")
+    content = _download_drive_file_bytes(service=service, file_id=file_id)
 
     suffix = Path(file_name).suffix.lower()
     if suffix not in _IMAGE_SUFFIXES:
         suffix = ".jpg"
     destination = target_folder / f"cover_from_drive{suffix}"
     destination.write_bytes(content)
+    pdf_destination = ""
+    if isinstance(pdf_file, dict):
+        pdf_id = str(pdf_file.get("id", "")).strip()
+        if pdf_id:
+            try:
+                pdf_bytes = _download_drive_file_bytes(service=service, file_id=pdf_id)
+                resolved_pdf = target_folder / "cover_from_drive.pdf"
+                resolved_pdf.write_bytes(pdf_bytes)
+                pdf_destination = str(resolved_pdf)
+            except Exception:
+                pdf_destination = ""
     return {
         "ok": True,
         "downloaded": True,
         "source": "google_drive",
         "path": str(destination),
+        "pdf_path": pdf_destination,
         "folder_name": folder_name,
         "drive_file_id": file_id,
     }
