@@ -62,10 +62,10 @@ MODEL_STYLE_PROFILES: list[dict[str, str]] = [
         "composition": "single dominant subject with layered depth and crop-safe margins",
     },
     {
-        "style": "neo-engraved chromatic classic",
-        "detail": "fine line etching texture with high-chroma painterly accents and scene-first storytelling",
+        "style": "narrative chromatic realism",
+        "detail": "painterly texture with grounded environment detail and scene-first storytelling",
         "palette": "vibrant sapphire, teal, amber, and luminous brass highlights",
-        "composition": "edge-to-edge story tableau with central visual tension",
+        "composition": "edge-to-edge narrative scene with natural perspective and no medallion-like framing",
     },
     {
         "style": "bold graphic poster",
@@ -93,7 +93,7 @@ MODEL_STYLE_PROFILES: list[dict[str, str]] = [
     },
     {
         "style": "baroque adventure painting",
-        "detail": "ornate light choreography, layered atmospheric perspective, dramatic motion",
+        "detail": "dramatic light choreography, layered atmospheric perspective, dramatic motion",
         "palette": "rich emerald, crimson, ultramarine, and luminous gold",
         "composition": "high-energy centered action with crop-safe margins",
     },
@@ -105,7 +105,7 @@ MODEL_PROVIDER_HINTS: tuple[tuple[str, str], ...] = (
     ("gpt-image", "Use precise scene layout instructions and clear object placement relationships."),
     ("openai", "Use precise scene layout instructions and clear object placement relationships."),
     ("flux", "Prioritize tactile lighting realism and material texture fidelity."),
-    ("gemini", "Lean into conceptual symbolism and non-literal narrative framing."),
+    ("gemini", "Prioritize grounded narrative scenes with natural perspective; avoid emblematic or circular compositions."),
     ("stable-diffusion", "Include technical style keywords and painterly medium guidance."),
     ("sdxl", "Include technical style keywords and painterly medium guidance."),
 )
