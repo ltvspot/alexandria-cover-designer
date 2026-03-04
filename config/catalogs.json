@@ -4,13 +4,13 @@
     {
       "id": "classics",
       "name": "Alexandria Classics",
-      "book_count": 99,
+      "book_count": 999,
       "catalog_file": "config/book_catalog.json",
       "prompts_file": "config/book_prompts.json",
       "input_covers_dir": "Input Covers",
       "output_covers_dir": "Output Covers",
       "cover_style": "navy_gold_medallion",
-      "status": "complete"
+      "status": "active"
     },
     {
       "id": "test-catalog",

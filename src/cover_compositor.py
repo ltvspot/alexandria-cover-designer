@@ -48,7 +48,7 @@ FALLBACK_RADIUS = 500
 TEMPLATE_PUNCH_RADIUS = 465
 TEMPLATE_FALLBACK_PUNCH_RADIUS = 420
 TEMPLATE_SUPERSAMPLE_FACTOR = 4
-ART_BLEED_PX = 60
+ART_BLEED_PX = 140
 FRAME_MASK_PATH = Path(__file__).resolve().parent.parent / "config" / "frame_mask.png"
 FRAME_OVERLAY_DIR = Path(__file__).resolve().parent.parent / "config" / "frame_overlays"
 FRAME_OVERLAY_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "extract_frame_overlays.py"
@@ -792,7 +792,7 @@ def composite_single(
         _h, _w = _orig_arr.shape[:2]
         _yy, _xx = np.ogrid[:_h, :_w]
         _dist = np.sqrt((_xx - center_x) ** 2 + (_yy - center_y) ** 2)
-        _ring = (_dist >= 420) & (_dist <= 520)
+        _ring = (_dist >= 500) & (_dist <= 680)
         _diff = np.abs(_orig_arr - _comp_arr).max(axis=2)
         _ring_diff = _diff[_ring]
         _changed_pct = 100.0 * float(np.sum(_ring_diff > 15)) / max(1, int(_ring_diff.size))
@@ -1386,7 +1386,7 @@ def _load_frame_overlay(cover_path: Path, size: tuple[int, int]) -> Image.Image 
     if int(alpha.max()) <= 5 or int(alpha.min()) >= 250:
         logger.warning("Frame overlay alpha is trivial, ignoring %s", candidate)
         return None
-    return _enforce_frame_guard_alpha(overlay)
+    return overlay
 
 
 def _build_fallback_frame_overlay(
@@ -1403,7 +1403,7 @@ def _build_fallback_frame_overlay(
     frame_mask = _load_frame_mask((w, h))
     if frame_mask is not None:
         cover_rgba.putalpha(frame_mask)
-        return _enforce_frame_guard_alpha(cover_rgba)
+        return cover_rgba
 
     scale = 4
     mask_large = Image.new("L", (w * scale, h * scale), 255)
@@ -1411,17 +1411,7 @@ def _build_fallback_frame_overlay(
     cx_s, cy_s, r_s = center_x * scale, center_y * scale, punch_radius * scale
     draw.ellipse((cx_s - r_s, cy_s - r_s, cx_s + r_s, cy_s + r_s), fill=0)
     cover_rgba.putalpha(mask_large.resize((w, h), Image.LANCZOS))
-    return _enforce_frame_guard_alpha(cover_rgba)
-
-
-def _enforce_frame_guard_alpha(overlay: Image.Image) -> Image.Image:
-    """Hard-protect the frame annulus and outer frame from art bleed."""
-    arr = np.array(overlay.convert("RGBA"), dtype=np.uint8)
-    h, w = arr.shape[:2]
-    yy, xx = np.ogrid[:h, :w]
-    dist = np.sqrt((xx - FALLBACK_CENTER_X) ** 2 + (yy - FALLBACK_CENTER_Y) ** 2)
-    arr[..., 3][dist >= 420] = 255
-    return Image.fromarray(arr, mode="RGBA")
+    return cover_rgba
 
 
 def ensure_frame_overlays_exist(*, input_dir: Path, catalog_path: Path) -> None:
