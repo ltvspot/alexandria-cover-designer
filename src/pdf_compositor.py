@@ -37,6 +37,9 @@ SMASK_FRAME_MIN = 5
 SMASK_FRAME_MAX = 250
 EXPECTED_DPI = 300
 EXPECTED_JPG_SIZE = (3784, 2777)
+# Trim generated art edges before fitting into the medallion image stream.
+# This reduces border-like artifacts synthesized near image boundaries.
+AI_ART_EDGE_TRIM_RATIO = 0.08
 
 
 def rgb_to_cmyk(rgb_array: np.ndarray) -> np.ndarray:
@@ -143,8 +146,15 @@ def _resolve_im0(page: Any) -> Any:
 
 def _load_ai_art_cmyk(*, ai_art_path: Path, width: int, height: int) -> np.ndarray:
     with Image.open(ai_art_path) as source:
+        rgb_source = source.convert("RGB")
+        if AI_ART_EDGE_TRIM_RATIO > 0:
+            src_w, src_h = rgb_source.size
+            trim_x = int(round(src_w * AI_ART_EDGE_TRIM_RATIO / 2.0))
+            trim_y = int(round(src_h * AI_ART_EDGE_TRIM_RATIO / 2.0))
+            if (src_w - 2 * trim_x) >= 64 and (src_h - 2 * trim_y) >= 64:
+                rgb_source = rgb_source.crop((trim_x, trim_y, src_w - trim_x, src_h - trim_y))
         rgb = ImageOps.fit(
-            source.convert("RGB"),
+            rgb_source,
             (int(width), int(height)),
             method=Image.LANCZOS,
             centering=(0.5, 0.5),
