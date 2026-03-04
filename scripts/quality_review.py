@@ -4034,7 +4034,9 @@ def _compose_prompt_for_book(
         title_keywords=keywords,
         negative_prompt=(
             "text, letters, words, typography, logos, labels, watermark, signature, "
-            "frame, border, decorative edge, ornamental border, ribbon banner, plaque"
+            "frame, border, decorative edge, ornamental border, ribbon banner, plaque, "
+            "filigree, scrollwork, arabesque, ornamental curls, decorative flourishes, "
+            "black ornamental silhouettes, lace-like cutout motifs"
         ),
         genre_negative_modifier=negative,
     )
@@ -4542,7 +4544,9 @@ def _builtin_prompt_seed_rows() -> list[dict[str, str]]:
                 "prompt_template": constrained_template,
                 "negative_prompt": (
                     "text, letters, words, typography, logos, labels, watermark, signature, "
-                    "ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border"
+                    "ribbon banner, plaque, medallion ring, border, frame, decorative edge, ornamental border, "
+                    "filigree, scrollwork, arabesque, ornamental curls, decorative flourishes, "
+                    "black ornamental silhouettes, lace-like cutout motifs"
                 ),
             }
         )

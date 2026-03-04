@@ -697,8 +697,23 @@ def _generate_with_model_prompts(
     base_prompt = prompt_generator.enforce_prompt_constraints(str(base_prompt or ""))
     normalized_negative = str(negative_prompt or "").strip()
     negative_low = normalized_negative.lower()
-    if "border" not in negative_low and "frame" not in negative_low:
-        normalized_negative = f"{normalized_negative}, border, frame, decorative edge, ornamental border".strip(", ")
+    required_negative_terms = (
+        "border",
+        "frame",
+        "decorative edge",
+        "ornamental border",
+        "filigree",
+        "scrollwork",
+        "arabesque",
+        "ornamental curls",
+        "black ornamental silhouettes",
+        "lace-like cutout motifs",
+    )
+    if any(term not in negative_low for term in required_negative_terms):
+        for term in required_negative_terms:
+            if term not in negative_low:
+                normalized_negative = f"{normalized_negative}, {term}".strip(", ")
+        negative_low = normalized_negative.lower()
 
     prompt_by_model: dict[str, str] = {}
     for model in models:

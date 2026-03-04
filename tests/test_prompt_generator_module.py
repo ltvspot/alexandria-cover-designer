@@ -99,6 +99,8 @@ def test_prompt_constraints_strip_typography_and_frame_directions():
     assert "typography-led" not in constrained
     assert "gilt ornament language" not in constrained
     assert "circular vignette composition" not in constrained
+    assert "filigree" in constrained
+    assert "scrollwork" in constrained
     assert "full-bleed narrative scene" in constrained
 
 
@@ -284,3 +286,25 @@ def test_build_diversified_prompt_applies_scene_only_constraints():
     assert "sevastopol / dramatic conflict" in prompt
     assert "no text" in prompt
     assert "no frame" in prompt
+
+
+def test_diversify_prompt_strips_ornamental_style_instructions(monkeypatch):
+    base = pg._ensure_prompt_constraints("scene-first prompt with vivid details")
+    monkeypatch.setattr(
+        pg,
+        "select_diverse_styles",
+        lambda _count, seed_token="": [
+            {
+                "id": "ornamental-style",
+                "label": "Ornamental Style",
+                "modifier": "The subject is framed by ornamental arches with filigree, arabesques, and scrollwork.",
+            }
+        ],
+    )
+    diversified = pg.diversify_prompt(base, 1).lower()
+    assert "ornamental arches" not in diversified
+    assert "filigree" in diversified
+    assert "scrollwork" in diversified
+    assert "arabesque" in diversified
+    assert "no border" in diversified
+    assert "no frame" in diversified

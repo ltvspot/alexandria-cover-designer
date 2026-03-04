@@ -35,7 +35,7 @@ def _default_registry() -> list[dict[str, Any]]:
                 "medallion": "center-right",
                 "ornaments": "corners-and-spine",
             },
-            "prompt_modifier": "classical engraved illustration, gilt ornament language, museum-grade heritage cover styling",
+            "prompt_modifier": "classical engraved illustration, museum-grade heritage cover styling, scene-first composition",
         }
     ]
 

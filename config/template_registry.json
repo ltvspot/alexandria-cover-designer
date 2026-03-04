@@ -12,7 +12,7 @@
       "medallion": "center-right",
       "ornaments": "corners-and-spine"
     },
-    "prompt_modifier": "classical engraved illustration, gilt ornament language, museum-grade heritage cover styling"
+    "prompt_modifier": "classical engraved illustration, museum-grade heritage cover styling, scene-first composition"
   },
   {
     "id": "victorian_engraving",
@@ -147,6 +147,6 @@
       "medallion": "center",
       "ornaments": "geometric"
     },
-    "prompt_modifier": "art deco geometry, metallic flourishes, elegant symmetrical framing, period poster sophistication"
+    "prompt_modifier": "art deco geometry, metallic highlights, elegant symmetry, period poster sophistication"
   }
 ]

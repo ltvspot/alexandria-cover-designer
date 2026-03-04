@@ -116,19 +116,28 @@ STRICT_SCENE_GUARDRAIL = (
     "no ribbons, no banners, no plaques, no inscriptions, no calligraphy, no medallion ring, "
     "no frame, no border, no decorative edge, no seal, no coin, no emblem."
 )
+NO_ORNAMENT_GUARDRAIL = (
+    "No filigree, no scrollwork, no arabesques, no ornamental curls, no decorative flourishes, "
+    "no black ornamental silhouettes, no lace-like cutout motifs."
+)
 VIVID_COLOR_GUARDRAIL = (
     "Color direction: vivid, high-saturation painterly palette with rich contrast and luminous highlights."
 )
-GENERATION_GUARDRAIL = f"{STRICT_SCENE_GUARDRAIL} {VIVID_COLOR_GUARDRAIL}"
+GENERATION_GUARDRAIL = f"{STRICT_SCENE_GUARDRAIL} {NO_ORNAMENT_GUARDRAIL} {VIVID_COLOR_GUARDRAIL}"
 MAX_CONTENT_VIOLATION_SCORE = 0.24
 TEXT_ARTIFACT_HARD_SCORE_FLOOR = 0.20
 TEXT_ARTIFACT_HARD_TEXT_PENALTY = 0.62
 TEXT_ARTIFACT_HARD_BAND_RATIO = 0.165
 TEXT_ARTIFACT_HARD_TINY_EFFECTIVE = 0.030
-ARTIFACT_RETRY_LIMIT = 2
+TEXT_ARTIFACT_ORNAMENT_TEXT_PENALTY = 0.40
+TEXT_ARTIFACT_ORNAMENT_BAND_MIN = 0.075
+TEXT_ARTIFACT_ORNAMENT_BAND_MAX = 0.155
+TEXT_ARTIFACT_ORNAMENT_TINY_MIN = 0.017
+ARTIFACT_RETRY_LIMIT = 3
 ARTIFACT_RETRY_APPEND = (
     "Retry instruction: scene artwork only. Absolutely no words, letters, numbers, logos, labels, ribbons, "
-    "banners, plaques, medallion rings, circular frames, ornamental borders, or decorative edges."
+    "banners, plaques, medallion rings, circular frames, ornamental borders, decorative edges, "
+    "filigree, scrollwork, arabesques, ornamental curls, black ornamental silhouettes, or lace-like cutout motifs."
 )
 _PROMPT_REMOVAL_PATTERNS: tuple[str, ...] = (
     r"\bcircular vignette composition\b",
@@ -140,6 +149,14 @@ _PROMPT_REMOVAL_PATTERNS: tuple[str, ...] = (
     r"\blogo(?:s)?\b",
     r"\bwatermark(?:s)?\b",
     r"\bribbon(?:\s+banner)?\b",
+    r"\bfiligree\b",
+    r"\bscroll(?:work)?\b",
+    r"\barabesque(?:s)?\b",
+    r"\btracery\b",
+    r"\bflourish(?:es)?\b",
+    r"\bbotanical ornament\b",
+    r"\bornamental arches?\b",
+    r"\blace(?:-like)?(?:\s+cutout)?(?:\s+motifs?)?\b",
     r"\bplaque\b",
     r"\bseal\b",
     r"\binner(?:\s+frame|\s+ring|\s+border)?\b",
@@ -220,14 +237,24 @@ def _is_high_confidence_text_artifact(*, content_score: float, metrics: dict[str
             return default
 
     text_penalty = _metric("text_penalty")
+    text_band_ratio = _metric("text_band_ratio")
+    tiny_effective = _metric("tiny_effective")
+
+    # Ornament-like black cutout signatures often evade the old high-score thresholds.
+    ornament_signature = (
+        text_penalty >= TEXT_ARTIFACT_ORNAMENT_TEXT_PENALTY
+        and TEXT_ARTIFACT_ORNAMENT_BAND_MIN <= text_band_ratio <= TEXT_ARTIFACT_ORNAMENT_BAND_MAX
+        and tiny_effective >= TEXT_ARTIFACT_ORNAMENT_TINY_MIN
+    )
+    if ornament_signature:
+        return True
+
     if text_penalty >= TEXT_ARTIFACT_HARD_TEXT_PENALTY:
         return True
 
     if float(content_score) < TEXT_ARTIFACT_HARD_SCORE_FLOOR:
         return False
 
-    text_band_ratio = _metric("text_band_ratio")
-    tiny_effective = _metric("tiny_effective")
     return (
         text_band_ratio >= TEXT_ARTIFACT_HARD_BAND_RATIO
         or tiny_effective >= TEXT_ARTIFACT_HARD_TINY_EFFECTIVE
@@ -515,7 +542,8 @@ class OpenRouterProvider(BaseProvider):
                     "role": "system",
                     "content": (
                         "Return only scene artwork. Strictly avoid text, letters, logos, labels, plaques, "
-                        "ribbons, medallion rings, frames, or decorative borders."
+                        "ribbons, medallion rings, frames, decorative borders, filigree, scrollwork, "
+                        "arabesques, ornamental curls, black ornamental silhouettes, or lace-like cutout motifs."
                     ),
                 },
                 {
