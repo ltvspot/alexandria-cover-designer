@@ -2,7 +2,33 @@
 
 Last updated: `2026-03-04`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `c4c2133e-adaa-4cfc-a430-02c5e7f921c6`
+Deployment ID: `feb98ade-1d1d-4afd-8e07-a4872e6e6bdc`
+
+## 1.2 PROMPT-09 Ornament Guardrail Hardening (2026-03-04)
+- Git commits (master):
+  - `22c6237` — anti-ornament prompt hardening + style/pipeline guardrails
+  - `77c92d8` — preserve anti-ornament negatives during sanitization
+- Railway deploys:
+  - `9388980c-2b28-4388-a43a-935e3c684767` (`SUCCESS`)
+  - `feb98ade-1d1d-4afd-8e07-a4872e6e6bdc` (`SUCCESS`, latest live)
+- Verification (local strict, mandatory):
+  - `bash scripts/test_compositor_integration.sh 1`
+  - result: all 9 checks passed (`ornament_zone`, `frame_pixels`, `ai_art_border`, `visual_frame` all `PASS`)
+- Live generation proof (post-deploy):
+  - API job: `fe14f0d7-b1d2-4d3b-b7ca-655f47fa2851` (`completed`)
+  - model: `openrouter/google/gemini-2.5-flash-image`
+  - output artifacts:
+    - composited: `tmp/composited/1/openrouter__google__gemini-2.5-flash-image/variant_1.jpg`
+    - raw: `tmp/generated/1/openrouter__google__gemini-2.5-flash-image/variant_1.png`
+- Visual proof artifacts:
+  - live dashboard with generated cover card:
+    - `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/proof-live-dashboard-card-20260304-ornament-fix-v2.png`
+  - live dashboard modal (composite/raw tabs):
+    - `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/proof-live-dashboard-20260304-ornament-fix-v2.png`
+  - direct composited cover image:
+    - `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/proof-live-cover-book1-20260304-v2.jpg`
+  - direct raw generated image:
+    - `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/proof-live-raw-book1-20260304-v2.png`
 
 ## 1.1 PROMPT-09C ZIP + Sync/Dropdown + Cache Rollout (2026-03-04)
 - Git commits (master):
