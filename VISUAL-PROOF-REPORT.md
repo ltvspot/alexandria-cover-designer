@@ -2,7 +2,7 @@
 
 Last updated: `2026-03-04`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `2051f68e-83e3-4568-b503-039e458d8144`
+Deployment ID: `8f13004d-97e3-42fc-b672-2a8a43a23918`
 
 ## 0. PROMPT-07B Hotfix Snapshot (2026-03-03)
 - Deployed with compositor detection window widened (15%), safety inset `14px`, expanded radius scan bounds, and relaxed offset guard.
@@ -140,6 +140,25 @@ Deployment ID: `2051f68e-83e3-4568-b503-039e458d8144`
     - `Using pixel-perfect frame mask from /app/config/frame_mask.png`
   - generated composite output remains full-resolution (`3784x2777 @ 300 DPI`)
 
+## 0.8 PROMPT-09A + 09B + 09C (2026-03-04)
+- Implemented PDF compositor and wiring:
+  - added `src/pdf_compositor.py`
+  - iterate generation now prefers source PDF compositing and falls back to raster compositor when PDF is unavailable
+  - Drive source cover ensure flow now downloads JPG + PDF companion (`cover_from_drive.pdf`) when present
+  - output artifacts per variant now include `.jpg`, `.pdf`, `.ai` in `tmp/composited/...`
+- Verification suite overhaul:
+  - replaced `scripts/verify_composite.py` with dual-mode PDF/JPG verifier
+  - added `scripts/test_compositor_integration.sh` and `Makefile` targets (`verify`, `test-compositor`)
+  - strict checks passed for two books in PDF mode (`book 1`, `book 9`)
+- Download/export naming + files:
+  - iterate ZIP keeps `{number}. {file_base}` folder structure
+  - ZIP now includes PDF/AI when available
+  - raw download remains `{number}. {file_base} (illustration).jpg`
+- Deployment/live verification:
+  - commit: `7f4a2be`
+  - deployment: `8f13004d-97e3-42fc-b672-2a8a43a23918` (`SUCCESS`)
+  - `/api/health` reports `status: ok`, `healthy: true`, `uptime_seconds: 1`
+
 ## 1. Test Proof
 - Full suite run: `pytest -q`.
 - Result: `100% passed`.
@@ -252,6 +271,13 @@ Deployment ID: `2051f68e-83e3-4568-b503-039e458d8144`
 - `/Users/timzengerink/proofs/07i-live-recent-result-card.png`
 - `/Users/timzengerink/proofs/07i-live-composite-fullres.jpg`
 - `/Users/timzengerink/proofs/07i-live-medallion-crop.jpg`
+
+### 3.0.7 PROMPT-09 Inline-Proof Assets (PDF compositor + verifier + downloads)
+- `/Users/timzengerink/proofs/prompt09-live-iterate.png`
+- `/Users/timzengerink/proofs/book_1-medallion-proof.jpg`
+- `/Users/timzengerink/proofs/book_9-medallion-proof.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/test_composites/book_1/test_output.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/test_composites/book_9/test_output.jpg`
 
 ### 3.1 Live UI Screenshots
 - `tmp/proof-live-iterate-20260302-prompt06.png`
