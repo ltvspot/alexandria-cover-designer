@@ -40,6 +40,10 @@ EXPECTED_JPG_SIZE = (3784, 2777)
 # Trim generated art edges before fitting into the medallion image stream.
 # This reduces border-like artifacts synthesized near image boundaries.
 AI_ART_EDGE_TRIM_RATIO = 0.08
+# Feather the first non-frame alpha band so high-contrast art edges do not
+# read like ornamental side cutouts against semi-transparent frame details.
+ART_EDGE_BLEND_MIN = SMASK_FRAME_MAX + 1  # 251
+ART_EDGE_BLEND_MAX = 254
 
 
 def rgb_to_cmyk(rgb_array: np.ndarray) -> np.ndarray:
@@ -235,6 +239,20 @@ def composite_cover_pdf(
         # Preserve source CMYK for all non-opaque SMask pixels (ring + antialiasing).
         preserve_mask = smask <= SMASK_FRAME_MAX
         composite[preserve_mask] = source_cmyk[preserve_mask]
+        blend_mask = (smask >= ART_EDGE_BLEND_MIN) & (smask <= ART_EDGE_BLEND_MAX)
+        if np.any(blend_mask):
+            blend_span = max(1.0, float(ART_EDGE_BLEND_MAX - ART_EDGE_BLEND_MIN))
+            edge_alpha = (
+                (smask[blend_mask].astype(np.float32) - float(ART_EDGE_BLEND_MIN)) / blend_span
+            ).reshape(-1, 1)
+            edge_alpha = np.clip(edge_alpha, 0.0, 1.0)
+            src_edge = source_cmyk[blend_mask].astype(np.float32)
+            ai_edge = composite[blend_mask].astype(np.float32)
+            composite[blend_mask] = np.clip(
+                (src_edge * (1.0 - edge_alpha)) + (ai_edge * edge_alpha),
+                0.0,
+                255.0,
+            ).astype(np.uint8)
 
         encoded = zlib.compress(composite.tobytes())
         smask_ref = im0.get("/SMask")
