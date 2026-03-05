@@ -542,3 +542,34 @@ Deployment ID: `58267a2d-62b4-418c-b4ea-c8296210e45f`
 Every completion message must include:
 1. direct deployed URL;
 2. visual proof report path(s).
+
+### 3.0.12 PROMPT-17 Batch Re-Composite + QA Proof (2026-03-05)
+- Commit: `42c0a6c`
+- Deployment: `9a18b0f2-80c6-4397-8e2c-1c9c49561f3d`
+- Live URL: `https://web-production-900a7.up.railway.app`
+- Build log: `https://railway.com/project/ff92d325-72a5-480f-8ff7-856744b6b859/service/3e03e783-724a-4999-8c55-c83db5a84b5e?id=9a18b0f2-80c6-4397-8e2c-1c9c49561f3d&`
+
+Verification summary:
+- Batch recomposite: `99 books`, `482 variants`, `99 passed frame check`, `0 failed`, `0 skipped`
+- Structural QA (`scripts/visual_qa.py`): `total=99`, `verified=99`, `passed=99`, `failed=0`
+- Comparison grids (`scripts/generate_comparison.py --catalog classics`): `generated=99`, `passed=0`, `failed=99` (whole-medallion diff metric, expected when artwork changes)
+- Sample comparison runs requested by prompt:
+  - generated: books `1, 10, 25, 50, 75, 100`
+  - not present in local catalog/composites: books `200, 500, 750, 999`
+
+Prompt-17 artifacts:
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/qa_output/classics/recomposite_summary.json`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/qa_output/classics/qa_report.json`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/recomposite_log.txt`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual_qa_log.txt`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/generate_comparison_all_log.txt`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/generate_comparison_samples_log.txt`
+
+Direct visual proofs:
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/proof-live-visualqa-prompt17-20260305.png`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual-qa/compare_001.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual-qa/compare_010.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual-qa/compare_025.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual-qa/compare_050.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual-qa/compare_075.jpg`
+- `/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/tmp/visual-qa/compare_100.jpg`
