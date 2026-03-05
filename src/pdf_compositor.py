@@ -1,12 +1,13 @@
-"""PDF-based compositor – three-layer approach (navy canvas → circular art → frame overlay).
+"""PDF-based compositor – SMask-alpha approach.
 
-Replaces the legacy SMask-blending compositor with Tim's proven layering model:
-  1. Rasterise the source PDF cover to RGB at 300 DPI.
-  2. Build a frame overlay from that raster (punch a transparent circle in the centre).
-  3. Create a solid navy canvas.
-  4. Clip the AI-generated art to a circle and paste it onto the navy canvas.
-  5. Paste the frame overlay on top – the frame naturally covers the art-edge seam.
-  6. Write the result as JPG.  Optionally inject CMYK back into the PDF stream.
+Simple compositing rule: use the SMask as a direct alpha blend.
+  - Where SMask = 255 (art zone): use 100% new AI art
+  - Where SMask = 0 (outside): use 100% source CMYK (transparent)
+  - Where SMask = 1-254 (frame + anti-aliasing): blend, heavily favouring source
+
+No radial feathering.  No black-edge suppression.  No hardcoded radii.
+The SMask IS the compositing mask – it already encodes the exact frame
+geometry for every book's unique ornamental design.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageOps
 
 try:
     import fitz  # type: ignore
@@ -43,21 +44,23 @@ except ModuleNotFoundError:  # pragma: no cover
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Geometry constants (proven in POC)
+# Constants
 # ---------------------------------------------------------------------------
 EXPECTED_DPI = 300
 EXPECTED_JPG_SIZE = (3784, 2777)          # full cover w x h
-MEDALLION_CENTER = (2864, 1620)           # centre of the circular medallion
-FRAME_HOLE_RADIUS = 540                   # inner edge of frame ring (transparent hole)
-ART_CLIP_RADIUS = 600                     # slightly larger - 60 px overlap hidden by frame
-NAVY_FILL_RGB = (21, 32, 76)             # background colour matching original cover
 
-# Art pre-processing (kept from previous version)
+# Art pre-processing
 AI_ART_EDGE_TRIM_RATIO = 0.08
 AI_UNIFORM_MARGIN_MAX_TRIM_RATIO = 0.22
 AI_UNIFORM_MARGIN_COLOR_TOL = 26.0
 AI_UNIFORM_MARGIN_STD_MAX = 22.0
 AI_UNIFORM_MARGIN_MATCH_RATIO = 0.92
+
+# SMask threshold: pixels with SMask >= this value get new AI art.
+# Pixels below this threshold keep source CMYK (frame preserved).
+# 255 = only pure art zone gets replaced (sharpest frame boundary).
+# Lower values would eat into the frame's anti-aliased edges.
+SMASK_ART_THRESHOLD = 255
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +123,7 @@ def _trim_uniform_margins(image: Image.Image) -> Image.Image:
 
 
 # ---------------------------------------------------------------------------
-# CMYK helpers (kept for optional PDF stream write-back)
+# CMYK helpers
 # ---------------------------------------------------------------------------
 def rgb_to_cmyk(rgb_array: np.ndarray) -> np.ndarray:
     """Convert RGB uint8 array (h,w,3) to CMYK uint8 (h,w,4)."""
@@ -247,116 +250,11 @@ def _render_pdf_to_jpg(*, source_pdf: Path, output_jpg: Path, dpi: int = EXPECTE
         doc.close()
 
 
-def _rasterise_pdf_page(source_pdf: Path, dpi: int = EXPECTED_DPI) -> Image.Image:
-    """Rasterise page 0 of a PDF to an RGB PIL Image at *dpi* resolution."""
-    doc = fitz.open(str(source_pdf))
-    try:
-        if doc.page_count <= 0:
-            raise ValueError("PDF has no pages")
-        page = doc[0]
-        scale = float(dpi) / 72.0
-        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
-        image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-        if image.size != EXPECTED_JPG_SIZE:
-            image = image.resize(EXPECTED_JPG_SIZE, Image.LANCZOS)
-        return image
-    finally:
-        doc.close()
-
-
 # ---------------------------------------------------------------------------
-# Three-layer compositing helpers
-# ---------------------------------------------------------------------------
-def _build_frame_overlay(cover_rgb: Image.Image) -> Image.Image:
-    """Create an RGBA frame overlay from the original cover raster.
-
-    Everything outside the inner medallion ring is kept opaque (the frame,
-    ornaments, text, spine, etc.).  The inside of the ring is made fully
-    transparent so the art layer beneath shows through.
-    """
-    w, h = cover_rgb.size
-    cx, cy = MEDALLION_CENTER
-
-    # Start with an RGBA copy of the full cover.
-    overlay = cover_rgb.copy().convert("RGBA")
-
-    # Create a mask: white = keep, black = transparent (the hole).
-    mask = Image.new("L", (w, h), 255)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse(
-        [cx - FRAME_HOLE_RADIUS, cy - FRAME_HOLE_RADIUS,
-         cx + FRAME_HOLE_RADIUS, cy + FRAME_HOLE_RADIUS],
-        fill=0,
-    )
-    overlay.putalpha(mask)
-    return overlay
-
-
-def _load_and_clip_art(ai_art_path: Path) -> Image.Image:
-    """Load AI art, trim margins, edge-trim, and clip to a circle of ART_CLIP_RADIUS.
-
-    Returns an RGBA image of size (2*ART_CLIP_RADIUS, 2*ART_CLIP_RADIUS) with
-    the circular art and transparent corners.
-    """
-    with Image.open(ai_art_path) as source:
-        rgb_source = _trim_uniform_margins(source)
-        if AI_ART_EDGE_TRIM_RATIO > 0:
-            src_w, src_h = rgb_source.size
-            trim_x = int(round(src_w * AI_ART_EDGE_TRIM_RATIO / 2.0))
-            trim_y = int(round(src_h * AI_ART_EDGE_TRIM_RATIO / 2.0))
-            if (src_w - 2 * trim_x) >= 64 and (src_h - 2 * trim_y) >= 64:
-                rgb_source = rgb_source.crop((trim_x, trim_y, src_w - trim_x, src_h - trim_y))
-
-    diameter = ART_CLIP_RADIUS * 2
-    art_resized = ImageOps.fit(
-        rgb_source,
-        (diameter, diameter),
-        method=Image.LANCZOS,
-        centering=(0.5, 0.5),
-    )
-    art_rgba = art_resized.convert("RGBA")
-
-    # Create circular mask.
-    circle_mask = Image.new("L", (diameter, diameter), 0)
-    draw = ImageDraw.Draw(circle_mask)
-    draw.ellipse([0, 0, diameter - 1, diameter - 1], fill=255)
-    art_rgba.putalpha(circle_mask)
-    return art_rgba
-
-
-def _composite_three_layers(
-    cover_rgb: Image.Image,
-    ai_art_path: Path,
-) -> Image.Image:
-    """Compose the three layers and return the final RGB image.
-
-    Layer 1 (bottom): solid navy canvas.
-    Layer 2 (middle): AI art clipped to circle at medallion centre.
-    Layer 3 (top):    frame overlay from the original cover.
-    """
-    w, h = cover_rgb.size
-    cx, cy = MEDALLION_CENTER
-
-    # Layer 1: navy canvas
-    canvas = Image.new("RGB", (w, h), NAVY_FILL_RGB)
-
-    # Layer 2: circular art
-    art_circle = _load_and_clip_art(ai_art_path)
-    art_x = cx - ART_CLIP_RADIUS
-    art_y = cy - ART_CLIP_RADIUS
-    canvas.paste(art_circle, (art_x, art_y), art_circle)
-
-    # Layer 3: frame overlay
-    frame_overlay = _build_frame_overlay(cover_rgb)
-    canvas.paste(frame_overlay, (0, 0), frame_overlay)
-
-    return canvas
-
-
-# ---------------------------------------------------------------------------
-# Legacy helper kept for backward-compat callers that still expect CMYK art
+# Art loading
 # ---------------------------------------------------------------------------
 def _load_ai_art_cmyk(*, ai_art_path: Path, width: int, height: int) -> np.ndarray:
+    """Load AI art, trim, edge-trim, resize to (width, height), convert to CMYK."""
     with Image.open(ai_art_path) as source:
         rgb_source = _trim_uniform_margins(source)
         if AI_ART_EDGE_TRIM_RATIO > 0:
@@ -376,7 +274,7 @@ def _load_ai_art_cmyk(*, ai_art_path: Path, width: int, height: int) -> np.ndarr
 
 
 # ---------------------------------------------------------------------------
-# Main entry: composite_cover_pdf  (THREE-LAYER APPROACH)
+# Main entry: composite_cover_pdf  (SMask-alpha approach)
 # ---------------------------------------------------------------------------
 def composite_cover_pdf(
     source_pdf_path: str,
@@ -385,13 +283,12 @@ def composite_cover_pdf(
     output_jpg_path: str,
     output_ai_path: str | None = None,
 ) -> dict[str, Any]:
-    """Replace PDF medallion illustration using the three-layer compositing model.
+    """Replace PDF medallion art using SMask-guided compositing.
 
-    1. Rasterise the original cover from the source PDF.
-    2. Build a frame overlay (original cover with transparent centre hole).
-    3. Create navy canvas, paste circular AI art, paste frame on top.
-    4. Save as JPG (primary webapp output).
-    5. Inject CMYK composite back into the PDF stream for PDF/AI output.
+    Simple rule: where SMask = 255, use new AI art CMYK.
+    Everywhere else, keep the original source CMYK unchanged.
+    The frame, ornaments, and anti-aliased edges are perfectly preserved
+    because we never touch pixels where SMask < 255.
     """
     source_pdf = Path(source_pdf_path)
     art_path = Path(ai_art_path)
@@ -408,27 +305,6 @@ def composite_cover_pdf(
     output_jpg.parent.mkdir(parents=True, exist_ok=True)
     output_ai.parent.mkdir(parents=True, exist_ok=True)
 
-    # --- Step 1: Rasterise the original cover from the source PDF ---
-    cover_rgb = _rasterise_pdf_page(source_pdf, dpi=EXPECTED_DPI)
-    logger.info(
-        "Rasterised source PDF",
-        extra={"source": str(source_pdf), "size": cover_rgb.size},
-    )
-
-    # --- Step 2-4: Three-layer composite ---
-    final_rgb = _composite_three_layers(cover_rgb, art_path)
-
-    # --- Step 5: Save JPG ---
-    final_rgb.save(
-        output_jpg,
-        format="JPEG",
-        quality=100,
-        subsampling=0,
-        dpi=(EXPECTED_DPI, EXPECTED_DPI),
-    )
-    logger.info("Saved composite JPG", extra={"path": str(output_jpg)})
-
-    # --- Step 6: Write composite back into PDF stream ---
     pdf = pikepdf.Pdf.open(str(source_pdf))
     try:
         if len(pdf.pages) == 0:
@@ -438,12 +314,41 @@ def composite_cover_pdf(
 
         width = int(im0.get("/Width"))
         height = int(im0.get("/Height"))
+        if width <= 0 or height <= 0:
+            raise ValueError("Invalid Im0 dimensions")
 
-        # Resize our RGB composite to match the PDF Im0 dimensions exactly.
-        pdf_rgb = final_rgb.resize((width, height), Image.LANCZOS)
-        cmyk_arr = rgb_to_cmyk(np.asarray(pdf_rgb, dtype=np.uint8))
+        # --- Extract source CMYK and SMask ---
+        raw_cmyk = _inflate_stream_bytes(im0, expected_len=width * height * 4)
+        source_cmyk = np.frombuffer(raw_cmyk, dtype=np.uint8).reshape(height, width, 4).copy()
 
-        encoded = zlib.compress(cmyk_arr.tobytes())
+        smask_obj = im0.get("/SMask")
+        if smask_obj is None:
+            raise ValueError("Im0 is missing /SMask")
+        smask_raw = _inflate_stream_bytes(smask_obj, expected_len=width * height)
+        smask = np.frombuffer(smask_raw, dtype=np.uint8).reshape(height, width)
+
+        # --- Load new AI art as CMYK, sized to match Im0 ---
+        ai_cmyk = _load_ai_art_cmyk(ai_art_path=art_path, width=width, height=height)
+
+        # --- Composite: replace art zone, keep everything else ---
+        # Binary mask: only pure art pixels (SMask=255) get the new art.
+        # Frame pixels (SMask<255) stay as source — ornaments untouched.
+        art_mask = smask >= SMASK_ART_THRESHOLD
+        composite = source_cmyk.copy()
+        composite[art_mask] = ai_cmyk[art_mask]
+
+        logger.info(
+            "Composited via SMask threshold",
+            extra={
+                "threshold": SMASK_ART_THRESHOLD,
+                "art_pixels": int(np.sum(art_mask)),
+                "frame_pixels": int(np.sum(~art_mask)),
+                "im0_size": f"{width}x{height}",
+            },
+        )
+
+        # --- Write composite back into PDF ---
+        encoded = zlib.compress(composite.tobytes())
         smask_ref = im0.get("/SMask")
         im0.write(encoded, filter=pikepdf.Name("/FlateDecode"))
         if smask_ref is not None:
@@ -455,10 +360,19 @@ def composite_cover_pdf(
     finally:
         pdf.close()
 
+    # --- Rasterize modified PDF to JPG ---
+    _render_pdf_to_jpg(source_pdf=output_pdf, output_jpg=output_jpg, dpi=EXPECTED_DPI)
+
+    # --- Copy PDF as AI file ---
     shutil.copyfile(output_pdf, output_ai)
+
     logger.info(
-        "Saved composite PDF + AI",
-        extra={"pdf": str(output_pdf), "ai": str(output_ai)},
+        "PDF compositor completed",
+        extra={
+            "source": str(source_pdf),
+            "output_jpg": str(output_jpg),
+            "output_pdf": str(output_pdf),
+        },
     )
 
     return {
@@ -467,10 +381,10 @@ def composite_cover_pdf(
         "output_pdf": str(output_pdf),
         "output_jpg": str(output_jpg),
         "output_ai": str(output_ai),
-        "center_x": MEDALLION_CENTER[0],
-        "center_y": MEDALLION_CENTER[1],
-        "image_width": int(cover_rgb.size[0]),
-        "image_height": int(cover_rgb.size[1]),
+        "center_x": int(width // 2),
+        "center_y": int(height // 2),
+        "image_width": int(width),
+        "image_height": int(height),
     }
 
 
