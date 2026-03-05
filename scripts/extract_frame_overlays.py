@@ -80,9 +80,20 @@ def _apply_scrollwork_gap_transparency(
     g_ch = cover_rgb[:, :, 1].astype(np.float32)
     b_ch = cover_rgb[:, :, 2].astype(np.float32)
     brightness = np.maximum(r_ch, np.maximum(g_ch, b_ch))
+    shadow = np.minimum(r_ch, np.minimum(g_ch, b_ch))
+    saturation = brightness - shadow
 
-    is_gold = ring_mask & (r_ch > 80.0) & (r_ch > (b_ch + 10.0)) & (g_ch > 30.0)
-    is_dark_frame = ring_mask & (brightness < 60.0)
+    # Keep only likely frame metal in the ring; aggressively drop old medallion art.
+    is_gold = (
+        ring_mask
+        & (r_ch >= 120.0)
+        & (g_ch >= 85.0)
+        & (b_ch <= 145.0)
+        & ((r_ch - g_ch) >= -4.0)
+        & ((r_ch - b_ch) >= 14.0)
+        & (saturation >= 22.0)
+    )
+    is_dark_frame = ring_mask & (brightness <= 40.0)
     is_frame_metal = is_gold | is_dark_frame
     is_non_metal = ring_mask & ~is_frame_metal
 
@@ -253,6 +264,8 @@ def _compose_overlay_with_smask(
         )
 
     rgba = np.dstack([cover_rgb, alpha])
+    # Zero RGB in fully transparent pixels to drastically improve PNG compression.
+    rgba[rgba[:, :, 3] == 0, :3] = 0
     output_path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(rgba, mode="RGBA").save(output_path, format="PNG", optimize=True)
 
@@ -320,6 +333,8 @@ def extract_overlay_fallback(cover_jpg_path: Path, output_path: Path, frame_mask
         )
 
     rgba = np.dstack([cover_rgb, alpha])
+    # Zero RGB in fully transparent pixels to drastically improve PNG compression.
+    rgba[rgba[:, :, 3] == 0, :3] = 0
     output_path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(rgba, mode="RGBA").save(output_path, format="PNG", optimize=True)
 

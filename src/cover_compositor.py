@@ -49,13 +49,15 @@ TEMPLATE_PUNCH_RADIUS = 465
 TEMPLATE_FALLBACK_PUNCH_RADIUS = 420
 TEMPLATE_SUPERSAMPLE_FACTOR = 4
 ART_BLEED_PX = 140
+ART_TARGET_OUTER_RADIUS = 700
+ART_OUTER_INSET_PX = 8
 FRAME_MASK_PATH = Path(__file__).resolve().parent.parent / "config" / "frame_mask.png"
 FRAME_OVERLAY_DIR = Path(__file__).resolve().parent.parent / "config" / "frame_overlays"
 FRAME_OVERLAY_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "extract_frame_overlays.py"
 VERIFY_COMPOSITE_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "verify_composite.py"
 # Bump this version when the overlay extraction logic changes.
 # This triggers automatic re-extraction of all cached frame overlays.
-FRAME_OVERLAY_VERSION = 4  # v4 transparent scrollwork gaps in frame ring overlays
+FRAME_OVERLAY_VERSION = 6  # v6 stricter frame-metal classifier + larger circle underlay
 
 _GEOMETRY_CACHE: dict[str, dict[str, int]] = {}
 _FRAME_OVERLAY_EXTRACTION_ATTEMPTED = False
@@ -774,7 +776,13 @@ def composite_single(
 
         canvas = Image.new("RGBA", (cover_w, cover_h), (*fill_rgb, 255))
 
-        art_diameter = FALLBACK_RADIUS * 2 + (ART_BLEED_PX * 2)
+        # Keep generated art beneath the medallion and extend it close to the
+        # medallion outside edge so transparent scrollwork gaps never reveal base fill.
+        art_radius = max(
+            int(FALLBACK_RADIUS + ART_BLEED_PX),
+            int(ART_TARGET_OUTER_RADIUS - ART_OUTER_INSET_PX),
+        )
+        art_diameter = int(art_radius * 2)
         art = _simple_center_crop(illustration)
         art = art.resize((art_diameter, art_diameter), Image.LANCZOS)
         art = _color_match_illustration(cover=cover, illustration=art, region=region_obj)
@@ -786,7 +794,7 @@ def composite_single(
         art_layer = Image.new("RGBA", (cover_w, cover_h), (0, 0, 0, 0))
         art_layer.paste(art, (center_x - art_diameter // 2, center_y - art_diameter // 2))
 
-        clip_radius = art_diameter // 2
+        clip_radius = art_radius
         clip_mask = _build_circle_feather_mask(
             width=cover_w,
             height=cover_h,
@@ -795,8 +803,6 @@ def composite_single(
             radius=clip_radius,
             feather_px=INNER_FEATHER_PX,
         )
-        if strict_window_mask is not None:
-            clip_mask = _combine_masks(clip_mask, strict_window_mask)
         art_layer.putalpha(clip_mask)
 
         result = Image.alpha_composite(canvas, art_layer)
@@ -1513,9 +1519,19 @@ def _build_fallback_frame_overlay(
     g_ch = cover_rgb[:, :, 1].astype(np.float32)
     b_ch = cover_rgb[:, :, 2].astype(np.float32)
     brightness = np.maximum(r_ch, np.maximum(g_ch, b_ch))
+    shadow = np.minimum(r_ch, np.minimum(g_ch, b_ch))
+    saturation = brightness - shadow
 
-    is_gold = ring_mask & (r_ch > 80.0) & (r_ch > (b_ch + 10.0)) & (g_ch > 30.0)
-    is_dark_frame = ring_mask & (brightness < 60.0)
+    is_gold = (
+        ring_mask
+        & (r_ch >= 120.0)
+        & (g_ch >= 85.0)
+        & (b_ch <= 145.0)
+        & ((r_ch - g_ch) >= -4.0)
+        & ((r_ch - b_ch) >= 14.0)
+        & (saturation >= 22.0)
+    )
+    is_dark_frame = ring_mask & (brightness <= 40.0)
     is_frame_metal = is_gold | is_dark_frame
     is_non_metal = ring_mask & ~is_frame_metal
 

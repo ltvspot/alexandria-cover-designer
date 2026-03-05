@@ -41,6 +41,7 @@ COPY config/book_prompts_test-catalog.json config/book_prompts_test-catalog.json
 COPY config/cover_regions.json config/cover_regions.json
 COPY config/cover_regions_test-catalog.json config/cover_regions_test-catalog.json
 COPY config/frame_mask.png config/frame_mask.png
+COPY config/frame_overlays/ config/frame_overlays/
 COPY scripts/extract_frame_overlays.py scripts/extract_frame_overlays.py
 COPY scripts/verify_composite.py scripts/verify_composite.py
 COPY config/prompt_templates.json config/prompt_templates.json
@@ -52,8 +53,6 @@ COPY config/mockup_templates.json config/mockup_templates.json
 COPY config/mockup_background_prompts.json config/mockup_background_prompts.json
 COPY favicon.ico favicon.ico
 COPY .env.example .env.example
-
-RUN python scripts/extract_frame_overlays.py || echo "Overlay extraction skipped"
 
 # Seed lightweight placeholder inputs for the default test catalog in stateless deploys.
 RUN mkdir -p tmp/test_catalog_input/"1. Sample Book - Test Author" \

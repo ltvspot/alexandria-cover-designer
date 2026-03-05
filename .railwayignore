@@ -13,11 +13,8 @@
 !scripts/
 !scripts/quality_review.py
 !scripts/extract_frame_overlays.py
-!scripts/generate_accurate_frame_mask.py
 !scripts/verify_composite.py
 !config/
-!config/templates/
-!config/templates/**
 !config/frame_overlays/
 !config/frame_overlays/**
 !config/catalogs.json
