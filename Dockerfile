@@ -41,7 +41,6 @@ COPY config/book_prompts_test-catalog.json config/book_prompts_test-catalog.json
 COPY config/cover_regions.json config/cover_regions.json
 COPY config/cover_regions_test-catalog.json config/cover_regions_test-catalog.json
 COPY config/frame_mask.png config/frame_mask.png
-COPY config/frame_overlays/ config/frame_overlays/
 COPY scripts/extract_frame_overlays.py scripts/extract_frame_overlays.py
 COPY scripts/verify_composite.py scripts/verify_composite.py
 COPY config/prompt_templates.json config/prompt_templates.json

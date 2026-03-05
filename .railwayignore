@@ -15,8 +15,6 @@
 !scripts/extract_frame_overlays.py
 !scripts/verify_composite.py
 !config/
-!config/frame_overlays/
-!config/frame_overlays/**
 !config/catalogs.json
 !config/book_catalog.json
 !config/book_prompts.json
