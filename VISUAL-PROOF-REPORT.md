@@ -1,8 +1,38 @@
 # Visual Proof Report
 
-Last updated: `2026-03-04`
+Last updated: `2026-03-06`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `58267a2d-62b4-418c-b4ea-c8296210e45f`
+Deployment ID: `dbeb6051-5b97-4717-8e0a-067386db5099`
+
+## 1.6 PROMPT-20/21 PDF Swap + Guardrail Deployment (2026-03-06)
+- Git commit (master):
+  - `e55e53d` — Add PDF swap compositor and prompt21 guardrails
+- Railway deploy:
+  - `dbeb6051-5b97-4717-8e0a-067386db5099` (`SUCCESS`)
+- Local validation before deploy:
+  - `.venv/bin/pytest -q` -> `PASS`
+  - strict PDF verifier on PROMPT-21 QA artifact -> `ALL CHECKS PASSED`
+- Live health after rollout:
+  - `status: ok`
+  - `healthy: true`
+  - `uptime_seconds: 1`
+  - `books_cataloged: 99` (`/api/health`)
+- Live iterate-data check:
+  - `GET /api/iterate-data?catalog=classics` returned `22` models
+  - includes `openrouter/google/gemini-2.5-flash-image`
+- Live generation proof (deployed backend):
+  - API job: `5047d7ad-a170-400e-916e-5604693c7390` (`completed`)
+  - book: `1`
+  - model: `openrouter/google/gemini-2.5-flash-image`
+  - cover source: `drive`
+  - compositor mode: `pdf`
+  - output composite: `tmp/composited/1/openrouter__google__gemini-2.5-flash-image/variant_1.jpg`
+  - output PDF: `tmp/composited/1/openrouter__google__gemini-2.5-flash-image/variant_1.pdf`
+  - raw generated art: `tmp/generated/1/openrouter__google__gemini-2.5-flash-image/variant_1.png`
+- Visual proof artifacts:
+  - live iterate page: `/tmp/alexandria-proof-live/live-iterate-prompt21.png`
+  - live dashboard page: `/tmp/alexandria-proof-live/live-dashboard-prompt21.png`
+  - live composited cover proof: `/tmp/alexandria-proof-live/live-cover-book1-prompt21.jpg`
 
 ## 1.5 PROMPT-11 White Gap + Download/Raw Fixes (2026-03-04)
 - Git commit (master):
