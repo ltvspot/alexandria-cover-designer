@@ -1055,6 +1055,8 @@ window.Pages.iterate = {
           style_id: style?.id || 'none',
           style_label: style?.label || 'Default',
           prompt_source: promptSource,
+          backend_prompt_source: 'custom',
+          compose_prompt: false,
           selected_cover_id: selectedCoverId,
           selected_cover_book_number: selectedCoverBookNumber,
           quality_score: null,

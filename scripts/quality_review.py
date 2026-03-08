@@ -2077,6 +2077,7 @@ def _execute_generation_payload(
     composed_prompt_payload: dict[str, Any] = {}
     book_row = _book_row_for_number(runtime=runtime, book_number=book)
     raw_request_prompt = str(prompt or "").strip()
+    precomposed_prompt = bool(raw_request_prompt) and not compose_prompt
     if compose_prompt and book_row is not None:
         default_diversified_prompt = prompt_generator.build_diversified_prompt(
             book_title=str(book_row.get("title", "")),
@@ -2111,12 +2112,13 @@ def _execute_generation_payload(
         if prompt_source == "template" or not raw_request_prompt:
             prompt = str(composed_prompt_payload.get("prompt", base_prompt_for_composer)).strip()
 
-    if book_row is not None:
+    if book_row is not None and not precomposed_prompt:
         prompt = _ensure_prompt_book_context(
             prompt=prompt,
             book=book_row,
             require_motif=(prompt_source != "custom" or not raw_request_prompt),
         )
+    if book_row is not None:
         logger.info("Generation prompt for book %s (%s): %s", book, prompt_source, prompt)
 
     dry_run = forced_dry_run or (not runtime.has_any_api_key())

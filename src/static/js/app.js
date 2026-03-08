@@ -325,7 +325,8 @@ window.JobQueue = {
             {
               book_id: job.book_id,
               catalog: 'classics',
-              prompt_source: String(job.prompt_source || 'custom').trim().toLowerCase() || 'custom',
+              prompt_source: String(job.backend_prompt_source || job.prompt_source || 'custom').trim().toLowerCase() || 'custom',
+              compose_prompt: job.compose_prompt !== false,
               cover_source: 'drive',
               selected_cover_id: resolvedSelectedCoverId,
               selected_cover_book_number: resolvedBookNumber,
