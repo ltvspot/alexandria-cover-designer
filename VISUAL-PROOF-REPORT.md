@@ -1,8 +1,59 @@
 # Visual Proof Report
 
-Last updated: `2026-03-06`
+Last updated: `2026-03-08`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `dbeb6051-5b97-4717-8e0a-067386db5099`
+Deployment ID: `87ac4e06-68e7-4089-82b0-18a810c5c0cb`
+
+## 1.7 PROMPT-22 Model Routing + Prompt Library + Save Raw (2026-03-08)
+- Git commits:
+  - `7fcd7e6` — preserve prompt text across retries
+  - `4874799` — fix raw artifact persistence
+  - `fb0edd4` — persist composite artifacts after hydration
+  - `7b618c3` — persist Save Raw button state across iterate refreshes
+  - deployed/pushed release tip: `a2d106a`
+- Railway deploy:
+  - `87ac4e06-68e7-4089-82b0-18a810c5c0cb` (`SUCCESS`)
+- Live health after rollout:
+  - `status: ok`
+  - `healthy: true`
+  - `uptime_seconds: 1`
+  - `books_cataloged: 99`
+- Live model inventory proof (`GET /api/models`):
+  - `openrouter/google/gemini-3-pro-image-preview` -> `Nano Banana Pro`
+  - `openrouter/google/gemini-2.5-flash-image` -> `Nano Banana (Gemini 2.5 Flash)`
+  - `google/gemini-3-pro-image-preview` -> `Nano Banana Pro (Google Direct)`
+  - `google/gemini-2.5-flash-image` -> `Gemini 2.5 Flash (Google Direct)`
+- Live base prompt generation proof:
+  - API job: `b163eca0-b49c-4e1b-ac3c-6ea7b4978706`
+  - `library_prompt_id` in request/result: `alexandria-base-romantic-realism`
+  - prompt prefix: `Book cover illustration only`
+  - legacy prompt text present: `false`
+  - compositor mode: `pdf`
+  - raw art path: `Output Covers/raw_art/1/b163eca0-b49c-4e1b-ac3c-_variant_1_openrouter_google_gemini-3-pro-image-preview.png`
+  - saved composite path: `Output Covers/saved_composites/1/b163eca0-b49c-4e1b-ac3c-_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg`
+- Live wildcard prompt generation proof:
+  - API job: `35d22a12-6b5a-4288-aa64-5afa6d66249d`
+  - `library_prompt_id` in request/result: `alexandria-wildcard-edo-meets-alexandria`
+  - prompt prefix: `Book cover illustration only`
+  - legacy prompt text present: `false`
+  - compositor mode: `pdf`
+  - raw art path: `Output Covers/raw_art/1/35d22a12-6b5a-4288-aa64-_variant_1_openrouter_google_gemini-3-pro-image-preview.png`
+  - saved composite path: `Output Covers/saved_composites/1/35d22a12-6b5a-4288-aa64-_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg`
+- Distinct artifact-path proof:
+  - base vs wildcard raw paths unique: `true`
+  - base vs wildcard saved composite paths unique: `true`
+- Live Save Raw proof:
+  - `POST /api/save-raw` for job `35d22a12-6b5a-4288-aa64-5afa6d66249d` returned `200`
+  - response: `ok=true`, `drive_url=null`
+  - local save succeeded under `/app/Output Covers/Chosen Winner Generated Covers/1. A Room with a View - E. M. Forster/...`
+  - Drive upload warning reports service-account quota failure (`storageQuotaExceeded`)
+  - Iterate UI persists amber state: `✓ Saved (Drive unavailable)` after list refresh
+- Visual proof artifacts:
+  - live iterate page: `/tmp/alexandria-proof-live-prompt22-final/live-iterate-prompt22-final.png`
+  - live results section: `/tmp/alexandria-proof-live-prompt22-final/live-iterate-results-prompt22-final.png`
+  - live wildcard result card with persisted save state: `/tmp/alexandria-proof-live-prompt22-final/live-wildcard-card-prompt22-final.png`
+  - live dashboard page: `/tmp/alexandria-proof-live-prompt22-final/live-dashboard-prompt22-final.png`
+  - live composited cover proof: `/tmp/alexandria-proof-live-prompt22-final/live-cover-wildcard-prompt22.jpg`
 
 ## 1.6 PROMPT-20/21 PDF Swap + Guardrail Deployment (2026-03-06)
 - Git commit (master):
