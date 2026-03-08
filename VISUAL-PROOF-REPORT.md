@@ -2,7 +2,55 @@
 
 Last updated: `2026-03-08`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `ef0cc4fc-8239-4f32-9589-044e6cdc7662`
+Deployment ID: `bc4de471-572a-4d6b-a174-231e14ac12a2`
+
+## 1.9 PROMPT-24 Prompt Rotation + Save Prompt Visibility (2026-03-08)
+- Git commit (master):
+  - `2e4512e` — Rotate prompts and fix save prompt visibility
+- Railway deploy:
+  - `01f9a464-7129-47c9-a05a-40714c42bfd6` (`REMOVED`; initial rollout never took traffic)
+  - `bc4de471-572a-4d6b-a174-231e14ac12a2` (`SUCCESS`; active PROMPT-24 runtime used for proof)
+- Local verification before deploy:
+  - `node --check src/static/js/pages/iterate.js` -> `PASS`
+  - `python3 -m py_compile scripts/quality_review.py` -> `PASS`
+  - targeted `pytest` selection for prompt rotation + save prompt upload fallback -> `PASS`
+- Live iterate configuration proof:
+  - selecting book `1` forces prompt selector to `All 10 prompts (auto-rotate)`
+  - variants auto-set to `10`
+  - helper text becomes visible: `Each variant will use a different prompt: 5 base styles + 5 wildcard styles`
+- Live rotated generation proof:
+  - Iterate batch reached `10 completed · 10 total`
+  - rendered result cards showed the full PROMPT-24 rotation in order:
+    - `BASE 1 — Classical Devotion`
+    - `BASE 2 — Philosophical Gravitas`
+    - `BASE 3 — Gothic Atmosphere`
+    - `BASE 4 — Romantic Realism`
+    - `BASE 5 — Esoteric Mysticism`
+    - `WILDCARD 1 — Edo Meets Alexandria`
+    - `WILDCARD 2 — Pre-Raphaelite Garden`
+    - `WILDCARD 3 — Illuminated Manuscript`
+    - `WILDCARD 4 — Celestial Cartography`
+    - `WILDCARD 5 — Temple of Knowledge`
+  - live API confirms completed book `1` jobs across all 10 `library_prompt_id` values for this rotation batch
+  - model: `openrouter/google/gemini-3-pro-image-preview`
+  - compositor mode: `pdf`
+- Live Save Prompt proof:
+  - all 10 completed result cards rendered visible `💾 Save Prompt` buttons before saving
+  - first result card (`BASE 1 — Classical Devotion`) saved successfully and rerendered as `✅ Saved`
+  - saved prompt id: `b9477b67-9413-4dfb-8018-a236d4771fff`
+  - saved prompt class persisted as `save-prompt-btn saved`
+  - `GET /api/prompts?catalog=classics` confirms live winner prompt:
+    - `Winner — A Room with a View — BASE 1 — Classical Devotion`
+    - `category: winner`
+    - `win_count: 1`
+- Live browser console proof:
+  - no warnings or errors captured during the PROMPT-24 proof run
+- Visual proof artifacts:
+  - live iterate configuration: `/tmp/alexandria-proof-live-prompt24-final/live-iterate-config-prompt24.png`
+  - live iterate completed rotation results: `/tmp/alexandria-proof-live-prompt24-final/live-iterate-results-prompt24.png`
+  - live iterate saved-state page: `/tmp/alexandria-proof-live-prompt24-final/live-iterate-saved-prompt24.png`
+  - live saved result card close-up: `/tmp/alexandria-proof-live-prompt24-final/live-result-card-saved-prompt24.png`
+  - live composited cover crop: `/tmp/alexandria-proof-live-prompt24-final/live-cover-book1-prompt24.png`
 
 ## 1.8 PROMPT-23 Scene-Only Prompt Rewrite + Winner Prompt Save (2026-03-08)
 - Git commit (master):
