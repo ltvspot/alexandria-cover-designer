@@ -2,13 +2,14 @@
 
 Last updated: `2026-03-08`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `c02020ba-26a1-45ee-8bb3-58286a891f10`
+Deployment ID: `ef0cc4fc-8239-4f32-9589-044e6cdc7662`
 
 ## 1.8 PROMPT-23 Scene-Only Prompt Rewrite + Winner Prompt Save (2026-03-08)
 - Git commit (master):
   - `c2d1e8b` — Rewrite Alexandria prompts and save winner prompts
 - Railway deploy:
   - `c02020ba-26a1-45ee-8bb3-58286a891f10` (`SUCCESS`)
+  - final parity redeploy from proof-report tip: `ef0cc4fc-8239-4f32-9589-044e6cdc7662` (`SUCCESS`)
 - Local verification before deploy:
   - `node --check src/static/js/pages/iterate.js` -> `PASS`
   - `node --check src/static/js/pages/prompts.js` -> `PASS`
