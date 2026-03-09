@@ -792,7 +792,7 @@ function saveRawButtonState(job) {
     return {
       label: '↻ Retry Drive',
       style: 'background:#d4af37;color:#0a1628;font-weight:600;',
-      title: truncatedWarning || 'Saved locally. Retry Google Drive upload.',
+      title: truncatedWarning || 'Files could not be saved to Google Drive. Retry the upload.',
       driveUrl,
       status,
     };
@@ -1862,7 +1862,7 @@ window.Pages.iterate = {
       this.loadExistingResults();
 
       if (String(data.status || '').trim().toLowerCase() === 'partial') {
-        Toast.warning(String(data.drive_warning || 'Saved locally; Google Drive unavailable.').trim());
+        Toast.error(String(data.drive_warning || 'Files could not be saved to Google Drive. Saved locally only.').trim());
       } else if (retryMode) {
         Toast.success('Google Drive upload completed.');
       } else {

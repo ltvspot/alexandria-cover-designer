@@ -193,6 +193,7 @@ def test_enrich_catalog_and_main(tmp_path: Path, monkeypatch):
         catalog=catalog_path,
         output=output_path,
         books="1",
+        all=False,
         force=False,
         provider=None,
         model=None,
@@ -200,6 +201,10 @@ def test_enrich_catalog_and_main(tmp_path: Path, monkeypatch):
         cost_per_1k=None,
         usage_path=usage_path,
         descriptions=desc_path,
+        delay=0.0,
+        batch_size=50,
+        batch_pause=0.0,
+        validate=False,
     )
     monkeypatch.setattr(be.argparse.ArgumentParser, "parse_args", lambda self: args)
     monkeypatch.setattr(be, "enrich_catalog", lambda **_kwargs: {"ok": True})
@@ -354,7 +359,7 @@ def test_prompt_build_guess_and_normalize_edge_branches():
     assert "Description: Deep sea voyage" in prompt
 
     fallback = be._fallback_enrichment(row={"title": "Alice in Wonderland", "author": "Lewis Carroll"}, description="curious rabbit hole")
-    assert fallback["protagonist"] == "Alice"
+    assert fallback["protagonist"] == "The main character of Alice in Wonderland"
     assert "curious" in fallback["iconic_scenes"][0].lower()
 
     assert be._guess_genre(title_lower="pride and prejudice", author="") == "Literary Fiction / Social Novel"
@@ -382,6 +387,189 @@ def test_prompt_build_guess_and_normalize_edge_branches():
         {"title": "Book", "author": "Author"},
     )
     assert len(normalized2["key_characters"]) >= 3
+
+
+def test_generate_enrichment_retries_generic_response_and_accumulates_tokens(monkeypatch):
+    runtime = SimpleNamespace(openai_api_key="k")
+    row = {"number": 1, "title": "Alice in Wonderland", "author": "Lewis Carroll"}
+    seen_retry_guidance: list[str] = []
+    responses = [
+        {
+            "enrichment": {
+                "genre": "Fantasy",
+                "protagonist": "Central protagonist",
+                "iconic_scenes": ["a", "b", "c"],
+            },
+            "input_tokens": 7,
+            "output_tokens": 3,
+        },
+        {
+            "enrichment": {
+                "genre": "Fantasy",
+                "protagonist": "Alice — curious Victorian child in a blue dress",
+                "iconic_scenes": [
+                    "Alice tumbling down the rabbit hole past floating furniture and shelves.",
+                    "Alice at the Mad Tea Party with the Hatter and March Hare in a cluttered garden.",
+                    "Alice confronting the Queen of Hearts in the surreal croquet ground.",
+                ],
+            },
+            "input_tokens": 5,
+            "output_tokens": 2,
+        },
+    ]
+
+    def _fake_openai(**kwargs):  # type: ignore[no-untyped-def]
+        seen_retry_guidance.append(str(kwargs.get("retry_guidance", "")))
+        return responses.pop(0)
+
+    monkeypatch.setattr(be, "_call_openai", _fake_openai)
+
+    out, in_tok, out_tok, source = be._generate_enrichment(
+        row=row,
+        description="",
+        provider="openai",
+        model="x",
+        max_tokens=20,
+        runtime=runtime,
+    )
+
+    assert source == "llm"
+    assert in_tok == 12
+    assert out_tok == 5
+    assert out["protagonist"].startswith("Alice")
+    assert len(seen_retry_guidance) == 2
+    assert seen_retry_guidance[0] == ""
+    assert "generic language" in seen_retry_guidance[1]
+
+
+def test_generate_enrichment_falls_back_after_two_generic_responses_and_keeps_token_usage(monkeypatch):
+    runtime = SimpleNamespace(openai_api_key="k")
+    row = {"number": 1, "title": "Book", "author": "Author"}
+    responses = [
+        {
+            "enrichment": {
+                "protagonist": "Central protagonist",
+                "iconic_scenes": ["a", "b", "c"],
+            },
+            "input_tokens": 4,
+            "output_tokens": 2,
+        },
+        {
+            "enrichment": {
+                "protagonist": "Central protagonist",
+                "iconic_scenes": ["a", "b", "c"],
+            },
+            "input_tokens": 6,
+            "output_tokens": 1,
+        },
+    ]
+    monkeypatch.setattr(be, "_call_openai", lambda **_kwargs: responses.pop(0))
+
+    out, in_tok, out_tok, source = be._generate_enrichment(
+        row=row,
+        description="",
+        provider="openai",
+        model="x",
+        max_tokens=20,
+        runtime=runtime,
+    )
+
+    assert source == "fallback"
+    assert in_tok == 10
+    assert out_tok == 3
+    assert out["protagonist"] == "The main character of Book"
+
+
+def test_validate_enrichment_rows_flags_generic_and_missing_entries():
+    summary = be.validate_enrichment_rows(
+        [
+            {
+                "number": 1,
+                "enrichment": {
+                    "protagonist": "Alice",
+                    "iconic_scenes": ["one", "two", "three"],
+                },
+            },
+            {
+                "number": 2,
+                "enrichment": {
+                    "protagonist": "Central protagonist",
+                    "iconic_scenes": ["one", "two", "three"],
+                },
+            },
+            {"number": 3, "enrichment": {}},
+        ]
+    )
+
+    assert summary["total_books"] == 3
+    assert summary["usable_books"] == 1
+    assert summary["generic_rows"] == 1
+    assert summary["books_missing_enrichment"] == 1
+    assert summary["passed"] is False
+
+
+def test_resolve_llm_provider_model_switches_to_available_provider():
+    runtime = SimpleNamespace(
+        llm_provider="anthropic",
+        llm_model="claude-sonnet-4-5-20250929",
+        anthropic_api_key="",
+        openai_api_key="k",
+    )
+
+    provider, model = be._resolve_llm_provider_model(runtime=runtime, provider="anthropic", model="claude-sonnet-4-5-20250929")
+
+    assert provider == "openai"
+    assert model == "gpt-4o-mini"
+
+
+def test_enrich_catalog_uses_effective_provider_and_model(tmp_path: Path, monkeypatch):
+    catalog_path = tmp_path / "catalog.json"
+    output_path = tmp_path / "enriched.json"
+    usage_path = tmp_path / "usage.json"
+    desc_path = tmp_path / "descriptions.json"
+    catalog_path.write_text(json.dumps(_catalog_rows()[:1]), encoding="utf-8")
+    desc_path.write_text("{}", encoding="utf-8")
+
+    runtime = SimpleNamespace(
+        llm_provider="anthropic",
+        llm_model="claude-sonnet-4-5-20250929",
+        llm_max_tokens=200,
+        llm_cost_per_1k_tokens=0.01,
+        anthropic_api_key="",
+        openai_api_key="k",
+    )
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(be.config, "get_config", lambda: runtime)
+
+    def _fake_generate_enrichment(**kwargs):  # type: ignore[no-untyped-def]
+        captured["provider"] = kwargs["provider"]
+        captured["model"] = kwargs["model"]
+        return (
+            {
+                "genre": "Generated",
+                "protagonist": "Alice",
+                "iconic_scenes": ["a", "b", "c"],
+            },
+            1,
+            1,
+            "llm",
+        )
+
+    monkeypatch.setattr(be, "_generate_enrichment", _fake_generate_enrichment)
+
+    summary = be.enrich_catalog(
+        catalog_path=catalog_path,
+        output_path=output_path,
+        usage_path=usage_path,
+        descriptions_path=desc_path,
+        books=[1],
+        force_refresh=True,
+    )
+
+    assert captured["provider"] == "openai"
+    assert captured["model"] == "gpt-4o-mini"
+    assert summary["provider"] == "openai"
+    assert summary["model"] == "gpt-4o-mini"
 
 
 def test_parse_json_and_loaders_and_parse_books_edges(tmp_path: Path):

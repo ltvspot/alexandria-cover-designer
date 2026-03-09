@@ -1158,14 +1158,77 @@ def test_save_raw_drive_status_payload_reports_parent_folder_access(
             None,
         ),
     )
+    monkeypatch.setattr(qr, "_probe_drive_write_access", lambda **_kwargs: {"ok": True, "error": "", "file_id": "probe-file"})
 
     payload = qr._save_raw_drive_status_payload(runtime=cfg)
 
     assert payload["ok"] is True
     assert payload["connected"] is True
     assert payload["parent_folder_access"] is True
+    assert payload["write_access"] is True
+    assert payload["retry_supported"] is True
     assert payload["service_account_email"] == "alexandria-bot@example.iam.gserviceaccount.com"
     assert payload["parent_folder_url"].startswith("https://drive.google.com/drive/folders/")
+
+
+def test_sync_catalog_from_drive_queues_auto_enrichment_for_new_books(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg = replace(cfg, gdrive_source_folder_id="source-folder")
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 1, "title": "Book", "author": "Author"}]),
+        encoding="utf-8",
+    )
+    queued: dict[str, Any] = {}
+
+    monkeypatch.setattr(qr, "_resolve_credentials_path", lambda _runtime: tmp_path / "creds.json")
+    monkeypatch.setattr(
+        qr.drive_manager,
+        "list_input_covers",
+        lambda **_kwargs: {
+            "covers": [{"id": "cover-1"}, {"id": "cover-2"}],
+            "total": 2,
+        },
+    )
+    monkeypatch.setattr(
+        qr,
+        "_merge_catalog_rows_with_drive",
+        lambda **_kwargs: (
+            [
+                {"number": 1, "title": "Book", "author": "Author"},
+                {"number": 2, "title": "New Book", "author": "New Author"},
+            ],
+            {"matched": 1, "unmatched": 0, "added": 1},
+        ),
+    )
+    monkeypatch.setattr(
+        qr,
+        "_queue_catalog_enrichment",
+        lambda **kwargs: queued.update(kwargs) or {"queued": True, "reason": kwargs["reason"], "books": kwargs["books"], "count": len(kwargs["books"])},
+    )
+    monkeypatch.setattr(qr, "write_iterate_data", lambda **_kwargs: None)
+    iterate_path = qr._iterate_data_path_for_runtime(cfg)
+
+    def _fake_load_json(path, default):  # type: ignore[no-untyped-def]
+        if Path(path) == iterate_path:
+            return {"books": []}
+        if Path(path).exists():
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+        return default
+
+    monkeypatch.setattr(qr, "_load_json", _fake_load_json)
+    monkeypatch.setattr(qr, "_invalidate_cache", lambda *_args, **_kwargs: 1)
+
+    payload = qr._sync_catalog_from_drive(runtime=cfg)
+
+    assert payload["ok"] is True
+    assert payload["added_drive_entries"] == 1
+    assert payload["auto_enrichment"]["queued"] is True
+    assert payload["auto_enrichment"]["books"] == [2]
+    assert queued["books"] == [2]
+    assert queued["reason"] == "drive_sync_new_books"
 
 
 def test_serialize_generation_results_persists_job_unique_raw_and_composite_artifacts(tmp_path: Path):
@@ -1685,6 +1748,7 @@ def test_run_startup_checks_healthy_with_valid_runtime_layout(tmp_path: Path):
     assert isinstance(report["checks"], list)
     assert any(row["name"] == "book_catalog_json" and row["ok"] for row in report["checks"])
     assert any(row["name"] == "prompts_json" and row["ok"] for row in report["checks"])
+    assert any(row["name"] == "enrichment_coverage" for row in report["checks"])
 
 
 def test_run_startup_checks_reports_missing_prompts_as_issue(tmp_path: Path):

@@ -4,6 +4,7 @@ import json
 import importlib
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -246,6 +247,62 @@ def test_get_config_always_includes_all_gemini_models():
         "google/gemini-2.5-flash-image",
     }
     assert required.issubset(set(cfg.all_models))
+
+
+def test_runtime_model_costs_include_prompt29_riverflow_fix():
+    assert config.runtime_model_costs_copy()["sourceful/riverflow-v2-fast"] == pytest.approx(0.02)
+    assert config.get_config("classics").get_model_cost("openrouter/sourceful/riverflow-v2-fast") == pytest.approx(0.02)
+
+
+def test_sync_openrouter_pricing_updates_runtime_costs_and_get_config(monkeypatch: pytest.MonkeyPatch):
+    class _FakeResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):  # type: ignore[no-untyped-def]
+            return {
+                "data": [
+                    {"id": "sourceful/riverflow-v2-fast", "pricing": {"image": "0.021"}},
+                    {"id": "google/gemini-3-pro-image-preview", "pricing": {"per_image": "0.024"}},
+                ]
+            }
+
+    original_costs = config.runtime_model_costs_copy()
+    original_state = config.openrouter_pricing_sync_status()
+
+    try:
+        session = SimpleNamespace(get=lambda *args, **kwargs: _FakeResponse())
+        status = config.sync_openrouter_pricing(api_key="test-key", session=session)
+        assert status["ok"] is True
+        assert status["updated"] >= 2
+
+        runtime_costs = config.runtime_model_costs_copy()
+        assert runtime_costs["sourceful/riverflow-v2-fast"] == pytest.approx(0.021)
+        assert runtime_costs["openrouter/sourceful/riverflow-v2-fast"] == pytest.approx(0.021)
+        assert runtime_costs["nano-banana-pro"] == pytest.approx(0.024)
+
+        cfg = config.get_config("classics")
+        assert cfg.get_model_cost("nano-banana-pro") == pytest.approx(0.024)
+        assert cfg.cost_per_image_usd == pytest.approx(runtime_costs.get(cfg.ai_model, 0.04))
+    finally:
+        with config._RUNTIME_MODEL_COST_LOCK:
+            config._RUNTIME_MODEL_COST_USD.clear()
+            config._RUNTIME_MODEL_COST_USD.update(original_costs)
+            config._OPENROUTER_PRICING_SYNC_STATE.clear()
+            config._OPENROUTER_PRICING_SYNC_STATE.update(original_state)
+
+
+def test_sync_openrouter_pricing_skips_without_api_key():
+    original_state = config.openrouter_pricing_sync_status()
+    try:
+        status = config.sync_openrouter_pricing(api_key="", session=SimpleNamespace(get=lambda *_args, **_kwargs: None))
+        assert status["ok"] is False
+        assert status["skipped"] is True
+        assert status["reason"] == "missing_api_key"
+    finally:
+        with config._RUNTIME_MODEL_COST_LOCK:
+            config._OPENROUTER_PRICING_SYNC_STATE.clear()
+            config._OPENROUTER_PRICING_SYNC_STATE.update(original_state)
 
 
 def test_drive_and_budget_alias_env_vars_are_honored(monkeypatch: pytest.MonkeyPatch):

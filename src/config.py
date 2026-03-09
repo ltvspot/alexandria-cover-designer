@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+import requests
 
 try:
     from src.logger import get_logger
@@ -66,6 +69,7 @@ GDRIVE_MOCKUPS_FOLDER_ID = os.getenv("GDRIVE_MOCKUPS_FOLDER_ID", "")
 GDRIVE_AMAZON_FOLDER_ID = os.getenv("GDRIVE_AMAZON_FOLDER_ID", "")
 GDRIVE_SOCIAL_FOLDER_ID = os.getenv("GDRIVE_SOCIAL_FOLDER_ID", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "")
+OPENROUTER_PRICING_SYNC_INTERVAL_SECONDS = int(os.getenv("OPENROUTER_PRICING_SYNC_INTERVAL_SECONDS", "21600"))
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").strip()
 WEBHOOK_EVENTS = [token.strip() for token in os.getenv("WEBHOOK_EVENTS", "batch_complete,batch_error,milestone").split(",") if token.strip()]
 OUTBOUND_ALLOWLIST_DOMAINS = [
@@ -191,7 +195,7 @@ MODEL_COST_USD: dict[str, float] = {
     "sourceful/riverflow-v2-max-preview": 0.075,
     "sourceful/riverflow-v2-standard-preview": 0.035,
     "sourceful/riverflow-v2-fast-preview": 0.03,
-    "sourceful/riverflow-v2-fast": 0.04,
+    "sourceful/riverflow-v2-fast": 0.02,
     "bytedance-seed/seedream-4.5": 0.04,
     "black-forest-labs/flux.2-max": 0.07,
     "black-forest-labs/flux.2-flex": 0.06,
@@ -206,6 +210,19 @@ MODEL_COST_USD: dict[str, float] = {
     "imagen-4.0-fast-generate-001": 0.03,
     "imagen-4.0-generate-001": 0.06,
     "imagen-4.0-ultra-generate-001": 0.08,
+}
+
+_RUNTIME_MODEL_COST_USD: dict[str, float] = MODEL_COST_USD.copy()
+_RUNTIME_MODEL_COST_LOCK = threading.Lock()
+_OPENROUTER_PRICING_SYNC_THREAD: threading.Thread | None = None
+_OPENROUTER_PRICING_SYNC_STARTED = False
+_OPENROUTER_PRICING_SYNC_STATE: dict[str, Any] = {
+    "ok": False,
+    "skipped": True,
+    "reason": "not_started",
+    "updated": 0,
+    "last_synced_at": "",
+    "error": "",
 }
 
 MODEL_MODALITY: dict[str, str] = {
@@ -773,7 +790,7 @@ class Config:
 
     model_provider_map: dict[str, str] = field(default_factory=lambda: MODEL_PROVIDER_MAP.copy())
     model_alias_map: dict[str, str] = field(default_factory=lambda: MODEL_ALIAS_MAP.copy())
-    model_cost_usd: dict[str, float] = field(default_factory=lambda: MODEL_COST_USD.copy())
+    model_cost_usd: dict[str, float] = field(default_factory=lambda: runtime_model_costs_copy())
     model_modality: dict[str, str] = field(default_factory=lambda: MODEL_MODALITY.copy())
 
     failures_path: Path = FAILURES_PATH
@@ -802,7 +819,7 @@ class Config:
     # Compatibility aliases
     input_covers_dir: Path = INPUT_DIR
     output_covers_dir: Path = OUTPUT_DIR
-    cost_per_image_usd: float = MODEL_COST_USD.get(AI_MODEL, 0.04)
+    cost_per_image_usd: float = field(default_factory=lambda: runtime_model_costs_copy().get(AI_MODEL, 0.04))
 
     @property
     def provider_keys(self) -> dict[str, str]:
@@ -856,9 +873,183 @@ class Config:
 RuntimeConfig = Config
 
 
+def runtime_model_costs_copy() -> dict[str, float]:
+    with _RUNTIME_MODEL_COST_LOCK:
+        return dict(_RUNTIME_MODEL_COST_USD)
+
+
+def openrouter_pricing_sync_status() -> dict[str, Any]:
+    with _RUNTIME_MODEL_COST_LOCK:
+        return dict(_OPENROUTER_PRICING_SYNC_STATE)
+
+
+def _coerce_price_value(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def _extract_openrouter_image_price(model_payload: dict[str, Any]) -> float | None:
+    pricing = model_payload.get("pricing", {})
+    if isinstance(pricing, dict):
+        for key in ("image", "per_image"):
+            parsed = _coerce_price_value(pricing.get(key))
+            if parsed is not None:
+                return parsed
+        for key in ("per_megapixel", "megapixel", "image_per_megapixel"):
+            parsed = _coerce_price_value(pricing.get(key))
+            if parsed is not None:
+                return parsed
+    for key in ("per_image", "image_price", "price_per_image", "price_per_megapixel"):
+        parsed = _coerce_price_value(model_payload.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _openrouter_cost_keys(model_id: str) -> set[str]:
+    token = str(model_id or "").strip()
+    if not token:
+        return set()
+    keys = {token, f"openrouter/{token}"}
+    for alias, resolved in MODEL_ALIAS_MAP.items():
+        if str(resolved).strip() == f"openrouter/{token}":
+            keys.add(str(alias).strip())
+    return {key for key in keys if key}
+
+
+def sync_openrouter_pricing(*, api_key: str | None = None, session: Any = requests) -> dict[str, Any]:
+    key = str(api_key or OPENROUTER_API_KEY or "").strip()
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    if not key:
+        state = {
+            "ok": False,
+            "skipped": True,
+            "reason": "missing_api_key",
+            "updated": 0,
+            "last_synced_at": now,
+            "error": "",
+        }
+        with _RUNTIME_MODEL_COST_LOCK:
+            _OPENROUTER_PRICING_SYNC_STATE.update(state)
+        return dict(state)
+
+    try:
+        response = session.get(
+            "https://openrouter.ai/api/v1/models",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=15,
+        )
+    except Exception as exc:  # pragma: no cover - network failure
+        message = f"OpenRouter pricing sync error: {exc}"
+        logger.warning(message)
+        state = {
+            "ok": False,
+            "skipped": False,
+            "reason": "request_error",
+            "updated": 0,
+            "last_synced_at": now,
+            "error": str(exc),
+        }
+        with _RUNTIME_MODEL_COST_LOCK:
+            _OPENROUTER_PRICING_SYNC_STATE.update(state)
+        return dict(state)
+
+    if getattr(response, "status_code", 0) != 200:
+        message = getattr(response, "text", "") or f"HTTP {getattr(response, 'status_code', 0)}"
+        logger.warning("OpenRouter pricing sync failed: %s", message[:240])
+        state = {
+            "ok": False,
+            "skipped": False,
+            "reason": "http_error",
+            "updated": 0,
+            "last_synced_at": now,
+            "error": message[:240],
+        }
+        with _RUNTIME_MODEL_COST_LOCK:
+            _OPENROUTER_PRICING_SYNC_STATE.update(state)
+        return dict(state)
+
+    payload = response.json()
+    models = payload.get("data", []) if isinstance(payload, dict) else []
+    if not isinstance(models, list):
+        models = []
+
+    canonical_updates: dict[str, tuple[float, float]] = {}
+    with _RUNTIME_MODEL_COST_LOCK:
+        runtime_costs = dict(_RUNTIME_MODEL_COST_USD)
+        for row in models:
+            if not isinstance(row, dict):
+                continue
+            model_id = str(row.get("id", "") or "").strip()
+            if not model_id:
+                continue
+            price = _extract_openrouter_image_price(row)
+            if price is None:
+                continue
+            keys = _openrouter_cost_keys(model_id)
+            if not any(key in runtime_costs or key in MODEL_COST_USD for key in keys):
+                continue
+            for key in keys:
+                old = runtime_costs.get(key, MODEL_COST_USD.get(key))
+                runtime_costs[key] = price
+                if old is not None and abs(float(old) - price) >= 1e-9 and key in {model_id, f"openrouter/{model_id}"}:
+                    canonical_updates[key] = (float(old), price)
+        _RUNTIME_MODEL_COST_USD.clear()
+        _RUNTIME_MODEL_COST_USD.update(runtime_costs)
+        _OPENROUTER_PRICING_SYNC_STATE.update(
+            {
+                "ok": True,
+                "skipped": False,
+                "reason": "",
+                "updated": len(canonical_updates),
+                "last_synced_at": now,
+                "error": "",
+            }
+        )
+
+    for model_name, values in sorted(canonical_updates.items()):
+        old, new = values
+        logger.info("Price update: %s changed from $%.3f to $%.3f per image", model_name, old, new)
+    return openrouter_pricing_sync_status()
+
+
+def start_openrouter_pricing_sync(*, api_key: str | None = None, interval_seconds: int = OPENROUTER_PRICING_SYNC_INTERVAL_SECONDS) -> bool:
+    global _OPENROUTER_PRICING_SYNC_THREAD, _OPENROUTER_PRICING_SYNC_STARTED
+    key = str(api_key or OPENROUTER_API_KEY or "").strip()
+    if not key or _OPENROUTER_PRICING_SYNC_STARTED:
+        return False
+
+    period = max(300, int(interval_seconds or OPENROUTER_PRICING_SYNC_INTERVAL_SECONDS))
+
+    def _worker() -> None:
+        while True:
+            try:
+                sync_openrouter_pricing(api_key=key)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("OpenRouter pricing background sync crashed: %s", exc)
+            time.sleep(period)
+
+    _OPENROUTER_PRICING_SYNC_THREAD = threading.Thread(
+        target=_worker,
+        name="openrouter-pricing-sync",
+        daemon=True,
+    )
+    _OPENROUTER_PRICING_SYNC_THREAD.start()
+    _OPENROUTER_PRICING_SYNC_STARTED = True
+    return True
+
+
 def get_config(catalog_id: str | None = None) -> Config:
     ensure_runtime_dirs()
     cfg = Config()
+    cfg.model_cost_usd = runtime_model_costs_copy()
     cfg.all_models = _sanitize_all_models(cfg.all_models)
     for model in REQUIRED_MODELS_ORDER:
         if model not in cfg.all_models:
@@ -874,6 +1065,7 @@ def get_config(catalog_id: str | None = None) -> Config:
     cfg.all_models = ordered_models
     if str(cfg.ai_model or "").strip().lower().startswith("replicate/"):
         cfg.ai_model = cfg.all_models[0] if cfg.all_models else ""
+    cfg.cost_per_image_usd = cfg.get_model_cost(cfg.ai_model)
     cfg.variants_per_cover = max(1, int(cfg.variants_per_cover or 1))
     cfg.max_generation_variants = max(cfg.variants_per_cover, int(cfg.max_generation_variants or cfg.variants_per_cover))
     cfg.max_export_variants = max(1, int(cfg.max_export_variants or 1))

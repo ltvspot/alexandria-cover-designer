@@ -209,6 +209,8 @@ _PRINT_VALIDATOR_LOCK = threading.Lock()
 _PRINT_VALIDATOR_INSTANCE: print_validator.PrintValidator | None = None
 _VISUAL_QA_RUNNING: set[str] = set()
 _VISUAL_QA_RUNNING_LOCK = threading.Lock()
+_CATALOG_ENRICHMENT_THREADS: dict[str, threading.Thread] = {}
+_CATALOG_ENRICHMENT_THREADS_LOCK = threading.Lock()
 
 
 def _budget_presets_for_runtime(runtime: config.Config) -> list[dict[str, Any]]:
@@ -4309,6 +4311,80 @@ def _merge_catalog_rows_with_drive(
     }
 
 
+def _queue_catalog_enrichment(*, runtime: config.Config, books: list[int], reason: str) -> dict[str, Any]:
+    target_books = sorted({int(book) for book in books if int(book) > 0})
+    if not target_books:
+        return {"queued": False, "reason": "no_books", "books": [], "count": 0}
+
+    catalog_id = runtime.catalog_id
+    enriched_path = config.enriched_catalog_path(catalog_id=catalog_id, config_dir=runtime.config_dir)
+    usage_path = _llm_usage_path_for_runtime(runtime)
+    descriptions_path = runtime.config_dir / "book_descriptions.json"
+
+    with _CATALOG_ENRICHMENT_THREADS_LOCK:
+        active = _CATALOG_ENRICHMENT_THREADS.get(catalog_id)
+        if active is not None and active.is_alive():
+            return {
+                "queued": False,
+                "reason": "already_running",
+                "books": target_books,
+                "count": len(target_books),
+            }
+
+        def _worker() -> None:
+            try:
+                worker_runtime = config.get_config(catalog_id)
+                summary = book_enricher.enrich_catalog(
+                    catalog_path=worker_runtime.book_catalog_path,
+                    output_path=enriched_path,
+                    books=target_books,
+                    force_refresh=False,
+                    provider=worker_runtime.llm_provider,
+                    model=worker_runtime.llm_model,
+                    max_tokens=worker_runtime.llm_max_tokens,
+                    cost_per_1k_tokens=worker_runtime.llm_cost_per_1k_tokens,
+                    usage_path=usage_path,
+                    descriptions_path=descriptions_path,
+                )
+                write_iterate_data(runtime=worker_runtime)
+                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/dashboard-data", "/api/analytics/")
+                logger.info(
+                    "Background enrichment completed",
+                    extra={
+                        "catalog": catalog_id,
+                        "reason": reason,
+                        "books": len(target_books),
+                        "validation": summary.get("validation", {}),
+                    },
+                )
+            except Exception as exc:  # pragma: no cover - background guard
+                logger.warning(
+                    "Background enrichment failed for catalog %s (%s): %s",
+                    catalog_id,
+                    reason,
+                    exc,
+                )
+            finally:
+                with _CATALOG_ENRICHMENT_THREADS_LOCK:
+                    if _CATALOG_ENRICHMENT_THREADS.get(catalog_id) is thread:
+                        _CATALOG_ENRICHMENT_THREADS.pop(catalog_id, None)
+
+        thread = threading.Thread(
+            target=_worker,
+            name=f"catalog-enrich-{catalog_id}",
+            daemon=True,
+        )
+        _CATALOG_ENRICHMENT_THREADS[catalog_id] = thread
+        thread.start()
+
+    return {
+        "queued": True,
+        "reason": reason,
+        "books": target_books,
+        "count": len(target_books),
+    }
+
+
 def _sync_catalog_from_drive(*, runtime: config.Config, force: bool = False, limit: int = 5000) -> dict[str, Any]:
     source_default = (
         str(getattr(runtime, "gdrive_source_folder_id", "") or "").strip()
@@ -4354,6 +4430,11 @@ def _sync_catalog_from_drive(*, runtime: config.Config, force: bool = False, lim
         raise RuntimeError("No Drive titles found in source folder.")
 
     existing_catalog_rows = _catalog_books_payload(runtime.book_catalog_path)
+    existing_numbers = {
+        _safe_int(row.get("number"), 0)
+        for row in existing_catalog_rows
+        if isinstance(row, dict) and _safe_int(row.get("number"), 0) > 0
+    }
     if existing_catalog_rows:
         catalog_rows, merge_stats = _merge_catalog_rows_with_drive(
             existing_rows=existing_catalog_rows,
@@ -4373,6 +4454,16 @@ def _sync_catalog_from_drive(*, runtime: config.Config, force: bool = False, lim
 
     runtime.book_catalog_path.parent.mkdir(parents=True, exist_ok=True)
     safe_json.atomic_write_json(runtime.book_catalog_path, catalog_rows)
+    added_numbers = [
+        _safe_int(row.get("number"), 0)
+        for row in catalog_rows
+        if isinstance(row, dict) and _safe_int(row.get("number"), 0) > 0 and _safe_int(row.get("number"), 0) not in existing_numbers
+    ]
+    auto_enrichment = _queue_catalog_enrichment(
+        runtime=runtime,
+        books=added_numbers,
+        reason="drive_sync_new_books",
+    )
     write_iterate_data(runtime=runtime)
     iterate_payload = _load_json(_iterate_data_path_for_runtime(runtime), {"books": []})
     iterate_rows = iterate_payload.get("books", []) if isinstance(iterate_payload, dict) else []
@@ -4419,6 +4510,7 @@ def _sync_catalog_from_drive(*, runtime: config.Config, force: bool = False, lim
         "matched_drive_entries": int(merge_stats.get("matched", 0)),
         "unmatched_drive_entries": int(merge_stats.get("unmatched", 0)),
         "added_drive_entries": int(merge_stats.get("added", 0)),
+        "auto_enrichment": auto_enrichment,
         "books": cgi_books,
     }
 
@@ -5773,6 +5865,66 @@ def _build_slo_evaluation(*, runtime: config.Config) -> tuple[dict[str, Any], di
     return api_slo, job_slo, slo_evaluation
 
 
+def _enrichment_coverage_payload(*, runtime: config.Config) -> dict[str, Any]:
+    source_rows = _catalog_books_payload(runtime.book_catalog_path)
+    total_books = len(source_rows)
+    enriched_path = config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir)
+    enriched_rows = _load_json(enriched_path, [])
+    valid_numbers: set[int] = set()
+    if isinstance(enriched_rows, list):
+        for row in enriched_rows:
+            if not isinstance(row, dict):
+                continue
+            number = _safe_int(row.get("number"), 0)
+            enrichment = row.get("enrichment", {})
+            if number <= 0 or not isinstance(enrichment, dict) or not enrichment:
+                continue
+            if book_enricher._has_generic_content(enrichment):  # type: ignore[attr-defined]
+                continue
+            valid_numbers.add(number)
+    usable_books = sum(
+        1
+        for row in source_rows
+        if isinstance(row, dict) and _safe_int(row.get("number"), 0) in valid_numbers
+    )
+    coverage_ratio = float(usable_books) / float(total_books) if total_books > 0 else 1.0
+    return {
+        "total_books": total_books,
+        "usable_books": usable_books,
+        "coverage_ratio": coverage_ratio,
+        "enriched_path": str(enriched_path),
+    }
+
+
+def _probe_drive_write_access(*, service: Any, parent_folder_id: str) -> dict[str, Any]:
+    fd, probe_name = tempfile.mkstemp(prefix="drive-write-probe-", suffix=".txt")
+    os.close(fd)
+    probe_path = Path(probe_name)
+    probe_path.write_bytes(b"1")
+    created_file_id = ""
+    try:
+        media = gdrive_sync.MediaFileUpload(str(probe_path), mimetype="text/plain")
+        created = service.files().create(
+            body={
+                "name": f"alexandria-write-probe-{uuid.uuid4().hex[:8]}.txt",
+                "parents": [str(parent_folder_id)],
+            },
+            media_body=media,
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+        created_file_id = str(created.get("id", "") or "").strip()
+        if not created_file_id:
+            raise RuntimeError("Google Drive write probe did not return an id")
+        service.files().delete(fileId=created_file_id, supportsAllDrives=True).execute()
+        return {"ok": True, "error": "", "file_id": created_file_id}
+    except Exception as exc:
+        details = _drive_error_details(exc)
+        return {"ok": False, "error": details["message"], "file_id": created_file_id}
+    finally:
+        probe_path.unlink(missing_ok=True)
+
+
 def _run_startup_checks(runtime: config.Config) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     issues: list[str] = []
@@ -5826,18 +5978,27 @@ def _run_startup_checks(runtime: config.Config) -> dict[str, Any]:
     any_key = any(bool(v.strip()) for v in runtime.provider_keys.values())
     _record("provider_api_keys", any_key, "No provider API keys configured", level="warning")
 
+    enrichment_coverage = _enrichment_coverage_payload(runtime=runtime)
+    _record(
+        "enrichment_coverage",
+        float(enrichment_coverage.get("coverage_ratio", 0.0)) >= 0.90,
+        (
+            f"Only {int(enrichment_coverage.get('usable_books', 0))}/"
+            f"{int(enrichment_coverage.get('total_books', 0))} books have usable enrichment data. "
+            "Run 'python -m src.book_enricher --force --all' to refresh enrichment."
+        ),
+        level="warning",
+    )
+
     drive_source_folder = (
         str(getattr(runtime, "gdrive_source_folder_id", "") or "").strip()
         or str(getattr(runtime, "gdrive_input_folder_id", "") or "").strip()
         or str(getattr(runtime, "gdrive_output_folder_id", "") or "").strip()
     )
     if drive_source_folder:
-        drive_credentials_path = _resolve_credentials_path(runtime)
-        drive_mode, drive_mode_error = _drive_credentials_mode(runtime, credentials_path=drive_credentials_path)
+        service, _credentials_path, drive_mode, credentials_meta, drive_error = _drive_service_for_runtime(runtime)
         if drive_mode:
-            try:
-                auth_path = None if drive_mode == "service_account_env" else drive_credentials_path
-                gdrive_sync.authenticate(auth_path)
+            if service is not None:
                 _record(
                     "google_drive_auth",
                     True,
@@ -5848,23 +6009,42 @@ def _run_startup_checks(runtime: config.Config) -> dict[str, Any]:
                     "Google Drive connected. Covers will be downloaded on demand from folder %s.",
                     drive_source_folder,
                 )
-            except Exception as exc:
+                write_probe = _probe_drive_write_access(service=service, parent_folder_id=SAVE_RAW_DRIVE_FOLDER_ID)
+                write_detail = (
+                    f"Save Raw Drive uploads verified for folder {SAVE_RAW_DRIVE_FOLDER_ID}."
+                    if bool(write_probe.get("ok", False))
+                    else (
+                        "Drive upload will fail — service account "
+                        f"{str(credentials_meta.get('client_email', '') or '(unknown)')} lacks write access to "
+                        f"folder {SAVE_RAW_DRIVE_FOLDER_ID}. Share the folder with the service account as Editor. "
+                        f"({str(write_probe.get('error', '') or 'write probe failed')})"
+                    )
+                )
+                _record(
+                    "save_raw_drive_write_access",
+                    bool(write_probe.get("ok", False)),
+                    write_detail,
+                    level="warning",
+                )
+                if not bool(write_probe.get("ok", False)):
+                    logger.warning(write_detail)
+            else:
                 _record(
                     "google_drive_auth",
                     False,
-                    f"Google Drive credential validation failed: {exc}",
+                    str(drive_error or "Google Drive credentials are not configured."),
                     level="warning",
                 )
                 logger.warning(
                     "Google Drive credentials not configured. Set GOOGLE_CREDENTIALS_JSON env var. "
                     "Cover generation will only work with local files. (%s)",
-                    exc,
+                    drive_error,
                 )
         else:
             _record(
                 "google_drive_auth",
                 False,
-                str(drive_mode_error or "Google Drive credentials are not configured."),
+                str(drive_error or "Google Drive credentials are not configured."),
                 level="warning",
             )
             logger.warning(
@@ -5920,6 +6100,10 @@ def serve_review_webapp(
     ACTIVE_WORKER_MODE = mode
     bind_host = (host or os.getenv("HOST", "0.0.0.0")).strip() or "0.0.0.0"
     default_runtime = config.get_config()
+    config.sync_openrouter_pricing(api_key=default_runtime.openrouter_api_key)
+    config.start_openrouter_pricing_sync(api_key=default_runtime.openrouter_api_key)
+    default_runtime.model_cost_usd = config.runtime_model_costs_copy()
+    default_runtime.cost_per_image_usd = default_runtime.get_model_cost(default_runtime.ai_model)
     _bootstrap_state_store_for_runtime(default_runtime)
     global STARTUP_HEALTH
     STARTUP_HEALTH = _run_startup_checks(default_runtime)
@@ -11702,6 +11886,8 @@ def _save_raw_drive_status_payload(*, runtime: config.Config) -> dict[str, Any]:
         "parent_folder_access": False,
         "parent_folder_name": "",
         "parent_folder_url": f"https://drive.google.com/drive/folders/{SAVE_RAW_DRIVE_FOLDER_ID}",
+        "write_access": False,
+        "write_probe_error": "",
         "retry_supported": False,
     }
     if service is None:
@@ -11712,6 +11898,7 @@ def _save_raw_drive_status_payload(*, runtime: config.Config) -> dict[str, Any]:
         parent = service.files().get(
             fileId=SAVE_RAW_DRIVE_FOLDER_ID,
             fields="id,name,webViewLink",
+            supportsAllDrives=True,
         ).execute()
     except Exception as exc:
         details = _drive_error_details(exc)
@@ -11721,7 +11908,10 @@ def _save_raw_drive_status_payload(*, runtime: config.Config) -> dict[str, Any]:
     payload["parent_folder_access"] = bool(str(parent.get("id", "") or "").strip())
     payload["parent_folder_name"] = str(parent.get("name", "") or "")
     payload["parent_folder_url"] = str(parent.get("webViewLink", "") or payload["parent_folder_url"])
-    payload["retry_supported"] = payload["connected"] and payload["parent_folder_access"]
+    write_probe = _probe_drive_write_access(service=service, parent_folder_id=SAVE_RAW_DRIVE_FOLDER_ID)
+    payload["write_access"] = bool(write_probe.get("ok", False))
+    payload["write_probe_error"] = str(write_probe.get("error", "") or "")
+    payload["retry_supported"] = payload["connected"] and payload["parent_folder_access"] and payload["write_access"]
     return payload
 
 
@@ -13262,7 +13452,13 @@ def _find_existing_drive_file_id(*, service: Any, parent_folder_id: str, file_na
         f"'{str(parent_folder_id)}' in parents and "
         "trashed=false"
     )
-    existing = service.files().list(q=query, fields="files(id, name)", pageSize=1).execute().get("files", [])
+    existing = service.files().list(
+        q=query,
+        fields="files(id, name)",
+        pageSize=1,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute().get("files", [])
     if not existing:
         return ""
     return str(existing[0].get("id", "")).strip()
@@ -13280,7 +13476,12 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
             mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
             media = gdrive_sync.MediaFileUpload(str(file_path), mimetype=mime_type)
             if existing_file_id:
-                updated = service.files().update(fileId=existing_file_id, media_body=media, fields="id").execute()
+                updated = service.files().update(
+                    fileId=existing_file_id,
+                    media_body=media,
+                    fields="id",
+                    supportsAllDrives=True,
+                ).execute()
                 file_id = str(updated.get("id", existing_file_id) or existing_file_id).strip()
                 return {
                     "ok": True,
@@ -13294,6 +13495,7 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
                 body={"name": file_path.name, "parents": [str(parent_folder_id)]},
                 media_body=media,
                 fields="id",
+                supportsAllDrives=True,
             ).execute()
             file_id = str(created.get("id", "")).strip()
             if not file_id:
@@ -13371,7 +13573,10 @@ def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folde
     except Exception as exc:
         details = _drive_error_details(exc)
         result["error"] = details["message"]
-        result["warning"] = f"Drive upload failed: {details['message']}"
+        result["warning"] = (
+            "Files could not be saved to Google Drive. "
+            f"The destination folder could not be prepared. Error: {details['message']}"
+        )
         result["failed"] = [
             {
                 "ok": False,
@@ -13408,13 +13613,11 @@ def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folde
     result["ok"] = bool(child_folder_id) and result["failed_count"] == 0
     if result["failed_count"] > 0:
         result["error"] = str(result["failed"][0].get("error", "") or "Drive upload failed.")
-        if result["uploaded_count"] > 0:
-            result["warning"] = (
-                f"Drive upload partially completed: {result['uploaded_count']} uploaded, "
-                f"{result['failed_count']} failed."
-            )
-        else:
-            result["warning"] = f"Drive upload failed for {result['failed_count']} file(s)."
+        result["warning"] = (
+            "Files could not be saved to Google Drive. "
+            f"The folder was created but {result['failed_count']} file(s) failed to upload. "
+            f"Error: {result['error']}"
+        )
     return result
 
 
@@ -13532,7 +13735,13 @@ def _ensure_drive_child_folder(*, service: Any, parent_folder_id: str, folder_na
         f"'{str(parent_folder_id)}' in parents and "
         "mimeType='application/vnd.google-apps.folder' and trashed=false"
     )
-    existing = service.files().list(q=query, fields="files(id, name)", pageSize=1).execute().get("files", [])
+    existing = service.files().list(
+        q=query,
+        fields="files(id, name)",
+        pageSize=1,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute().get("files", [])
     if existing:
         folder_id = str(existing[0].get("id", "")).strip()
         if folder_id:
@@ -13545,6 +13754,7 @@ def _ensure_drive_child_folder(*, service: Any, parent_folder_id: str, folder_na
             "parents": [str(parent_folder_id)],
         },
         fields="id",
+        supportsAllDrives=True,
     ).execute()
     folder_id = str(created.get("id", "")).strip()
     if not folder_id:
@@ -13582,18 +13792,25 @@ def _upload_saved_prompt_metadata_to_drive(
             f"name='{file_name_query}' and "
             f"'{str(child_folder_id)}' in parents and trashed=false"
         )
-        existing = service.files().list(q=query, fields="files(id, name)", pageSize=1).execute().get("files", [])
+        existing = service.files().list(
+            q=query,
+            fields="files(id, name)",
+            pageSize=1,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        ).execute().get("files", [])
         media = gdrive_sync.MediaFileUpload(str(temp_path), mimetype="application/json")
         if existing:
             file_id = str(existing[0].get("id", "")).strip()
             if not file_id:
                 raise RuntimeError("Google Drive file update target is missing an id")
-            service.files().update(fileId=file_id, media_body=media).execute()
+            service.files().update(fileId=file_id, media_body=media, supportsAllDrives=True).execute()
         else:
             created = service.files().create(
                 body={"name": file_name, "parents": [child_folder_id]},
                 media_body=media,
                 fields="id",
+                supportsAllDrives=True,
             ).execute()
             file_id = str(created.get("id", "")).strip()
             if not file_id:
