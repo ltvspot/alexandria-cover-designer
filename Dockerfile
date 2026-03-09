@@ -36,6 +36,7 @@ RUN mkdir -p config scripts
 COPY scripts/quality_review.py scripts/quality_review.py
 COPY config/catalogs.json config/catalogs.json
 COPY config/book_catalog.json config/book_catalog.json
+COPY config/book_catalog_enriched.json config/book_catalog_enriched.json
 COPY config/book_prompts.json config/book_prompts.json
 COPY config/book_catalog_test-catalog.json config/book_catalog_test-catalog.json
 COPY config/book_prompts_test-catalog.json config/book_prompts_test-catalog.json

@@ -96,6 +96,29 @@ def test_generation_idempotency_key_stable_model_order():
     assert key_b == key_c
 
 
+def test_api_models_payload_prefers_runtime_cost_when_history_is_zero(monkeypatch: pytest.MonkeyPatch):
+    runtime = config.get_config("classics")
+    monkeypatch.setattr(
+        qr,
+        "_quality_by_model_payload",
+        lambda **_kwargs: {
+            "models": [
+                {
+                    "model": "openrouter/google/gemini-2.5-flash-image",
+                    "provider": "openrouter",
+                    "count": 0,
+                    "avg_cost_per_variant": 0.0,
+                }
+            ]
+        },
+    )
+
+    payload = qr._api_models_payload(runtime=runtime)
+    models = payload.get("models", [])
+    target = next(row for row in models if row.get("id") == "openrouter/google/gemini-2.5-flash-image")
+    assert float(target.get("cost_per_image", 0.0)) == pytest.approx(runtime.get_model_cost("openrouter/google/gemini-2.5-flash-image"))
+
+
 def test_generation_idempotency_key_changes_with_cover_source_and_selected_cover():
     base = qr._generation_idempotency_key(
         catalog_id="classics",

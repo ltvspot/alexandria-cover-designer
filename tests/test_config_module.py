@@ -292,6 +292,42 @@ def test_sync_openrouter_pricing_updates_runtime_costs_and_get_config(monkeypatc
             config._OPENROUTER_PRICING_SYNC_STATE.update(original_state)
 
 
+def test_sync_openrouter_pricing_ignores_suspiciously_tiny_image_prices():
+    class _FakeResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):  # type: ignore[no-untyped-def]
+            return {
+                "data": [
+                    {"id": "google/gemini-3-pro-image-preview", "pricing": {"per_image": "0.000002"}},
+                ]
+            }
+
+    original_costs = config.runtime_model_costs_copy()
+    original_state = config.openrouter_pricing_sync_status()
+
+    try:
+        session = SimpleNamespace(get=lambda *args, **kwargs: _FakeResponse())
+        status = config.sync_openrouter_pricing(api_key="test-key", session=session)
+        assert status["ok"] is True
+
+        runtime_costs = config.runtime_model_costs_copy()
+        assert runtime_costs["nano-banana-pro"] == pytest.approx(original_costs["nano-banana-pro"])
+        assert runtime_costs["openrouter/google/gemini-3-pro-image-preview"] == pytest.approx(
+            original_costs["openrouter/google/gemini-3-pro-image-preview"]
+        )
+        assert runtime_costs["google/gemini-3-pro-image-preview"] == pytest.approx(
+            original_costs["google/gemini-3-pro-image-preview"]
+        )
+    finally:
+        with config._RUNTIME_MODEL_COST_LOCK:
+            config._RUNTIME_MODEL_COST_USD.clear()
+            config._RUNTIME_MODEL_COST_USD.update(original_costs)
+            config._OPENROUTER_PRICING_SYNC_STATE.clear()
+            config._OPENROUTER_PRICING_SYNC_STATE.update(original_state)
+
+
 def test_sync_openrouter_pricing_skips_without_api_key():
     original_state = config.openrouter_pricing_sync_status()
     try:

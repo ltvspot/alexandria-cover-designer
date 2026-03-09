@@ -996,6 +996,25 @@ def sync_openrouter_pricing(*, api_key: str | None = None, session: Any = reques
             keys = _openrouter_cost_keys(model_id)
             if not any(key in runtime_costs or key in MODEL_COST_USD for key in keys):
                 continue
+            baseline_candidates = [
+                float(runtime_costs.get(key, 0.0) or 0.0)
+                for key in keys
+                if float(runtime_costs.get(key, 0.0) or 0.0) > 0
+            ]
+            baseline_candidates.extend(
+                float(MODEL_COST_USD.get(key, 0.0) or 0.0)
+                for key in keys
+                if float(MODEL_COST_USD.get(key, 0.0) or 0.0) > 0
+            )
+            baseline = max(baseline_candidates) if baseline_candidates else 0.0
+            if baseline >= 0.001 and price < (baseline * 0.1):
+                logger.warning(
+                    "Ignoring suspiciously low OpenRouter image price for %s: %.6f (baseline %.6f)",
+                    model_id,
+                    price,
+                    baseline,
+                )
+                continue
             for key in keys:
                 old = runtime_costs.get(key, MODEL_COST_USD.get(key))
                 runtime_costs[key] = price

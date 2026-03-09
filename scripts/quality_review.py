@@ -4878,7 +4878,9 @@ def _api_models_payload(*, runtime: config.Config) -> dict[str, Any]:
         count = _safe_int(stats.get("count"), 0)
         failure_rate_percent = _safe_float(stats.get("failure_rate_percent"), 0.0)
         success_rate = max(0.0, min(1.0, 1.0 - (failure_rate_percent / 100.0 if count > 0 else 0.0)))
-        model_cost = round(_safe_float(stats.get("avg_cost_per_variant"), runtime.get_model_cost(model)), 6)
+        runtime_cost = round(_safe_float(runtime.get_model_cost(model), 0.04), 6)
+        historical_cost = round(_safe_float(stats.get("avg_cost_per_variant"), 0.0), 6)
+        model_cost = historical_cost if count > 0 and historical_cost > 0 else runtime_cost
         out.append(
             {
                 "id": model,
