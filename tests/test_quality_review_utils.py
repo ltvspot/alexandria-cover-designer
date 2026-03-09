@@ -979,6 +979,195 @@ def test_save_raw_helpers_resolve_paths_and_preserve_display_naming(tmp_path: Pa
     assert qr._display_filename_token("Temple – Dawn") == "Temple – Dawn"
 
 
+def test_upload_single_file_to_drive_retries_and_updates_existing_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    file_path = tmp_path / "cover.jpg"
+    file_path.write_bytes(b"jpg-bytes")
+    monkeypatch.setattr(qr.gdrive_sync, "MediaFileUpload", lambda path, mimetype=None: SimpleNamespace(path=path, mimetype=mimetype))
+
+    class _FakeFiles:
+        def __init__(self) -> None:
+            self.update_attempts = 0
+
+        def list(self, **_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(execute=lambda: {"files": [{"id": "file-existing", "name": file_path.name}]})
+
+        def update(self, **kwargs):  # type: ignore[no-untyped-def]
+            def _execute():
+                self.update_attempts += 1
+                if self.update_attempts == 1:
+                    raise RuntimeError("temporary drive failure")
+                return {"id": kwargs["fileId"]}
+
+            return SimpleNamespace(execute=_execute)
+
+    class _FakeService:
+        def __init__(self) -> None:
+            self._files = _FakeFiles()
+
+        def files(self):
+            return self._files
+
+    result = qr._upload_single_file_to_drive(
+        service=_FakeService(),
+        parent_folder_id="folder-1",
+        file_path=file_path,
+    )
+
+    assert result["ok"] is True
+    assert result["action"] == "updated"
+    assert result["attempts"] == 2
+    assert result["file_id"] == "file-existing"
+
+
+def test_upload_folder_to_drive_returns_structured_failure_when_drive_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    local_folder = tmp_path / "Chosen Winner Generated Covers" / "1. Book - Author"
+    local_folder.mkdir(parents=True, exist_ok=True)
+    (local_folder / "Book – Author.jpg").write_bytes(b"jpg")
+
+    monkeypatch.setattr(
+        qr,
+        "_drive_service_for_runtime",
+        lambda _runtime: (
+            None,
+            Path("/tmp/credentials.json"),
+            None,
+            {"client_email": "", "source": "missing", "loaded": False},
+            "No Google credentials found.",
+        ),
+    )
+
+    result = qr._upload_folder_to_drive(
+        runtime=cfg,
+        local_folder=local_folder,
+        folder_name="1. Book - Author",
+        parent_folder_id="parent-folder",
+    )
+
+    assert result["ok"] is False
+    assert result["uploaded_count"] == 0
+    assert result["failed_count"] == 1
+    assert "No Google credentials found" in str(result["warning"])
+    assert result["failed"][0]["name"] == "Book – Author.jpg"
+
+
+def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 7, "title": "Temple Dawn", "author": "A. Writer"}]),
+        encoding="utf-8",
+    )
+    raw_path = cfg.tmp_dir / "generated" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.png"
+    comp_path = cfg.tmp_dir / "composited" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.jpg"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (12, 34, 56)).save(raw_path, format="PNG")
+    Image.new("RGB", (64, 64), (56, 34, 12)).save(comp_path, format="JPEG")
+    job = qr.job_store.JobRecord(
+        id="job-raw-partial",
+        idempotency_key="idem-raw-partial",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=7,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 1,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "image_path": str(raw_path),
+                    "composited_path": str(comp_path),
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+    monkeypatch.setattr(
+        qr,
+        "_upload_folder_to_drive",
+        lambda **_kwargs: {
+            "ok": False,
+            "folder_id": "drive-folder-1",
+            "drive_url": "https://drive.google.com/drive/folders/drive-folder-1",
+            "uploaded": [{"name": "Temple Dawn – A. Writer (generated raw).png"}],
+            "failed": [{"name": "Temple Dawn – A. Writer.jpg", "error": "storageQuotaExceeded"}],
+            "warning": "Drive upload partially completed: 1 uploaded, 1 failed.",
+        },
+    )
+
+    payload = qr._save_raw_payload_for_job(runtime=cfg, job=job)
+
+    assert payload["ok"] is True
+    assert payload["status"] == "partial"
+    assert payload["retry_available"] is True
+    assert payload["drive_folder_id"] == "drive-folder-1"
+    assert len(payload["saved_files"]) == 2
+    assert Path(payload["saved_files"][0]).exists()
+    assert Path(payload["saved_files"][1]).exists()
+    assert "Drive upload partially completed" in str(payload["warning"])
+
+
+def test_save_raw_drive_status_payload_reports_parent_folder_access(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+
+    class _FakeFiles:
+        def get(self, **kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(
+                execute=lambda: {
+                    "id": kwargs["fileId"],
+                    "name": "Chosen Winner Generated Covers",
+                    "webViewLink": f"https://drive.google.com/drive/folders/{kwargs['fileId']}",
+                }
+            )
+
+    class _FakeService:
+        def files(self):
+            return _FakeFiles()
+
+    monkeypatch.setattr(
+        qr,
+        "_drive_service_for_runtime",
+        lambda _runtime: (
+            _FakeService(),
+            Path("/tmp/credentials.json"),
+            "service_account_env",
+            {"client_email": "alexandria-bot@example.iam.gserviceaccount.com", "source": "env", "loaded": True},
+            None,
+        ),
+    )
+
+    payload = qr._save_raw_drive_status_payload(runtime=cfg)
+
+    assert payload["ok"] is True
+    assert payload["connected"] is True
+    assert payload["parent_folder_access"] is True
+    assert payload["service_account_email"] == "alexandria-bot@example.iam.gserviceaccount.com"
+    assert payload["parent_folder_url"].startswith("https://drive.google.com/drive/folders/")
+
+
 def test_serialize_generation_results_persists_job_unique_raw_and_composite_artifacts(tmp_path: Path):
     cfg = _build_runtime_for_startup_checks(tmp_path)
     model = "openrouter/google/gemini-3-pro-image-preview"

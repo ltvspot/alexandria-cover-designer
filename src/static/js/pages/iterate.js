@@ -775,7 +775,7 @@ function sceneSnippetText(value, maxLength = 84) {
 function saveRawButtonState(job) {
   const status = String(job?.save_raw_status || '').trim().toLowerCase();
   const driveUrl = String(job?.save_raw_drive_url || '').trim();
-  const warning = String(job?.save_raw_warning || '').trim();
+  const warning = String(job?.save_raw_drive_warning || job?.save_raw_warning || '').trim();
   const truncatedWarning = warning.length > 220 ? `${warning.slice(0, 220)}…` : warning;
 
   if (status === 'saved') {
@@ -790,10 +790,10 @@ function saveRawButtonState(job) {
 
   if (status === 'partial') {
     return {
-      label: '✓ Saved (Drive unavailable)',
+      label: '↻ Retry Drive',
       style: 'background:#d4af37;color:#0a1628;font-weight:600;',
-      title: truncatedWarning || 'Saved locally; Google Drive unavailable.',
-      driveUrl: '',
+      title: truncatedWarning || 'Saved locally. Retry Google Drive upload.',
+      driveUrl,
       status,
     };
   }
@@ -805,6 +805,22 @@ function saveRawButtonState(job) {
     driveUrl: '',
     status: '',
   };
+}
+
+function applySaveRawPayloadToJob(job, data) {
+  if (!job || !data || typeof data !== 'object') return;
+  job.save_raw_status = String(data.status || (data.drive_ok ? 'saved' : 'partial') || '').trim();
+  job.save_raw_warning = String(data.warning || '').trim();
+  job.save_raw_drive_warning = String(data.drive_warning || data.warning || '').trim();
+  job.save_raw_drive_url = String(data.drive_url || '').trim();
+  job.save_raw_drive_folder_id = String(data.drive_folder_id || '').trim();
+  job.save_raw_local_folder = String(data.local_folder || '').trim();
+  job.save_raw_saved_files = Array.isArray(data.saved_files) ? data.saved_files : [];
+  job.save_raw_missing_files = Array.isArray(data.missing_files) ? data.missing_files : [];
+  job.save_raw_drive_uploaded = Array.isArray(data.drive_uploaded) ? data.drive_uploaded : [];
+  job.save_raw_drive_failed = Array.isArray(data.drive_failed) ? data.drive_failed : [];
+  job.save_raw_retry_available = Boolean(data.retry_available);
+  job.save_raw_saved_at = new Date().toISOString();
 }
 
 function savedPromptForJob(job) {
@@ -1811,8 +1827,9 @@ window.Pages.iterate = {
   async saveRaw(jobId, button) {
     const job = DB.dbGet('jobs', jobId);
     if (!job || !button) return;
+    const currentStatus = String(button.dataset.saveStatus || job.save_raw_status || '').trim().toLowerCase();
     const existingDriveUrl = String(button.dataset.driveUrl || job.save_raw_drive_url || '').trim();
-    if (existingDriveUrl) {
+    if (currentStatus === 'saved' && existingDriveUrl) {
       window.open(existingDriveUrl, '_blank', 'noopener,noreferrer');
       return;
     }
@@ -1822,14 +1839,15 @@ window.Pages.iterate = {
       return;
     }
 
+    const retryMode = currentStatus === 'partial';
     const originalText = String(button.textContent || '💾 Save Raw');
     const originalBackground = button.style.background;
     const originalColor = button.style.color;
     button.disabled = true;
-    button.textContent = 'Saving...';
+    button.textContent = retryMode ? 'Retrying...' : 'Saving...';
 
     try {
-      const resp = await fetch('/api/save-raw', {
+      const resp = await fetch(retryMode ? '/api/retry-drive-upload' : '/api/save-raw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_id: backendJobId }),
@@ -1839,18 +1857,14 @@ window.Pages.iterate = {
         throw new Error(data.message || data.error || `HTTP ${resp.status}`);
       }
 
-      const partial = Boolean(data.warning) && !data.drive_url;
-      job.save_raw_status = partial ? 'partial' : 'saved';
-      job.save_raw_warning = String(data.warning || '').trim();
-      job.save_raw_drive_url = String(data.drive_url || '').trim();
-      job.save_raw_local_folder = String(data.local_folder || '').trim();
-      job.save_raw_saved_files = Array.isArray(data.saved_files) ? data.saved_files : [];
-      job.save_raw_saved_at = new Date().toISOString();
+      applySaveRawPayloadToJob(job, data);
       DB.dbPut('jobs', job);
       this.loadExistingResults();
 
-      if (partial) {
-        Toast.warning('Saved locally; Google Drive unavailable.');
+      if (String(data.status || '').trim().toLowerCase() === 'partial') {
+        Toast.warning(String(data.drive_warning || 'Saved locally; Google Drive unavailable.').trim());
+      } else if (retryMode) {
+        Toast.success('Google Drive upload completed.');
       } else {
         Toast.success('Saved raw package.');
       }

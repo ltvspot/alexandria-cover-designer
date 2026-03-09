@@ -166,6 +166,7 @@ def test_quality_review_server_primary_routes_smoke():
             "/api/analytics/audit",
             "/api/analytics/reports",
             "/api/analytics/reports/schedule",
+            "/api/drive-status",
             "/api/drive/status",
             "/api/drive/sync-status",
             "/api/drive/input-covers",
@@ -203,6 +204,12 @@ def test_quality_review_server_primary_routes_smoke():
 def test_quality_review_server_drive_and_provider_connectivity_payloads():
     process, base_url = _start_server()
     try:
+        status_save_raw_drive, save_raw_drive = _request_json(base_url, "/api/drive-status")
+        assert status_save_raw_drive == 200
+        assert save_raw_drive.get("ok") is True
+        for key in ("connected", "mode", "service_account_email", "parent_folder_id", "parent_folder_access"):
+            assert key in save_raw_drive
+
         status_drive, drive = _request_json(base_url, "/api/drive/status")
         assert status_drive == 200
         assert drive.get("ok") is True

@@ -83,6 +83,92 @@ def authenticate(credentials_path: Path | None = None):
     return build("drive", "v3", credentials=creds)
 
 
+def credential_details(credentials_path: Path | None = None) -> dict[str, Any]:
+    """Return non-secret credential metadata for diagnostics."""
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON", "").strip()
+    payload: dict[str, Any] | None = None
+    source = "missing"
+    resolved_path = Path(credentials_path) if credentials_path is not None else None
+
+    if creds_json:
+        try:
+            parsed = json.loads(creds_json)
+        except json.JSONDecodeError as exc:
+            return {
+                "source": "env",
+                "loaded": False,
+                "error": f"GOOGLE_CREDENTIALS_JSON is not valid JSON: {exc}",
+                "path": "",
+                "type": "",
+                "client_email": "",
+                "project_id": "",
+                "client_id": "",
+            }
+        if not isinstance(parsed, dict):
+            return {
+                "source": "env",
+                "loaded": False,
+                "error": "GOOGLE_CREDENTIALS_JSON must be a JSON object",
+                "path": "",
+                "type": "",
+                "client_email": "",
+                "project_id": "",
+                "client_id": "",
+            }
+        payload = parsed
+        source = "env"
+    elif resolved_path is not None and resolved_path.exists():
+        try:
+            parsed = json.loads(resolved_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {
+                "source": "file",
+                "loaded": False,
+                "error": str(exc),
+                "path": str(resolved_path),
+                "type": "",
+                "client_email": "",
+                "project_id": "",
+                "client_id": "",
+            }
+        if not isinstance(parsed, dict):
+            return {
+                "source": "file",
+                "loaded": False,
+                "error": "Credentials file must contain a JSON object",
+                "path": str(resolved_path),
+                "type": "",
+                "client_email": "",
+                "project_id": "",
+                "client_id": "",
+            }
+        payload = parsed
+        source = "file"
+
+    if not isinstance(payload, dict):
+        return {
+            "source": source,
+            "loaded": False,
+            "error": "No Google credentials found",
+            "path": str(resolved_path) if resolved_path is not None else "",
+            "type": "",
+            "client_email": "",
+            "project_id": "",
+            "client_id": "",
+        }
+
+    return {
+        "source": source,
+        "loaded": True,
+        "error": "",
+        "path": str(resolved_path) if (resolved_path is not None and source == "file") else "",
+        "type": str(payload.get("type", "") or ""),
+        "client_email": str(payload.get("client_email", "") or ""),
+        "project_id": str(payload.get("project_id", "") or ""),
+        "client_id": str(payload.get("client_id", "") or ""),
+    }
+
+
 def sync_to_drive(
     local_output_dir: Path,
     drive_folder_id: str,

@@ -150,6 +150,8 @@ CGI_CATALOG_CACHE_PATH = PROJECT_ROOT / "catalog_cache.json"
 CGI_CATALOG_MAX_AGE_SECONDS = 3600
 SAVE_RAW_DRIVE_FOLDER_ID = "1SHzAaDU1pN0ECC61KCRtYijv4dp4IR59"
 SAVE_RAW_LOCAL_DIRNAME = "Chosen Winner Generated Covers"
+SAVE_RAW_DRIVE_RETRY_ATTEMPTS = max(1, int(os.getenv("SAVE_RAW_DRIVE_RETRY_ATTEMPTS", "2")))
+SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS = max(0.0, float(os.getenv("SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS", "0.5")))
 SAVE_PROMPT_DRIVE_SUBDIR = "saved_prompts"
 FALLBACK_FAVICON_SVG = (
     b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
@@ -6695,6 +6697,14 @@ def serve_review_webapp(
                     )
                 content_type = "application/pdf" if report_path.suffix.lower() == ".pdf" else "application/json"
                 return self._send_file(report_path, content_type=content_type, cache_control="no-store")
+            if path == "/api/drive-status":
+                return _cache_and_send(
+                    {
+                        **_save_raw_drive_status_payload(runtime=runtime_req),
+                        "catalog": runtime_req.catalog_id,
+                        "endpoint": path,
+                    }
+                )
             if path == "/api/drive/status" or path == "/api/drive/sync-status":
                 source_default = (
                     getattr(runtime_req, "gdrive_source_folder_id", "")
@@ -9871,8 +9881,9 @@ def serve_review_webapp(
                         status=HTTPStatus.NOT_FOUND,
                         endpoint=path,
                     )
-                book = _book_row_for_number(runtime=runtime_req, book_number=int(job.book_number or 0))
-                if not isinstance(book, dict):
+                try:
+                    payload = _save_raw_payload_for_job(runtime=runtime_req, job=job)
+                except LookupError:
                     return self._send_error(
                         code="BOOK_NOT_FOUND",
                         message="book not found for job",
@@ -9880,23 +9891,7 @@ def serve_review_webapp(
                         status=HTTPStatus.NOT_FOUND,
                         endpoint=path,
                     )
-
-                title = _display_filename_token(str(book.get("title", f"Book {int(job.book_number or 0)}")))
-                author = _display_filename_token(str(book.get("author", "Unknown")))
-                catalog_number = str(
-                    book.get("catalog_number")
-                    or book.get("number")
-                    or job.book_number
-                    or "0"
-                ).strip()
-                folder_name = f"{catalog_number}. {title} - {author}"
-                file_stem = f"{title} – {author}"
-                raw_filename = f"{file_stem} (generated raw).png"
-                comp_filename = f"{file_stem}.jpg"
-
-                raw_source = _resolve_raw_image_path_for_job(runtime=runtime_req, job=job)
-                comp_source = _resolve_composite_image_path_for_job(runtime=runtime_req, job=job)
-                if raw_source is None and comp_source is None:
+                except FileNotFoundError:
                     return self._send_error(
                         code="JOB_OUTPUTS_NOT_FOUND",
                         message="No raw or composite image found for job",
@@ -9904,49 +9899,46 @@ def serve_review_webapp(
                         status=HTTPStatus.NOT_FOUND,
                         endpoint=path,
                     )
+                return self._send_json(payload)
 
-                local_folder = _local_save_raw_root(runtime=runtime_req) / folder_name
-                local_folder.mkdir(parents=True, exist_ok=True)
-                warnings: list[str] = []
-                saved_files: list[str] = []
-
-                if raw_source is not None and raw_source.exists():
-                    raw_target = _copy_image_with_format(raw_source, local_folder / raw_filename, format_name="PNG")
-                    saved_files.append(str(raw_target))
-                else:
-                    warnings.append("Generated raw image not found.")
-
-                if comp_source is not None and comp_source.exists():
-                    comp_target = _copy_image_with_format(comp_source, local_folder / comp_filename, format_name="JPEG")
-                    saved_files.append(str(comp_target))
-                else:
-                    warnings.append("Composite image not found.")
-
-                drive_url: str | None = None
-                try:
-                    drive_url = _upload_folder_to_drive(
-                        runtime=runtime_req,
-                        local_folder=local_folder,
-                        folder_name=folder_name,
-                        parent_folder_id=SAVE_RAW_DRIVE_FOLDER_ID,
+            if path == "/api/retry-drive-upload":
+                job_id = str(body.get("job_id", "") or body.get("backend_job_id", "")).strip()
+                if not job_id:
+                    return self._send_error(
+                        code="JOB_ID_REQUIRED",
+                        message="job_id is required",
+                        status=HTTPStatus.BAD_REQUEST,
+                        endpoint=path,
                     )
-                except Exception as exc:
-                    warning = f"Drive upload failed: {exc}"
-                    logger.warning(warning)
-                    warnings.append(warning)
-
-                return self._send_json(
-                    {
-                        "ok": True,
-                        "job_id": job_id,
-                        "book_number": int(job.book_number or 0),
-                        "folder_name": folder_name,
-                        "local_folder": str(local_folder),
-                        "saved_files": saved_files,
-                        "drive_url": drive_url,
-                        "warning": " ".join(warnings).strip() or None,
-                    }
-                )
+                job = job_db_store.get_job(job_id)
+                if job is None:
+                    return self._send_error(
+                        code="JOB_NOT_FOUND",
+                        message="job not found",
+                        details={"job_id": job_id},
+                        status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                try:
+                    payload = _save_raw_payload_for_job(runtime=runtime_req, job=job)
+                except LookupError:
+                    return self._send_error(
+                        code="BOOK_NOT_FOUND",
+                        message="book not found for job",
+                        details={"job_id": job_id, "book_number": int(job.book_number or 0)},
+                        status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                except FileNotFoundError:
+                    return self._send_error(
+                        code="JOB_OUTPUTS_NOT_FOUND",
+                        message="No raw or composite image found for job",
+                        details={"job_id": job_id},
+                        status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                payload["retried"] = True
+                return self._send_json(payload)
 
             if path == "/api/save-prompt":
                 try:
@@ -11696,6 +11688,43 @@ def _drive_credentials_mode(
     return None, "No Google credentials found. Set GOOGLE_CREDENTIALS_JSON environment variable."
 
 
+def _save_raw_drive_status_payload(*, runtime: config.Config) -> dict[str, Any]:
+    service, credentials_path, mode, credentials_meta, connection_error = _drive_service_for_runtime(runtime)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "connected": False,
+        "mode": mode,
+        "error": connection_error,
+        "credentials_path": str(credentials_path),
+        "credentials": credentials_meta,
+        "service_account_email": str(credentials_meta.get("client_email", "") or ""),
+        "parent_folder_id": SAVE_RAW_DRIVE_FOLDER_ID,
+        "parent_folder_access": False,
+        "parent_folder_name": "",
+        "parent_folder_url": f"https://drive.google.com/drive/folders/{SAVE_RAW_DRIVE_FOLDER_ID}",
+        "retry_supported": False,
+    }
+    if service is None:
+        return payload
+
+    payload["connected"] = True
+    try:
+        parent = service.files().get(
+            fileId=SAVE_RAW_DRIVE_FOLDER_ID,
+            fields="id,name,webViewLink",
+        ).execute()
+    except Exception as exc:
+        details = _drive_error_details(exc)
+        payload["error"] = details["message"]
+        return payload
+
+    payload["parent_folder_access"] = bool(str(parent.get("id", "") or "").strip())
+    payload["parent_folder_name"] = str(parent.get("name", "") or "")
+    payload["parent_folder_url"] = str(parent.get("webViewLink", "") or payload["parent_folder_url"])
+    payload["retry_supported"] = payload["connected"] and payload["parent_folder_access"]
+    return payload
+
+
 def _collect_selected_variant_files(output_dir: Path, selections: dict[str, Any], *, catalog_path: Path = config.BOOK_CATALOG_PATH) -> list[str]:
     if not selections:
         return []
@@ -13169,34 +13198,331 @@ def _local_save_raw_root(*, runtime: config.Config) -> Path:
     return runtime.output_dir / SAVE_RAW_LOCAL_DIRNAME
 
 
-def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folder_name: str, parent_folder_id: str) -> str:
+def _escape_drive_query_value(token: str) -> str:
+    return str(token or "").replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _drive_error_details(exc: Exception) -> dict[str, Any]:
+    message = str(exc).strip() or exc.__class__.__name__
+    error_code = ""
+    http_status = 0
+    content = getattr(exc, "content", None)
+    if isinstance(content, (bytes, bytearray)):
+        try:
+            payload = json.loads(content.decode("utf-8"))
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            error_payload = payload.get("error", payload)
+            if isinstance(error_payload, dict):
+                nested_message = str(error_payload.get("message", "") or "").strip()
+                if nested_message:
+                    message = nested_message
+                error_code = str(error_payload.get("status", "") or error_payload.get("code", "") or "").strip()
+                detail_rows = error_payload.get("errors", [])
+                if not error_code and isinstance(detail_rows, list) and detail_rows:
+                    first = detail_rows[0]
+                    if isinstance(first, dict):
+                        error_code = str(first.get("reason", "") or first.get("domain", "") or "").strip()
+    resp = getattr(exc, "resp", None)
+    if resp is not None:
+        try:
+            http_status = int(getattr(resp, "status", 0) or 0)
+        except Exception:
+            http_status = 0
+    if not error_code and "storageQuotaExceeded" in message:
+        error_code = "storageQuotaExceeded"
+    return {
+        "message": message,
+        "code": error_code,
+        "http_status": http_status,
+    }
+
+
+def _drive_service_for_runtime(runtime: config.Config) -> tuple[Any | None, Path, str | None, dict[str, Any], str | None]:
     credentials_path = _resolve_credentials_path(runtime)
     if not credentials_path.is_absolute():
         credentials_path = PROJECT_ROOT / credentials_path
-    service = gdrive_sync.authenticate(credentials_path if credentials_path.exists() else None)
+    mode, mode_error = _drive_credentials_mode(runtime, credentials_path=credentials_path)
+    credentials_meta = gdrive_sync.credential_details(credentials_path)
+    if not mode:
+        return None, credentials_path, None, credentials_meta, mode_error or "Google Drive credentials are not configured."
+    auth_path = None if mode == "service_account_env" else credentials_path
+    try:
+        service = gdrive_sync.authenticate(auth_path)
+    except Exception as exc:
+        return None, credentials_path, mode, credentials_meta, _drive_error_details(exc)["message"]
+    return service, credentials_path, mode, credentials_meta, None
 
-    folder_metadata = {
-        "name": str(folder_name),
-        "mimeType": "application/vnd.google-apps.folder",
-        "parents": [str(parent_folder_id)],
+
+def _find_existing_drive_file_id(*, service: Any, parent_folder_id: str, file_name: str) -> str:
+    file_name_query = _escape_drive_query_value(file_name)
+    query = (
+        f"name='{file_name_query}' and "
+        f"'{str(parent_folder_id)}' in parents and "
+        "trashed=false"
+    )
+    existing = service.files().list(q=query, fields="files(id, name)", pageSize=1).execute().get("files", [])
+    if not existing:
+        return ""
+    return str(existing[0].get("id", "")).strip()
+
+
+def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_path: Path) -> dict[str, Any]:
+    max_attempts = SAVE_RAW_DRIVE_RETRY_ATTEMPTS
+    for attempt in range(1, max_attempts + 1):
+        try:
+            existing_file_id = _find_existing_drive_file_id(
+                service=service,
+                parent_folder_id=parent_folder_id,
+                file_name=file_path.name,
+            )
+            mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+            media = gdrive_sync.MediaFileUpload(str(file_path), mimetype=mime_type)
+            if existing_file_id:
+                updated = service.files().update(fileId=existing_file_id, media_body=media, fields="id").execute()
+                file_id = str(updated.get("id", existing_file_id) or existing_file_id).strip()
+                return {
+                    "ok": True,
+                    "name": file_path.name,
+                    "path": str(file_path),
+                    "file_id": file_id,
+                    "action": "updated",
+                    "attempts": attempt,
+                }
+            created = service.files().create(
+                body={"name": file_path.name, "parents": [str(parent_folder_id)]},
+                media_body=media,
+                fields="id",
+            ).execute()
+            file_id = str(created.get("id", "")).strip()
+            if not file_id:
+                raise RuntimeError("Google Drive file upload did not return an id")
+            return {
+                "ok": True,
+                "name": file_path.name,
+                "path": str(file_path),
+                "file_id": file_id,
+                "action": "created",
+                "attempts": attempt,
+            }
+        except Exception as exc:
+            details = _drive_error_details(exc)
+            if attempt < max_attempts and SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS > 0:
+                time.sleep(SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS)
+                continue
+            return {
+                "ok": False,
+                "name": file_path.name,
+                "path": str(file_path),
+                "file_id": "",
+                "action": "failed",
+                "attempts": attempt,
+                "error": details["message"],
+                "error_code": details["code"],
+                "http_status": details["http_status"],
+            }
+
+
+def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folder_name: str, parent_folder_id: str) -> dict[str, Any]:
+    local_files = [file_path for file_path in sorted(local_folder.iterdir()) if file_path.is_file()]
+    service, credentials_path, mode, credentials_meta, connection_error = _drive_service_for_runtime(runtime)
+    result: dict[str, Any] = {
+        "ok": False,
+        "mode": mode,
+        "folder_name": str(folder_name),
+        "parent_folder_id": str(parent_folder_id),
+        "folder_id": "",
+        "drive_url": None,
+        "uploaded": [],
+        "failed": [],
+        "uploaded_count": 0,
+        "failed_count": 0,
+        "credentials_path": str(credentials_path),
+        "credentials": credentials_meta,
+        "warning": None,
+        "error": connection_error,
     }
-    created_folder = service.files().create(body=folder_metadata, fields="id").execute()
-    created_folder_id = str(created_folder.get("id", "")).strip()
-    if not created_folder_id:
-        raise RuntimeError("Google Drive folder creation did not return an id")
+    if service is None:
+        result["warning"] = connection_error or "Google Drive is unavailable."
+        result["failed"] = [
+            {
+                "ok": False,
+                "name": file_path.name,
+                "path": str(file_path),
+                "file_id": "",
+                "action": "failed",
+                "attempts": 0,
+                "error": result["warning"],
+                "error_code": "",
+                "http_status": 0,
+            }
+            for file_path in local_files
+        ]
+        result["failed_count"] = len(result["failed"])
+        return result
 
-    for file_path in sorted(local_folder.iterdir()):
-        if not file_path.is_file():
-            continue
-        mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
-        file_metadata = {
-            "name": file_path.name,
-            "parents": [created_folder_id],
-        }
-        media = gdrive_sync.MediaFileUpload(str(file_path), mimetype=mime_type)
-        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+    try:
+        child_folder_id = _ensure_drive_child_folder(
+            service=service,
+            parent_folder_id=parent_folder_id,
+            folder_name=folder_name,
+        )
+    except Exception as exc:
+        details = _drive_error_details(exc)
+        result["error"] = details["message"]
+        result["warning"] = f"Drive upload failed: {details['message']}"
+        result["failed"] = [
+            {
+                "ok": False,
+                "name": file_path.name,
+                "path": str(file_path),
+                "file_id": "",
+                "action": "failed",
+                "attempts": 0,
+                "error": details["message"],
+                "error_code": details["code"],
+                "http_status": details["http_status"],
+            }
+            for file_path in local_files
+        ]
+        result["failed_count"] = len(result["failed"])
+        return result
 
-    return f"https://drive.google.com/drive/folders/{created_folder_id}"
+    result["folder_id"] = child_folder_id
+    result["drive_url"] = f"https://drive.google.com/drive/folders/{child_folder_id}"
+
+    for file_path in local_files:
+        upload_row = _upload_single_file_to_drive(
+            service=service,
+            parent_folder_id=child_folder_id,
+            file_path=file_path,
+        )
+        if bool(upload_row.get("ok", False)):
+            result["uploaded"].append(upload_row)
+        else:
+            result["failed"].append(upload_row)
+
+    result["uploaded_count"] = len(result["uploaded"])
+    result["failed_count"] = len(result["failed"])
+    result["ok"] = bool(child_folder_id) and result["failed_count"] == 0
+    if result["failed_count"] > 0:
+        result["error"] = str(result["failed"][0].get("error", "") or "Drive upload failed.")
+        if result["uploaded_count"] > 0:
+            result["warning"] = (
+                f"Drive upload partially completed: {result['uploaded_count']} uploaded, "
+                f"{result['failed_count']} failed."
+            )
+        else:
+            result["warning"] = f"Drive upload failed for {result['failed_count']} file(s)."
+    return result
+
+
+def _save_raw_context_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> dict[str, Any]:
+    book = _book_row_for_number(runtime=runtime, book_number=int(job.book_number or 0))
+    if not isinstance(book, dict):
+        raise LookupError("book not found for job")
+
+    title = _display_filename_token(str(book.get("title", f"Book {int(job.book_number or 0)}")))
+    author = _display_filename_token(str(book.get("author", "Unknown")))
+    catalog_number = str(
+        book.get("catalog_number")
+        or book.get("number")
+        or job.book_number
+        or "0"
+    ).strip()
+    folder_name = f"{catalog_number}. {title} - {author}"
+    file_stem = f"{title} – {author}"
+    raw_source = _resolve_raw_image_path_for_job(runtime=runtime, job=job)
+    comp_source = _resolve_composite_image_path_for_job(runtime=runtime, job=job)
+    if raw_source is None and comp_source is None:
+        raise FileNotFoundError("No raw or composite image found for job")
+    return {
+        "job_id": str(job.id or "").strip(),
+        "book_number": int(job.book_number or 0),
+        "folder_name": folder_name,
+        "local_folder": _local_save_raw_root(runtime=runtime) / folder_name,
+        "raw_source": raw_source,
+        "raw_filename": f"{file_stem} (generated raw).png",
+        "comp_source": comp_source,
+        "comp_filename": f"{file_stem}.jpg",
+    }
+
+
+def _materialize_save_raw_package(*, runtime: config.Config, job: job_store.JobRecord) -> dict[str, Any]:
+    context = _save_raw_context_for_job(runtime=runtime, job=job)
+    local_folder = Path(context["local_folder"])
+    local_folder.mkdir(parents=True, exist_ok=True)
+    warnings: list[str] = []
+    missing_files: list[str] = []
+    saved_files: list[str] = []
+
+    raw_source = context["raw_source"]
+    if isinstance(raw_source, Path) and raw_source.exists():
+        raw_target = _copy_image_with_format(raw_source, local_folder / str(context["raw_filename"]), format_name="PNG")
+        saved_files.append(str(raw_target))
+    else:
+        missing_files.append(str(context["raw_filename"]))
+        warnings.append("Generated raw image not found.")
+
+    comp_source = context["comp_source"]
+    if isinstance(comp_source, Path) and comp_source.exists():
+        comp_target = _copy_image_with_format(comp_source, local_folder / str(context["comp_filename"]), format_name="JPEG")
+        saved_files.append(str(comp_target))
+    else:
+        missing_files.append(str(context["comp_filename"]))
+        warnings.append("Composite image not found.")
+
+    if not saved_files:
+        raise FileNotFoundError("No raw or composite image found for job")
+
+    return {
+        "job_id": context["job_id"],
+        "book_number": context["book_number"],
+        "folder_name": context["folder_name"],
+        "local_folder": str(local_folder),
+        "saved_files": saved_files,
+        "missing_files": missing_files,
+        "warning": " ".join(warnings).strip() or None,
+    }
+
+
+def _save_raw_payload_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> dict[str, Any]:
+    local_payload = _materialize_save_raw_package(runtime=runtime, job=job)
+    drive_payload = _upload_folder_to_drive(
+        runtime=runtime,
+        local_folder=Path(local_payload["local_folder"]),
+        folder_name=str(local_payload["folder_name"]),
+        parent_folder_id=SAVE_RAW_DRIVE_FOLDER_ID,
+    )
+    warnings = [
+        token
+        for token in [
+            str(local_payload.get("warning", "") or "").strip(),
+            str(drive_payload.get("warning", "") or "").strip(),
+        ]
+        if token
+    ]
+    saved_status = "saved" if bool(drive_payload.get("ok", False)) else "partial"
+    return {
+        "ok": True,
+        "job_id": local_payload["job_id"],
+        "book_number": local_payload["book_number"],
+        "folder_name": local_payload["folder_name"],
+        "local_folder": local_payload["local_folder"],
+        "saved_files": local_payload["saved_files"],
+        "missing_files": local_payload["missing_files"],
+        "status": saved_status,
+        "drive_ok": bool(drive_payload.get("ok", False)),
+        "drive_url": drive_payload.get("drive_url"),
+        "drive_folder_id": str(drive_payload.get("folder_id", "") or ""),
+        "drive_uploaded": drive_payload.get("uploaded", []),
+        "drive_failed": drive_payload.get("failed", []),
+        "drive_warning": drive_payload.get("warning"),
+        "retry_available": not bool(drive_payload.get("ok", False)),
+        "warning": " ".join(warnings).strip() or None,
+        "drive": drive_payload,
+    }
 
 
 def _ensure_drive_child_folder(*, service: Any, parent_folder_id: str, folder_name: str) -> str:
@@ -14748,6 +15074,7 @@ def _build_api_docs_html() -> str:
         ("GET", "/api/cover-hash/15", "Single cover hash", "-", "{\"hash\":{...}}", "pHash/dHash/histogram values for one winner."),
         ("GET", "/api/mockup-status?limit=25&offset=0", "Mockup status", "limit,offset", "{\"books\":[...],\"pagination\":{...}}", "Paginated per-book mockup completion status."),
         ("GET", "/api/providers/connectivity?force=0", "Provider connectivity", "force,catalog", "{\"providers\":{...}}", "Cached provider connectivity checks used by iterate auto-status."),
+        ("GET", "/api/drive-status", "Save Raw drive status", "catalog", "{\"connected\":true,...}", "Focused Save Raw Google Drive diagnostics including credential identity and parent folder access."),
         ("GET", "/api/drive/status", "Drive status", "catalog,drive_folder_id,input_folder_id", "{\"connected\":true,...}", "Drive credentials/source/output status and sync summary."),
         ("GET", "/api/drive/sync-status", "Drive sync status", "catalog,drive_folder_id,input_folder_id", "{\"status\":{...}}", "Alias for drive status focused on sync/pending/error summary."),
         ("GET", "/api/drive/input-covers", "Drive input covers", "catalog,drive_folder_id,input_folder_id,limit,force", "{\"covers\":[...]}", "List top-level source covers/folders from Google Drive for iterate selection."),
@@ -14775,6 +15102,8 @@ def _build_api_docs_html() -> str:
         ("POST", "/api/generate-amazon-set", "Generate Amazon set", "{\"book\":15}|{\"all_books\":true}", "{\"ok\":true}", "Generate 7-image Amazon listing set."),
         ("POST", "/api/generate-social-cards", "Generate social cards", "{\"book\":15,\"formats\":[\"instagram\",\"facebook\"]}", "{\"ok\":true}", "Generate marketing cards for social platforms."),
         ("POST", "/api/visual-qa/generate", "Generate visual QA", "{\"book_number\":15}", "{\"ok\":true,\"generated\":99,\"passed\":95,\"failed\":4}", "Generate visual comparison grids for one/all books."),
+        ("POST", "/api/save-raw", "Save raw package", "{\"job_id\":\"...\"}", "{\"ok\":true,\"status\":\"saved|partial\",...}", "Copy raw/composited winner files locally and upload them to Google Drive with structured per-file status."),
+        ("POST", "/api/retry-drive-upload", "Retry save raw Drive upload", "{\"job_id\":\"...\"}", "{\"ok\":true,\"retried\":true,...}", "Retry the Google Drive upload for an already saved raw package without surfacing a hard client error."),
         ("POST", "/api/save-prompt", "Save prompt", "{\"name\":\"...\",\"prompt_template\":\"...\"}", "{\"ok\":true,\"prompt_id\":\"...\"}", "Save prompt into prompt library."),
         ("POST", "/api/providers/reset", "Reset provider runtime", "{\"provider\":\"all|openai|...\"}", "{\"ok\":true}", "Reset provider circuit/rate-limit/runtime counters."),
         ("POST", "/api/test-connection", "Test provider keys", "{\"provider\":\"all|openai|...\"}", "{\"ok\":true,\"report\":{...}}", "Validate provider connectivity."),

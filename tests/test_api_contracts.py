@@ -132,6 +132,7 @@ def test_api_contract_get_endpoints_status_and_content_type():
             "/api/similarity-alerts",
             "/api/similarity-clusters",
             "/api/mockup-status?limit=5&offset=0",
+            "/api/drive-status",
             "/api/drive/status",
             "/api/drive/sync-status",
             "/api/drive/input-covers",
