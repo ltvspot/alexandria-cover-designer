@@ -536,6 +536,42 @@ def test_quality_review_server_generate_requires_explicit_models():
         _stop_server(process)
 
 
+def test_quality_review_server_generate_dry_run_resolves_placeholder_prompt_from_enrichment():
+    process, base_url = _start_server()
+    try:
+        request = Request(
+            f"{base_url}/api/generate",
+            method="POST",
+            data=json.dumps(
+                {
+                    "catalog": "classics",
+                    "book": 1,
+                    "models": ["openrouter/google/gemini-3-pro-image-preview"],
+                    "variants": 1,
+                    "prompt": "Book cover illustration only — {SCENE}. The mood is {MOOD}. Era reference: {ERA}.",
+                    "prompt_source": "custom",
+                    "compose_prompt": False,
+                    "cover_source": "drive",
+                    "async": True,
+                    "dry_run": True,
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urlopen(request, timeout=20) as response:
+            assert response.status == 200
+            body = json.loads(response.read().decode("utf-8"))
+        payload = body.get("job", {}).get("payload", {})
+        prompt = str(payload.get("prompt", "")).strip()
+        assert "{SCENE}" not in prompt
+        assert "{MOOD}" not in prompt
+        assert "{ERA}" not in prompt
+        assert "romantic longing" in prompt
+        assert "Early 20th century" in prompt
+    finally:
+        _stop_server(process)
+
+
 def test_quality_review_server_rejects_invalid_json_body():
     process, base_url = _start_server()
     try:

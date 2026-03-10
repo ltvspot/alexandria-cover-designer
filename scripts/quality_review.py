@@ -4890,11 +4890,25 @@ def _genre_prompt_payload(*, runtime: config.Config) -> dict[str, Any]:
 
 
 def _book_row_for_number(*, runtime: config.Config, book_number: int) -> dict[str, Any] | None:
+    match: dict[str, Any] | None = None
     books = _catalog_books_payload(runtime.book_catalog_path)
     for row in books:
         if _safe_int(row.get("number"), 0) == int(book_number):
-            return row
-    return None
+            match = dict(row)
+            break
+    if match is None:
+        return None
+    enriched_catalog_path = config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir)
+    enriched_rows = _json_list_rows_cache_entry(enriched_catalog_path).get("rows", [])
+    if isinstance(enriched_rows, list):
+        for row in enriched_rows:
+            if _safe_int((row or {}).get("number"), 0) != int(book_number):
+                continue
+            enrichment = row.get("enrichment", {}) if isinstance(row, dict) else {}
+            if isinstance(enrichment, dict):
+                match["enrichment"] = enrichment
+            break
+    return match
 
 
 def _prompt_reference_tokens(value: str) -> list[str]:
