@@ -153,6 +153,8 @@ SAVE_RAW_LOCAL_DIRNAME = "Chosen Winner Generated Covers"
 SAVE_RAW_DRIVE_RETRY_ATTEMPTS = max(1, int(os.getenv("SAVE_RAW_DRIVE_RETRY_ATTEMPTS", "2")))
 SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS = max(0.0, float(os.getenv("SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS", "0.5")))
 SAVE_RAW_DRIVE_PROBE_TIMEOUT_SECONDS = max(0.1, float(os.getenv("SAVE_RAW_DRIVE_PROBE_TIMEOUT_SECONDS", "5")))
+SAVE_RAW_DRIVE_PROBE_DELETE_ATTEMPTS = max(1, int(os.getenv("SAVE_RAW_DRIVE_PROBE_DELETE_ATTEMPTS", "6")))
+SAVE_RAW_DRIVE_PROBE_DELETE_DELAY_SECONDS = max(0.0, float(os.getenv("SAVE_RAW_DRIVE_PROBE_DELETE_DELAY_SECONDS", "0.5")))
 SAVE_PROMPT_DRIVE_SUBDIR = "saved_prompts"
 FALLBACK_FAVICON_SVG = (
     b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
@@ -6285,7 +6287,21 @@ def _probe_drive_write_access(*, service: Any, parent_folder_id: str) -> dict[st
         created_file_id = str(created.get("id", "") or "").strip()
         if not created_file_id:
             raise RuntimeError("Google Drive write probe did not return an id")
-        service.files().delete(fileId=created_file_id, supportsAllDrives=True).execute()
+        last_delete_exc: Exception | None = None
+        for attempt in range(1, SAVE_RAW_DRIVE_PROBE_DELETE_ATTEMPTS + 1):
+            try:
+                service.files().delete(fileId=created_file_id, supportsAllDrives=True).execute()
+                last_delete_exc = None
+                break
+            except Exception as exc:
+                details = _drive_error_details(exc)
+                message = str(details.get("message", "") or exc).lower()
+                last_delete_exc = exc
+                if "not found" not in message or attempt >= SAVE_RAW_DRIVE_PROBE_DELETE_ATTEMPTS:
+                    raise
+                time.sleep(SAVE_RAW_DRIVE_PROBE_DELETE_DELAY_SECONDS)
+        if last_delete_exc is not None:
+            raise last_delete_exc
         return {"ok": True, "error": "", "file_id": created_file_id}
     except Exception as exc:
         details = _drive_error_details(exc)

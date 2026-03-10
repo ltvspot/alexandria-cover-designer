@@ -1216,6 +1216,44 @@ def test_probe_drive_write_access_with_timeout_returns_quickly(monkeypatch: pyte
     assert elapsed < 0.15
 
 
+def test_probe_drive_write_access_retries_delete_visibility_lag(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(qr.gdrive_sync, "MediaFileUpload", lambda path, mimetype=None: SimpleNamespace(path=path, mimetype=mimetype))
+    monkeypatch.setattr(qr.time, "sleep", lambda _seconds: None)
+
+    class _FakeFiles:
+        def __init__(self) -> None:
+            self.delete_attempts = 0
+
+        def create(self, **_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(execute=lambda: {"id": "probe-file"})
+
+        def delete(self, **_kwargs):  # type: ignore[no-untyped-def]
+            def _execute():
+                self.delete_attempts += 1
+                if self.delete_attempts == 1:
+                    raise RuntimeError("File not found: probe-file")
+                return {}
+
+            return SimpleNamespace(execute=_execute)
+
+    class _FakeService:
+        def __init__(self) -> None:
+            self._files = _FakeFiles()
+
+        def files(self):
+            return self._files
+
+    service = _FakeService()
+    payload = qr._probe_drive_write_access(service=service, parent_folder_id="folder-1")
+
+    assert payload["ok"] is True
+    assert payload["file_id"] == "probe-file"
+    assert service._files.delete_attempts == 2
+
+
 def test_run_startup_checks_logs_shared_drive_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
     cfg = replace(_build_runtime_for_startup_checks(tmp_path), gdrive_source_folder_id="source-folder")
     monkeypatch.setattr(
