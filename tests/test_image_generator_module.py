@@ -797,6 +797,42 @@ def test_validate_prompt_relevance_prepends_title_when_missing():
     assert "melville" in prompt
 
 
+def test_validate_prompt_relevance_uses_variant_scene_anchor_from_enrichment(tmp_path: Path):
+    runtime = _Runtime(tmp_path)
+    enriched_path = ig.config.enriched_catalog_path(config_dir=runtime.config_dir)
+    enriched_path.write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {
+                        "number": 52,
+                        "enrichment": {
+                            "iconic_scenes": [
+                                "Gulliver bound by tiny ropes in Lilliput while miniature figures swarm over him",
+                                "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him",
+                            ],
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    prompt = ig._validate_prompt_relevance(
+        "Painterly satirical voyage scene.",
+        book_title="Gulliver's Travels",
+        book_author="Jonathan Swift",
+        runtime=runtime,
+        book_number=52,
+        variant_index=1,
+    )
+
+    assert "Primary scene anchor:" in prompt
+    assert "Brobdingnag" in prompt
+    assert "Lilliput" not in prompt
+
+
 def test_generate_all_models_applies_model_specific_diversity(tmp_path: Path, monkeypatch):
     runtime = _Runtime(tmp_path)
     monkeypatch.setattr(ig.config, "get_config", lambda: runtime)

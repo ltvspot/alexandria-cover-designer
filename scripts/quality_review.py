@@ -2260,6 +2260,7 @@ def _execute_generation_payload(
     template_id = str(payload.get("template_id", payload.get("templateId", "")) or "").strip()
     compose_prompt = bool(payload.get("compose_prompt", True))
     preserve_prompt_text = bool(payload.get("preserve_prompt_text", False))
+    scene_description = str(payload.get("scene_description", "") or "").strip()
     template_ok, _template_details = _validate_template_id(runtime=runtime, template_id=template_id)
     if not template_ok:
         raise ValueError(f"Unknown template_id: {template_id}")
@@ -2333,6 +2334,7 @@ def _execute_generation_payload(
             base_prompt=str(base_prompt_for_composer),
             template_id=template_id,
             variant_index=max(0, requested_variant - 1),
+            scene_override=scene_description,
         )
         if prompt_source == "template" or not raw_request_prompt:
             prompt = str(composed_prompt_payload.get("prompt", base_prompt_for_composer)).strip()
@@ -2342,11 +2344,23 @@ def _execute_generation_payload(
             prompt=prompt,
             book=book_row,
             require_motif=(prompt_source != "custom" or not raw_request_prompt),
+            variant_index=max(0, requested_variant - 1),
+            scene_override=scene_description,
         )
     if book_row is not None:
-        prompt = _sanitize_prompt_placeholders(prompt, book_row, variant_index=max(0, requested_variant - 1))
+        prompt = _sanitize_prompt_placeholders(
+            prompt,
+            book_row,
+            variant_index=max(0, requested_variant - 1),
+            scene_override=scene_description,
+        )
         if not precomposed_prompt:
-            prompt = _ensure_enriched_prompt(prompt, book_row, variant_index=max(0, requested_variant - 1))
+            prompt = _ensure_enriched_prompt(
+                prompt,
+                book_row,
+                variant_index=max(0, requested_variant - 1),
+                scene_override=scene_description,
+            )
     if book_row is not None:
         logger.info("Generation prompt for book %s (%s): %s", book, prompt_source, prompt)
 
@@ -5003,7 +5017,14 @@ def _prompt_reference_tokens(value: str) -> list[str]:
     return [token for token in re.findall(r"[a-z0-9]+", str(value or "").lower()) if len(token) >= 4]
 
 
-def _ensure_prompt_book_context(*, prompt: str, book: dict[str, Any], require_motif: bool = False) -> str:
+def _ensure_prompt_book_context(
+    *,
+    prompt: str,
+    book: dict[str, Any],
+    require_motif: bool = False,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
     text = " ".join(str(prompt or "").split()).strip()
     title = str(book.get("title", "") or "").strip()
     author = str(book.get("author", "") or "").strip()
@@ -5014,22 +5035,35 @@ def _ensure_prompt_book_context(*, prompt: str, book: dict[str, Any], require_mo
     title_tokens = _prompt_reference_tokens(title)
     author_tokens = _prompt_reference_tokens(author)
     has_reference = any(token in text_lower for token in (title_tokens + author_tokens) if token)
+    context = ""
     if not has_reference:
         context = f"Illustration for '{title}'"
         if author:
             context = f"{context} by {author}"
         text = f"{context}. {text}".strip()
 
+    scene = ""
     if require_motif:
-        try:
-            motif = prompt_generator._motif_for_book(book)  # type: ignore[attr-defined]
-            scene = str(getattr(motif, "iconic_scene", "") or "").strip()
-        except Exception:
-            scene = ""
-        if scene and scene.lower() not in text.lower():
-            text = f"Primary narrative anchor: {scene}. {text}".strip()
-
-    return prompt_generator.enforce_prompt_constraints(text)
+        scene = _scene_for_book_variant(
+            book,
+            variant_index=variant_index,
+            scene_override=scene_override,
+        )
+        if not scene:
+            try:
+                motif = prompt_generator._motif_for_book(book)  # type: ignore[attr-defined]
+                scene = str(getattr(motif, "iconic_scene", "") or "").strip()
+            except Exception:
+                scene = ""
+    constrained = prompt_generator.enforce_prompt_constraints(text)
+    if context and context.lower() not in constrained.lower():
+        constrained = f"{context}. {constrained}".strip()
+    if scene and scene.lower() not in constrained.lower():
+        constrained = f"Primary narrative anchor: {scene}. {constrained}".strip()
+    words = constrained.split()
+    if len(words) > 92:
+        constrained = " ".join(words[:92]).rstrip(",")
+    return constrained.strip()
 
 
 _PLACEHOLDER_PATTERN = re.compile(r"\{(SCENE|MOOD|ERA|TITLE|AUTHOR|SUBTITLE)\}", re.IGNORECASE)
@@ -9492,6 +9526,7 @@ def serve_review_webapp(
                 template_id = str(body.get("template_id", body.get("templateId", "")) or "").strip()
                 compose_prompt = bool(body.get("compose_prompt", True))
                 preserve_prompt_text = bool(body.get("preserve_prompt_text", False))
+                scene_description = str(body.get("scene_description", "") or "").strip()
                 template_ok, template_details = _validate_template_id(runtime=runtime_req, template_id=template_id)
                 if not template_ok:
                     return self._send_error(
@@ -9567,13 +9602,24 @@ def serve_review_webapp(
                             ),
                             template_id=template_id,
                             variant_index=max(0, requested_variant - 1),
+                            scene_override=scene_description,
                         )
                         if prompt_source == "template" or not str(prompt).strip():
                             prompt = str(composed_prompt_payload.get("prompt", prompt)).strip()
                 if book_row is not None:
-                    prompt = _sanitize_prompt_placeholders(prompt, book_row, variant_index=max(0, requested_variant - 1))
+                    prompt = _sanitize_prompt_placeholders(
+                        prompt,
+                        book_row,
+                        variant_index=max(0, requested_variant - 1),
+                        scene_override=scene_description,
+                    )
                     if not precomposed_prompt:
-                        prompt = _ensure_enriched_prompt(prompt, book_row, variant_index=max(0, requested_variant - 1))
+                        prompt = _ensure_enriched_prompt(
+                            prompt,
+                            book_row,
+                            variant_index=max(0, requested_variant - 1),
+                            scene_override=scene_description,
+                        )
                 idempotency_key = str(body.get("idempotency_key", "")).strip() or _generation_idempotency_key(
                     catalog_id=runtime_req.catalog_id,
                     book=book,
@@ -9606,6 +9652,7 @@ def serve_review_webapp(
                             "template_id": template_id,
                             **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
                             "variant": requested_variant,
+                            "scene_description": scene_description,
                             "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
                             "prompt_components": composed_prompt_payload,
                             "inferred_genre": str(composed_prompt_payload.get("genre", "")).strip(),
@@ -11297,13 +11344,24 @@ def serve_review_webapp(
                             .strip(),
                             template_id=template_id,
                             variant_index=max(0, requested_variant - 1),
+                            scene_override=scene_description,
                         )
                         if prompt_source == "template" or not str(prompt).strip():
                             prompt = str(composed_prompt_payload.get("prompt", prompt)).strip()
                 if book_row is not None:
-                    prompt = _sanitize_prompt_placeholders(prompt, book_row, variant_index=max(0, requested_variant - 1))
+                    prompt = _sanitize_prompt_placeholders(
+                        prompt,
+                        book_row,
+                        variant_index=max(0, requested_variant - 1),
+                        scene_override=scene_description,
+                    )
                     if not precomposed_prompt:
-                        prompt = _ensure_enriched_prompt(prompt, book_row, variant_index=max(0, requested_variant - 1))
+                        prompt = _ensure_enriched_prompt(
+                            prompt,
+                            book_row,
+                            variant_index=max(0, requested_variant - 1),
+                            scene_override=scene_description,
+                        )
                 active_models = [str(item).strip() for item in models if str(item).strip()]
                 if not active_models:
                     return self._send_error(
@@ -11363,10 +11421,11 @@ def serve_review_webapp(
                             max_attempts=max(1, int(body.get("max_attempts", 3))),
                             metadata={
                                 "prompt_source": prompt_source,
-                            "template_id": template_id,
-                            **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
-                            "variant": requested_variant,
-                            "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
+                                "template_id": template_id,
+                                **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
+                                "variant": requested_variant,
+                                "scene_description": scene_description,
+                                "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
                                 "prompt_components": composed_prompt_payload,
                                 "inferred_genre": str(composed_prompt_payload.get("genre", "")).strip(),
                             },

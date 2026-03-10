@@ -2493,6 +2493,30 @@ def test_ensure_enriched_prompt_replaces_generic_scene_and_mood():
     assert "satirical wonder with unease" in resolved
 
 
+def test_ensure_prompt_book_context_rotates_scene_anchor_for_variant():
+    book = {
+        "title": "Gulliver's Travels",
+        "author": "Jonathan Swift",
+        "enrichment": {
+            "iconic_scenes": [
+                "Gulliver bound by tiny ropes in Lilliput while miniature figures swarm over him",
+                "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him",
+            ],
+        },
+    }
+
+    resolved = qr._ensure_prompt_book_context(
+        prompt="Painterly scene with atmospheric depth.",
+        book=book,
+        require_motif=True,
+        variant_index=1,
+    )
+
+    assert "Primary narrative anchor:" in resolved
+    assert "Brobdingnag" in resolved
+    assert "Lilliput" not in resolved
+
+
 def test_execute_generation_payload_preserves_precomposed_prompt_when_compose_prompt_disabled(tmp_path: Path, monkeypatch):
     cfg = _build_runtime_for_startup_checks(tmp_path)
     cfg = replace(cfg, openrouter_api_key="test-key")
@@ -2645,6 +2669,64 @@ def test_execute_generation_payload_appends_enrichment_for_generic_prompt(tmp_pa
 
     assert "The illustration must depict: Gulliver wakes on the beach bound by hundreds of tiny ropes" in captured["prompt_text"]
     assert "satirical wonder with unease" in captured["prompt_text"]
+
+
+def test_execute_generation_payload_honors_scene_description_for_variant_prompt(tmp_path: Path, monkeypatch):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg = replace(cfg, openrouter_api_key="test-key")
+    monkeypatch.setattr(qr.config, "get_config", lambda *_args, **_kwargs: cfg)
+
+    captured: dict[str, Any] = {}
+
+    def _fake_generate_single_book(**kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(qr.image_generator, "generate_single_book", _fake_generate_single_book)
+    monkeypatch.setattr(qr, "_serialize_generation_results", lambda **_kwargs: [])
+    monkeypatch.setattr(qr.cover_compositor, "composite_all_variants", lambda **_kwargs: None)
+    monkeypatch.setattr(qr, "_record_generation_costs", lambda **_kwargs: None)
+    monkeypatch.setattr(qr.state_db_store, "append_generation_records", lambda **_kwargs: 0)
+    monkeypatch.setattr(qr.state_db_store, "export_history_payload", lambda **_kwargs: {"items": []})
+    monkeypatch.setattr(qr, "_build_review_data_payload", lambda *_args, **_kwargs: {"books": []})
+    monkeypatch.setattr(qr, "_invalidate_cache", lambda *_args, **_kwargs: 1)
+    monkeypatch.setattr(
+        qr,
+        "_book_row_for_number",
+        lambda **_kwargs: {
+            "number": 52,
+            "title": "Gulliver's Travels",
+            "author": "Jonathan Swift",
+            "enrichment": {
+                "iconic_scenes": [
+                    "Gulliver bound by tiny ropes in Lilliput while miniature figures swarm over him",
+                    "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him",
+                ],
+                "emotional_tone": "satirical wonder with unease",
+                "era": "18th-century voyage literature",
+            },
+        },
+    )
+
+    qr._execute_generation_payload(
+        {
+            "catalog": "classics",
+            "book": 52,
+            "models": ["openrouter/google/gemini-3-pro-image-preview"],
+            "variants": 1,
+            "variant": 2,
+            "prompt": 'Create a colorful circular medallion illustration for "Gulliver\'s Travels" by Jonathan Swift.',
+            "prompt_source": "template",
+            "compose_prompt": False,
+            "scene_description": "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him",
+            "provider": "all",
+            "cover_source": "drive",
+            "dry_run": True,
+        }
+    )
+
+    assert "Brobdingnag" in captured["prompt_text"]
+    assert "Lilliput" not in captured["prompt_text"]
 
 
 def test_execute_generation_payload_forwards_preserve_prompt_text_flag(tmp_path: Path, monkeypatch):

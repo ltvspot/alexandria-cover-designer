@@ -234,7 +234,15 @@ def _prompt_reference_tokens(value: str) -> list[str]:
     return [token for token in tokens if len(token) >= 4]
 
 
-def _validate_prompt_relevance(prompt: str, book_title: str, book_author: str) -> str:
+def _validate_prompt_relevance(
+    prompt: str,
+    book_title: str,
+    book_author: str,
+    *,
+    runtime: config.Config | None = None,
+    book_number: int = 0,
+    variant_index: int = 0,
+) -> str:
     """Ensure prompt keeps strong title/author anchoring before provider dispatch."""
     base_prompt = " ".join(str(prompt or "").split())
     title = str(book_title or "").strip()
@@ -250,20 +258,29 @@ def _validate_prompt_relevance(prompt: str, book_title: str, book_author: str) -
     if has_reference:
         return base_prompt
 
-    motif_scene = ""
-    try:
-        motif = prompt_generator._motif_for_book({"title": title, "author": author})  # type: ignore[attr-defined]
-        motif_scene = str(getattr(motif, "iconic_scene", "") or "").strip()
-    except Exception:
-        motif_scene = ""
+    scene_anchor = ""
+    if runtime is not None and int(book_number or 0) > 0:
+        enrichment = _enriched_book_lookup(runtime).get(int(book_number), {})
+        if isinstance(enrichment, dict):
+            scene_anchor = _scene_for_variant(
+                enrichment=enrichment,
+                title=title,
+                variant_index=max(0, int(variant_index)),
+            )
+    if not scene_anchor:
+        try:
+            motif = prompt_generator._motif_for_book({"title": title, "author": author})  # type: ignore[attr-defined]
+            scene_anchor = str(getattr(motif, "iconic_scene", "") or "").strip()
+        except Exception:
+            scene_anchor = ""
 
     prefix_parts = [f"Book cover illustration for '{title}'"]
     if author:
         prefix_parts[0] = f"{prefix_parts[0]} by {author}"
-    if motif_scene:
-        prefix_parts.append(f"Primary scene anchor: {motif_scene}")
+    if scene_anchor:
+        prefix_parts.append(f"Primary scene anchor: {scene_anchor}")
     prefix = ". ".join(prefix_parts).strip().rstrip(".") + "."
-    logger.warning("Prompt lacked explicit book reference. Prepending title/motif anchor for '%s'.", title)
+    logger.warning("Prompt lacked explicit book reference. Prepending title/scene anchor for '%s'.", title)
     if not base_prompt:
         return prefix
     return f"{prefix} {base_prompt}".strip()
@@ -1666,6 +1683,9 @@ def generate_all_models(
                     diversified_prompt,
                     book_title=book_title,
                     book_author=book_author,
+                    runtime=runtime,
+                    book_number=book_number,
+                    variant_index=max(0, variant - 1),
                 )
             if preserve_prompt_text:
                 diversified_prompt = _sanitize_prompt_text(diversified_prompt)
