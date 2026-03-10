@@ -8,14 +8,22 @@ Release branch/worktree: `/private/tmp/alexandria-prompt39-scene-first`
 
 Functional release commit: `b33e7a8`
 
+Proof-report commit: `63e8dbd`
+
 Latest deployed app:
 
 - [https://web-production-900a7.up.railway.app](https://web-production-900a7.up.railway.app)
 
 Latest Railway deployment:
 
-- `cb98d244-b344-4967-9c5b-8abefde57d0b`
+- `de4da62d-cf5a-43fc-8c2a-00d1bf1ef0c0`
 - status: `SUCCESS`
+
+Runtime note:
+
+- `de4da62d-cf5a-43fc-8c2a-00d1bf1ef0c0` is the report-tip deploy.
+- The functional scene-first rollout was `cb98d244-b344-4967-9c5b-8abefde57d0b`.
+- The final report-tip deploy is runtime-equivalent for the PROMPT-38 code path.
 
 ## What was verified live
 
