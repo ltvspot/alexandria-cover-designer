@@ -428,9 +428,10 @@ function buildScenePool(book, count) {
   const promptComponents = (book && typeof book.prompt_components === 'object' && book.prompt_components) ? book.prompt_components : {};
   const pool = [];
   const seen = new Set();
+  const genericPattern = /iconic turning point|central protagonist|atmospheric setting moment|dramatic emotional conflict/i;
   const pushUnique = (value) => {
     const trimmed = String(value || '').replace(/\s+/g, ' ').trim();
-    if (!trimmed) return;
+    if (!trimmed || trimmed.length < 20 || genericPattern.test(trimmed)) return;
     const token = trimmed.toLowerCase();
     if (seen.has(token)) return;
     seen.add(token);
@@ -443,7 +444,9 @@ function buildScenePool(book, count) {
 
   const protagonist = String(enrichment.protagonist || '').trim();
   const settingPrimary = String(enrichment.setting_primary || '').trim();
-  const settingDetails = String(enrichment.setting_details || '').trim();
+  const settingDetails = Array.isArray(enrichment.setting_details)
+    ? enrichment.setting_details.map((item) => String(item || '').trim()).filter(Boolean).join(', ')
+    : String(enrichment.setting_details || '').trim();
 
   if (protagonist) {
     pushUnique(
@@ -552,31 +555,30 @@ function resolvePrompt(templateObj, book, customPrompt, sceneVal, moodVal, eraVa
   return resolved.trim();
 }
 
-function ensureEnrichedPrompt(promptText, book) {
+function ensureEnrichedPrompt(promptText, book, sceneOverride = '') {
   const prompt = String(promptText || '').trim();
   const enrichment = _bookEnrichment(book);
   const populatedScenes = (Array.isArray(enrichment.iconic_scenes) ? enrichment.iconic_scenes : [])
     .map((item) => String(item || '').trim())
     .filter(Boolean);
-  const firstScene = populatedScenes[0] || '';
-  const sceneSentence = firstScene.replace(/[.!?]+$/g, '');
+  const selectedScene = String(sceneOverride || populatedScenes[0] || '').trim();
+  const sceneSentence = selectedScene.replace(/[.!?]+$/g, '');
   const protagonist = String(enrichment.protagonist || '').trim();
   const setting = String(enrichment.setting_primary || '').trim();
   const emotionalTone = String(enrichment.emotional_tone || enrichment.mood || '').trim();
   const era = String(enrichment.era || '').trim();
 
   let result = emotionalTone ? prompt.replace(GENERIC_MOOD_PATTERN, emotionalTone) : prompt;
-  if (!firstScene) {
+  if (!selectedScene) {
     return cleanupResolvedPrompt(result);
   }
 
-  result = result.replace(GENERIC_SCENE_PATTERN, firstScene);
+  result = result.replace(GENERIC_SCENE_PATTERN, selectedScene);
   const lowered = result.toLowerCase();
-  const hasScene = populatedScenes
-    .slice(0, 3)
-    .some((scene) => scene.substring(0, 30).trim() && lowered.includes(scene.substring(0, 30).toLowerCase()));
+  const sceneNeedle = selectedScene.substring(0, 30).trim().toLowerCase();
+  const hasScene = Boolean(sceneNeedle) && lowered.includes(sceneNeedle);
   if (!hasScene) {
-    const enrichmentParts = [`The illustration must depict: ${sceneSentence || firstScene}.`];
+    const enrichmentParts = [`The illustration must depict: ${sceneSentence || selectedScene}.`];
     if (protagonist) enrichmentParts.push(`Character: ${protagonist}.`);
     if (setting) enrichmentParts.push(`Setting: ${setting}.`);
     if (emotionalTone) enrichmentParts.push(`Mood: ${emotionalTone}.`);
@@ -606,6 +608,7 @@ function buildGenerationJobPrompt({ book, templateObj, promptId, customPrompt, s
       ? basePrompt
       : `${StyleDiversifier.buildDiversifiedPrompt(book.title, book.author, style)} ${basePrompt}`.trim(),
     book,
+    sceneVal,
   );
   const templateName = String(templateObj?.name || '').trim();
   const styleLabel = usesStandalonePrompt
@@ -629,7 +632,7 @@ function buildGenerationJobPrompt({ book, templateObj, promptId, customPrompt, s
 
 window.__ITERATE_TEST_HOOKS__ = window.__ITERATE_TEST_HOOKS__ || {};
 window.__ITERATE_TEST_HOOKS__.buildGenerationJobPrompt = buildGenerationJobPrompt;
-window.__ITERATE_TEST_HOOKS__.ensureEnrichedPrompt = ({ promptText, book }) => ensureEnrichedPrompt(promptText, book);
+window.__ITERATE_TEST_HOOKS__.ensureEnrichedPrompt = ({ promptText, book, sceneOverride }) => ensureEnrichedPrompt(promptText, book, sceneOverride);
 window.__ITERATE_TEST_HOOKS__.defaultMoodForBook = (book) => defaultMoodForBook(book);
 window.__ITERATE_TEST_HOOKS__.buildScenePool = ({ book, count, ...rawBook }) => {
   const targetBook = book && typeof book === 'object' ? book : rawBook;
@@ -1733,6 +1736,9 @@ window.Pages.iterate = {
     const resolvedMood = String(moodVal || defaultMoodForBook(book)).trim();
     const resolvedEra = String(eraVal || defaultEraForBook(book)).trim();
     const trimmedCustomPrompt = String(customPrompt || '').trim();
+    const defaultScene = String(defaultSceneForBook(book)).trim();
+    const hasManualSceneOverride = Boolean(String(sceneVal || '').trim()) && String(sceneVal || '').trim() !== defaultScene;
+    const scenePool = buildScenePool(book, variantCount);
     const styleSelections = StyleDiversifier.selectDiverseStyles(selectedModels.length * variantCount);
     const rotateAssignments = isAutoRotateSelection(promptId, trimmedCustomPrompt)
       ? buildGenreAwareRotation(book, variantCount)
@@ -1758,7 +1764,10 @@ window.Pages.iterate = {
         const assignment = rotateTemplates[variant - 1] || null;
         const assignedPromptId = String(assignment?.promptId || promptId).trim();
         const assignedTemplate = assignment?.templateObj || templateObj || null;
-        const assignedScene = String(assignment?.sceneOverride || resolvedScene).trim();
+        const rotatedScene = hasManualSceneOverride
+          ? resolvedScene
+          : String(scenePool[(variant - 1) % scenePool.length] || resolvedScene).trim();
+        const assignedScene = String(assignment?.sceneOverride || rotatedScene || resolvedScene).trim();
         const promptPayload = buildGenerationJobPrompt({
           book,
           templateObj: assignedTemplate,

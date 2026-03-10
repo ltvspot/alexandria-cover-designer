@@ -1002,6 +1002,48 @@ def test_save_raw_helpers_resolve_paths_and_preserve_display_naming(tmp_path: Pa
     assert qr._display_filename_token("Temple – Dawn") == "Temple – Dawn"
 
 
+def test_save_raw_helpers_do_not_fallback_to_directory_scans(tmp_path: Path):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    raw_path = cfg.tmp_dir / "generated" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.png"
+    comp_path = cfg.tmp_dir / "composited" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.jpg"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (12, 34, 56)).save(raw_path, format="PNG")
+    Image.new("RGB", (64, 64), (56, 34, 12)).save(comp_path, format="JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-no-fallback",
+        idempotency_key="idem-no-fallback",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=7,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 1,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    assert qr._resolve_raw_image_path_for_job(runtime=cfg, job=job) is None
+    assert qr._resolve_composite_image_path_for_job(runtime=cfg, job=job) is None
+
+
 def test_upload_single_file_to_drive_retries_and_updates_existing_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1132,9 +1174,9 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
             "ok": False,
             "folder_id": "drive-folder-1",
             "drive_url": "https://drive.google.com/drive/folders/drive-folder-1",
-            "uploaded": [{"name": "Temple Dawn – A. Writer (generated raw).png"}],
-            "failed": [{"name": "Temple Dawn – A. Writer.jpg", "error": "storageQuotaExceeded"}],
-            "warning": "Drive upload partially completed: 1 uploaded, 1 failed.",
+            "uploaded": [{"name": "Temple Dawn – A. Writer (generated raw).jpg"}],
+            "failed": [{"name": "Temple Dawn – A. Writer.ai", "error": "storageQuotaExceeded"}],
+            "warning": "Drive upload partially completed: 5 uploaded, 1 failed.",
         },
     )
 
@@ -1144,9 +1186,9 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
     assert payload["status"] == "partial"
     assert payload["retry_available"] is True
     assert payload["drive_folder_id"] == "drive-folder-1"
-    assert len(payload["saved_files"]) == 2
-    assert Path(payload["saved_files"][0]).exists()
-    assert Path(payload["saved_files"][1]).exists()
+    assert len(payload["saved_files"]) == 6
+    assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
+    assert all(Path(path).exists() for path in payload["saved_files"])
     assert "Drive upload partially completed" in str(payload["warning"])
 
 
@@ -2426,7 +2468,10 @@ def test_ensure_enriched_prompt_replaces_generic_scene_and_mood():
         "title": "Gulliver's Travels",
         "author": "Jonathan Swift",
         "enrichment": {
-            "iconic_scenes": ["Gulliver bound by tiny ropes in Lilliput while miniature figures swarm over him"],
+            "iconic_scenes": [
+                "Gulliver bound by tiny ropes in Lilliput while miniature figures swarm over him",
+                "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him",
+            ],
             "protagonist": "Gulliver",
             "setting_primary": "the shore of Lilliput",
             "emotional_tone": "satirical wonder with unease",
@@ -2440,10 +2485,11 @@ def test_ensure_enriched_prompt_replaces_generic_scene_and_mood():
         'depicting the central emotional conflict with period-accurate setting, costume, and atmosphere. '
         'Mood: classical, timeless, evocative.',
         book,
+        variant_index=1,
     )
 
     assert "A pivotal dramatic moment from the literary work" not in resolved
-    assert "Gulliver bound by tiny ropes in Lilliput" in resolved
+    assert "Brobdingnag" in resolved
     assert "satirical wonder with unease" in resolved
 
 
@@ -2477,6 +2523,7 @@ def test_execute_generation_payload_preserves_precomposed_prompt_when_compose_pr
             "prompt": prompt,
             "prompt_source": "custom",
             "compose_prompt": False,
+            "preserve_prompt_text": True,
             "provider": "all",
             "cover_source": "drive",
             "dry_run": True,
@@ -2486,7 +2533,7 @@ def test_execute_generation_payload_preserves_precomposed_prompt_when_compose_pr
     assert result["dry_run"] is True
     assert captured["prompt_text"] == prompt
     assert captured["library_prompt_id"] is None
-    assert captured["preserve_prompt_text"] is False
+    assert captured["preserve_prompt_text"] is True
 
 
 def test_execute_generation_payload_sanitizes_unresolved_placeholders_before_generation(tmp_path: Path, monkeypatch):

@@ -69,6 +69,7 @@ try:
     from src import prompt_generator
     from src import job_store
     from src import mockup_generator
+    from src import output_exporter
     from src import print_validator
     from src import repository
     from src import safe_json
@@ -108,6 +109,7 @@ except ModuleNotFoundError:  # pragma: no cover
     import prompt_generator  # type: ignore
     import job_store  # type: ignore
     import mockup_generator  # type: ignore
+    import output_exporter  # type: ignore
     import print_validator  # type: ignore
     import repository  # type: ignore
     import safe_json  # type: ignore
@@ -1897,6 +1899,16 @@ def _serialize_generation_results(
                     composite_source=candidate,
                     job_token=raw_job_token,
                 )
+        composed_pdf_path = None
+        composed_ai_path = None
+        if composed:
+            composed_path = PROJECT_ROOT / str(composed)
+            pdf_candidate = _resolve_composited_companion(composed_path, ".pdf")
+            if pdf_candidate and pdf_candidate.exists():
+                composed_pdf_path = _to_project_relative(pdf_candidate)
+            ai_candidate = _resolve_composited_companion(composed_path, ".ai")
+            if ai_candidate and ai_candidate.exists():
+                composed_ai_path = _to_project_relative(ai_candidate)
         serialized.append(
             {
                 "book_number": row.book_number,
@@ -1908,8 +1920,8 @@ def _serialize_generation_results(
                 "raw_art_path": persisted_raw_path,
                 "composited_path": composed,
                 "saved_composited_path": persisted_composite_path,
-                "composited_pdf_path": None,
-                "composited_ai_path": None,
+                "composited_pdf_path": composed_pdf_path,
+                "composited_ai_path": composed_ai_path,
                 "success": row.success,
                 "error": row.error,
                 "generation_time": row.generation_time,
@@ -2242,6 +2254,7 @@ def _execute_generation_payload(
     book = _safe_int(payload.get("book"), 0)
     models = payload.get("models", [])
     variants = _safe_int(payload.get("variants"), 5)
+    requested_variant = max(1, _safe_int(payload.get("variant"), 1))
     prompt = str(payload.get("prompt", ""))
     prompt_source = str(payload.get("prompt_source", payload.get("promptSource", "template")) or "template").strip().lower() or "template"
     template_id = str(payload.get("template_id", payload.get("templateId", "")) or "").strip()
@@ -2279,13 +2292,13 @@ def _execute_generation_payload(
     composed_prompt_payload: dict[str, Any] = {}
     book_row = _book_row_for_number(runtime=runtime, book_number=book)
     raw_request_prompt = str(prompt or "").strip()
-    precomposed_prompt = bool(raw_request_prompt) and not compose_prompt
+    precomposed_prompt = bool(raw_request_prompt) and not compose_prompt and preserve_prompt_text
     if compose_prompt and book_row is not None:
         default_diversified_prompt = prompt_generator.build_diversified_prompt(
             book_title=str(book_row.get("title", "")),
             book_author=str(book_row.get("author", "")),
             book_number=book,
-            variant_index=1,
+            variant_index=requested_variant,
         )
         if prompt_source == "custom" and raw_request_prompt:
             base_prompt_for_composer = raw_request_prompt
@@ -2295,9 +2308,18 @@ def _execute_generation_payload(
             default_prompt = ""
             variants_payload = book_row.get("variants", [])
             if isinstance(variants_payload, list) and variants_payload:
-                first_variant = variants_payload[0]
-                if isinstance(first_variant, dict):
-                    default_prompt = str(first_variant.get("prompt", "")).strip()
+                matching_variant = next(
+                    (
+                        row
+                        for row in variants_payload
+                        if isinstance(row, dict)
+                        and _safe_int(row.get("variant_id", row.get("variant")), 0) == requested_variant
+                    ),
+                    None,
+                )
+                variant_row = matching_variant or variants_payload[0]
+                if isinstance(variant_row, dict):
+                    default_prompt = str(variant_row.get("prompt", "")).strip()
             base_prompt_for_composer = (
                 default_prompt
                 or (
@@ -2310,6 +2332,7 @@ def _execute_generation_payload(
             book=book_row,
             base_prompt=str(base_prompt_for_composer),
             template_id=template_id,
+            variant_index=max(0, requested_variant - 1),
         )
         if prompt_source == "template" or not raw_request_prompt:
             prompt = str(composed_prompt_payload.get("prompt", base_prompt_for_composer)).strip()
@@ -2321,8 +2344,9 @@ def _execute_generation_payload(
             require_motif=(prompt_source != "custom" or not raw_request_prompt),
         )
     if book_row is not None:
-        prompt = _sanitize_prompt_placeholders(prompt, book_row)
-        prompt = _ensure_enriched_prompt(prompt, book_row)
+        prompt = _sanitize_prompt_placeholders(prompt, book_row, variant_index=max(0, requested_variant - 1))
+        if not precomposed_prompt:
+            prompt = _ensure_enriched_prompt(prompt, book_row, variant_index=max(0, requested_variant - 1))
     if book_row is not None:
         logger.info("Generation prompt for book %s (%s): %s", book, prompt_source, prompt)
 
@@ -2373,6 +2397,7 @@ def _execute_generation_payload(
                 output_dir=runtime.tmp_dir / "generated",
                 models=active_models,
                 variants=variants,
+                prompt_variant=requested_variant,
                 prompt_text=prompt,
                 library_prompt_id=library_prompt_id or None,
                 provider_override=provider_override,
@@ -5015,16 +5040,133 @@ _GENERIC_SCENE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _GENERIC_MOOD_PATTERN = re.compile(r"classical,\s+timeless,\s+evocative", re.IGNORECASE)
+_GENERIC_SCENE_FALLBACK_PATTERN = re.compile(
+    r"iconic turning point|central protagonist|atmospheric setting moment|dramatic emotional conflict",
+    re.IGNORECASE,
+)
 
 
-def _alexandria_placeholder_replacements(book: dict[str, Any]) -> dict[str, str]:
+def _scene_pool_for_book(book: dict[str, Any], *, count: int = 1) -> list[str]:
+    total = max(1, int(count or 1))
+    enrichment = book.get("enrichment", {}) if isinstance(book.get("enrichment"), dict) else {}
+    prompt_components = book.get("prompt_components", {}) if isinstance(book.get("prompt_components"), dict) else {}
+    pool: list[str] = []
+    seen: set[str] = set()
+
+    def _push_unique(value: Any) -> None:
+        trimmed = re.sub(r"\s+", " ", str(value or "")).strip()
+        if not trimmed or len(trimmed) < 20 or _GENERIC_SCENE_FALLBACK_PATTERN.search(trimmed):
+            return
+        token = trimmed.lower()
+        if token in seen:
+            return
+        seen.add(token)
+        pool.append(trimmed)
+
+    iconic_scenes = enrichment.get("iconic_scenes", []) if isinstance(enrichment.get("iconic_scenes"), list) else []
+    for scene in iconic_scenes:
+        _push_unique(scene)
+
+    protagonist = str(enrichment.get("protagonist", "") or "").strip()
+    setting_primary = str(enrichment.get("setting_primary", "") or "").strip()
+    raw_setting_details = enrichment.get("setting_details", "")
+    if isinstance(raw_setting_details, list):
+        setting_details = ", ".join(str(item or "").strip() for item in raw_setting_details if str(item or "").strip())
+    else:
+        setting_details = str(raw_setting_details or "").strip()
+
+    if protagonist:
+        _push_unique(
+            f"{protagonist} in a pivotal moment"
+            f"{f' set in {setting_primary}' if setting_primary else ' from the story'}"
+        )
+    if setting_primary:
+        _push_unique(
+            f"{setting_primary}{f', {setting_details}' if setting_details else ''} — "
+            "establishing atmosphere of the story's world"
+        )
+
+    motifs = enrichment.get("visual_motifs", []) if isinstance(enrichment.get("visual_motifs"), list) else []
+    symbols = enrichment.get("symbolic_elements", []) if isinstance(enrichment.get("symbolic_elements"), list) else []
+    symbolic_pool = [
+        str(item or "").strip()
+        for item in [*motifs, *symbols]
+        if str(item or "").strip()
+    ][:4]
+    if len(symbolic_pool) >= 2:
+        _push_unique(f"symbolic arrangement of {', '.join(symbolic_pool)} — visual metaphor for the story's themes")
+
+    key_characters = enrichment.get("key_characters", []) if isinstance(enrichment.get("key_characters"), list) else []
+    character_pool = [str(item or "").strip() for item in key_characters if str(item or "").strip()]
+    if len(character_pool) >= 2:
+        _push_unique(f"{', '.join(character_pool[:3])} — a dramatic ensemble scene from the story")
+
+    title_keywords = prompt_components.get("title_keywords", []) if isinstance(prompt_components.get("title_keywords"), list) else []
+    keywords = [str(item or "").strip() for item in title_keywords if str(item or "").strip()]
+    title = str(book.get("title", "the story") or "the story").strip()
+    if keywords:
+        _push_unique(f"narrative tableau shaped by {', '.join(keywords[:3])} — a defining moment from {title}")
+        if len(keywords) >= 2:
+            _push_unique(f"setting-focused scene built around {' and '.join(keywords[-2:])} with period atmosphere")
+        if len(keywords) >= 3:
+            _push_unique(f"symbolic arrangement of {', '.join(keywords[:4])} — thematic emblem for {title}")
+
+    if not pool:
+        author = str(book.get("author", "Unknown author") or "Unknown author").strip()
+        _push_unique(f'A pivotal dramatic moment from the literary work "{title}" by {author}')
+
+    variation_prefixes = [
+        "",
+        "intimate close-up view of ",
+        "wide panoramic establishing shot of ",
+        "dramatic chiaroscuro lighting on ",
+        "serene contemplative depiction of ",
+        "dynamic action-filled moment of ",
+    ]
+    results: list[str] = []
+    for index in range(total):
+        if index < len(pool):
+            results.append(pool[index])
+            continue
+        base_scene = pool[index % len(pool)] if pool else ""
+        prefix = variation_prefixes[(index // max(1, len(pool))) % len(variation_prefixes)] if pool else ""
+        results.append(f"{prefix}{base_scene}".strip())
+    return [scene for scene in results if scene]
+
+
+def _scene_for_book_variant(
+    book: dict[str, Any],
+    *,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
+    override = re.sub(r"\s+", " ", str(scene_override or "")).strip()
+    if override:
+        return override
+    pool = _scene_pool_for_book(book, count=max(1, int(variant_index) + 1))
+    if not pool:
+        return ""
+    clamped_index = max(0, int(variant_index))
+    return str(pool[clamped_index if clamped_index < len(pool) else 0] or "").strip()
+
+
+def _alexandria_placeholder_replacements(
+    book: dict[str, Any],
+    *,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> dict[str, str]:
     enrichment = book.get("enrichment", {}) if isinstance(book.get("enrichment"), dict) else {}
     title = str(book.get("title", "") or "").strip()
     author = str(book.get("author", "") or "").strip()
     subtitle = str(book.get("subtitle", "") or "").strip()
     protagonist = str(enrichment.get("protagonist", "") or book.get("protagonist", "") or "").strip()
     setting_primary = str(enrichment.get("setting_primary", "") or book.get("setting_primary", "") or "").strip()
-    setting_details = str(enrichment.get("setting_details", "") or "").strip()
+    raw_setting_details = enrichment.get("setting_details", "")
+    if isinstance(raw_setting_details, list):
+        setting_details = ", ".join(str(item or "").strip() for item in raw_setting_details if str(item or "").strip())
+    else:
+        setting_details = str(raw_setting_details or "").strip()
     emotional_tone = str(
         enrichment.get("emotional_tone", "")
         or enrichment.get("mood", "")
@@ -5033,8 +5175,7 @@ def _alexandria_placeholder_replacements(book: dict[str, Any]) -> dict[str, str]
     ).strip()
     era = str(enrichment.get("era", "") or book.get("era", "") or "").strip()
 
-    iconic_scenes = enrichment.get("iconic_scenes", []) if isinstance(enrichment.get("iconic_scenes"), list) else []
-    first_scene = next((str(item or "").strip() for item in iconic_scenes if str(item or "").strip()), "")
+    first_scene = _scene_for_book_variant(book, variant_index=variant_index, scene_override=scene_override)
     motifs = enrichment.get("visual_motifs", []) if isinstance(enrichment.get("visual_motifs"), list) else []
     motif_text = ", ".join(str(item or "").strip() for item in motifs if str(item or "").strip())
 
@@ -5069,13 +5210,23 @@ def _alexandria_placeholder_replacements(book: dict[str, Any]) -> dict[str, str]
     }
 
 
-def _resolve_alexandria_placeholders(prompt_text: str, book: dict[str, Any]) -> str:
+def _resolve_alexandria_placeholders(
+    prompt_text: str,
+    book: dict[str, Any],
+    *,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
     text = str(prompt_text or "").strip()
     if not text:
         return ""
     if not _PLACEHOLDER_PATTERN.search(text):
         return text
-    replacements = _alexandria_placeholder_replacements(book)
+    replacements = _alexandria_placeholder_replacements(
+        book,
+        variant_index=variant_index,
+        scene_override=scene_override,
+    )
 
     def _replace(match: re.Match[str]) -> str:
         key = match.group(1).upper()
@@ -5084,13 +5235,23 @@ def _resolve_alexandria_placeholders(prompt_text: str, book: dict[str, Any]) -> 
     return _PLACEHOLDER_PATTERN.sub(_replace, text).strip()
 
 
-def _sanitize_prompt_placeholders(prompt: str, book: dict[str, Any]) -> str:
+def _sanitize_prompt_placeholders(
+    prompt: str,
+    book: dict[str, Any],
+    *,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
     text = str(prompt or "").strip()
     if not text:
         return ""
     if not _PLACEHOLDER_PATTERN.search(text):
         return text
-    replacements = _alexandria_placeholder_replacements(book)
+    replacements = _alexandria_placeholder_replacements(
+        book,
+        variant_index=variant_index,
+        scene_override=scene_override,
+    )
 
     def _replace(match: re.Match[str]) -> str:
         key = match.group(1).upper()
@@ -5104,13 +5265,19 @@ def _sanitize_prompt_placeholders(prompt: str, book: dict[str, Any]) -> str:
     return _PLACEHOLDER_PATTERN.sub(_replace, text).strip()
 
 
-def _ensure_enriched_prompt(prompt: str, book: dict[str, Any]) -> str:
+def _ensure_enriched_prompt(
+    prompt: str,
+    book: dict[str, Any],
+    *,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
     """Ensure the final prompt carries concrete book-specific enrichment."""
     text = str(prompt or "").strip()
     enrichment = book.get("enrichment", {}) if isinstance(book.get("enrichment"), dict) else {}
     iconic_scenes = enrichment.get("iconic_scenes", []) if isinstance(enrichment.get("iconic_scenes"), list) else []
     populated_scenes = [str(item or "").strip() for item in iconic_scenes if str(item or "").strip()]
-    first_scene = populated_scenes[0] if populated_scenes else ""
+    first_scene = _scene_for_book_variant(book, variant_index=variant_index, scene_override=scene_override)
     scene_sentence = first_scene.rstrip(" .!?")
     protagonist = str(enrichment.get("protagonist", "") or "").strip()
     setting = str(enrichment.get("setting_primary", "") or "").strip()
@@ -5124,7 +5291,9 @@ def _ensure_enriched_prompt(prompt: str, book: dict[str, Any]) -> str:
 
     result = _GENERIC_SCENE_PATTERN.sub(first_scene, text)
     lowered = result.lower()
-    scene_present = any(scene[:30].lower() in lowered for scene in populated_scenes[:3] if scene[:30].strip())
+    scene_present = bool(first_scene[:30].strip()) and first_scene[:30].lower() in lowered
+    if not scene_present and populated_scenes:
+        scene_present = any(scene[:30].lower() in lowered for scene in populated_scenes[:3] if scene[:30].strip())
     if not scene_present:
         enrichment_sentences = [f"The illustration must depict: {scene_sentence or first_scene}."]
         if protagonist:
@@ -5151,6 +5320,8 @@ def _compose_prompt_for_book(
     book: dict[str, Any],
     base_prompt: str,
     template_id: str = "",
+    variant_index: int = 0,
+    scene_override: str = "",
 ) -> dict[str, Any]:
     prompts = _genre_prompt_payload(runtime=runtime)
     enrichment = book.get("enrichment", {}) if isinstance(book.get("enrichment"), dict) else {}
@@ -5189,9 +5360,19 @@ def _compose_prompt_for_book(
         ),
         genre_negative_modifier=negative,
     )
-    resolved_prompt = _resolve_alexandria_placeholders(str(composed.get("prompt", "")).strip(), book)
+    resolved_prompt = _resolve_alexandria_placeholders(
+        str(composed.get("prompt", "")).strip(),
+        book,
+        variant_index=variant_index,
+        scene_override=scene_override,
+    )
     constrained_prompt = prompt_generator.enforce_prompt_constraints(resolved_prompt)
-    composed["prompt"] = _ensure_enriched_prompt(constrained_prompt, book)
+    composed["prompt"] = _ensure_enriched_prompt(
+        constrained_prompt,
+        book,
+        variant_index=variant_index,
+        scene_override=scene_override,
+    )
     composed["genre_modifier"] = composed.get("genre", "")
     composed["genre"] = inferred_genre
     composed["genre_source"] = str(inferred.get("source", "default"))
@@ -9297,6 +9478,7 @@ def serve_review_webapp(
                     active_models = runtime_req.all_models[:]
                 max_variants = _max_generation_variants(runtime_req)
                 variants = _safe_int(body.get("variants"), runtime_req.variants_per_cover)
+                requested_variant = max(1, _safe_int(body.get("variant"), 1))
                 if variants < 1 or variants > max_variants:
                     return self._send_error(
                         code="VARIANT_COUNT_OUT_OF_RANGE",
@@ -9354,14 +9536,24 @@ def serve_review_webapp(
                 selected_cover_id = str(resolved_selected_cover_id or "").strip()
                 composed_prompt_payload: dict[str, Any] = {}
                 book_row = _book_row_for_number(runtime=runtime_req, book_number=book)
+                precomposed_prompt = bool(str(prompt).strip()) and not compose_prompt and preserve_prompt_text
                 if compose_prompt:
                     if book_row is not None:
                         default_prompt = ""
                         variants_payload = book_row.get("variants", [])
                         if isinstance(variants_payload, list) and variants_payload:
-                            first_variant = variants_payload[0]
-                            if isinstance(first_variant, dict):
-                                default_prompt = str(first_variant.get("prompt", "")).strip()
+                            matching_variant = next(
+                                (
+                                    row
+                                    for row in variants_payload
+                                    if isinstance(row, dict)
+                                    and _safe_int(row.get("variant_id", row.get("variant")), 0) == requested_variant
+                                ),
+                                None,
+                            )
+                            variant_row = matching_variant or variants_payload[0]
+                            if isinstance(variant_row, dict):
+                                default_prompt = str(variant_row.get("prompt", "")).strip()
                         composed_prompt_payload = _compose_prompt_for_book(
                             runtime=runtime_req,
                             book=book_row,
@@ -9374,12 +9566,14 @@ def serve_review_webapp(
                                 )
                             ),
                             template_id=template_id,
+                            variant_index=max(0, requested_variant - 1),
                         )
                         if prompt_source == "template" or not str(prompt).strip():
                             prompt = str(composed_prompt_payload.get("prompt", prompt)).strip()
                 if book_row is not None:
-                    prompt = _sanitize_prompt_placeholders(prompt, book_row)
-                    prompt = _ensure_enriched_prompt(prompt, book_row)
+                    prompt = _sanitize_prompt_placeholders(prompt, book_row, variant_index=max(0, requested_variant - 1))
+                    if not precomposed_prompt:
+                        prompt = _ensure_enriched_prompt(prompt, book_row, variant_index=max(0, requested_variant - 1))
                 idempotency_key = str(body.get("idempotency_key", "")).strip() or _generation_idempotency_key(
                     catalog_id=runtime_req.catalog_id,
                     book=book,
@@ -9411,6 +9605,7 @@ def serve_review_webapp(
                             "prompt_source": prompt_source,
                             "template_id": template_id,
                             **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
+                            "variant": requested_variant,
                             "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
                             "prompt_components": composed_prompt_payload,
                             "inferred_genre": str(composed_prompt_payload.get("genre", "")).strip(),
@@ -10981,6 +11176,7 @@ def serve_review_webapp(
                 book = int(body.get("book", 0))
                 models = list(body.get("models", [])) if isinstance(body.get("models", []), list) else []
                 variants = int(body.get("variants", 5))
+                requested_variant = max(1, _safe_int(body.get("variant"), 1))
                 prompt = str(body.get("prompt", ""))
                 prompt_source = str(body.get("promptSource", body.get("prompt_source", "template")) or "template").strip().lower() or "template"
                 template_id = str(body.get("template_id", body.get("templateId", "")) or "").strip()
@@ -11069,14 +11265,24 @@ def serve_review_webapp(
                 selected_cover_id = str(resolved_selected_cover_id or "").strip()
                 composed_prompt_payload: dict[str, Any] = {}
                 book_row = _book_row_for_number(runtime=runtime_req, book_number=book)
+                precomposed_prompt = bool(str(prompt).strip()) and not compose_prompt and preserve_prompt_text
                 if compose_prompt:
                     if book_row is not None:
                         default_prompt = ""
                         variants_payload = book_row.get("variants", [])
                         if isinstance(variants_payload, list) and variants_payload:
-                            first_variant = variants_payload[0]
-                            if isinstance(first_variant, dict):
-                                default_prompt = str(first_variant.get("prompt", "")).strip()
+                            matching_variant = next(
+                                (
+                                    row
+                                    for row in variants_payload
+                                    if isinstance(row, dict)
+                                    and _safe_int(row.get("variant_id", row.get("variant")), 0) == requested_variant
+                                ),
+                                None,
+                            )
+                            variant_row = matching_variant or variants_payload[0]
+                            if isinstance(variant_row, dict):
+                                default_prompt = str(variant_row.get("prompt", "")).strip()
                         composed_prompt_payload = _compose_prompt_for_book(
                             runtime=runtime_req,
                             book=book_row,
@@ -11090,12 +11296,14 @@ def serve_review_webapp(
                             )
                             .strip(),
                             template_id=template_id,
+                            variant_index=max(0, requested_variant - 1),
                         )
                         if prompt_source == "template" or not str(prompt).strip():
                             prompt = str(composed_prompt_payload.get("prompt", prompt)).strip()
                 if book_row is not None:
-                    prompt = _sanitize_prompt_placeholders(prompt, book_row)
-                    prompt = _ensure_enriched_prompt(prompt, book_row)
+                    prompt = _sanitize_prompt_placeholders(prompt, book_row, variant_index=max(0, requested_variant - 1))
+                    if not precomposed_prompt:
+                        prompt = _ensure_enriched_prompt(prompt, book_row, variant_index=max(0, requested_variant - 1))
                 active_models = [str(item).strip() for item in models if str(item).strip()]
                 if not active_models:
                     return self._send_error(
@@ -11155,9 +11363,10 @@ def serve_review_webapp(
                             max_attempts=max(1, int(body.get("max_attempts", 3))),
                             metadata={
                                 "prompt_source": prompt_source,
-                                "template_id": template_id,
-                                **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
-                                "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
+                            "template_id": template_id,
+                            **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
+                            "variant": requested_variant,
+                            "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
                                 "prompt_components": composed_prompt_payload,
                                 "inferred_genre": str(composed_prompt_payload.get("genre", "")).strip(),
                             },
@@ -14104,6 +14313,7 @@ def _primary_job_result_row(job: job_store.JobRecord | None) -> dict[str, Any] |
 
 
 def _resolve_raw_image_path_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> Path | None:
+    del runtime
     row = _primary_job_result_row(job)
     if not isinstance(row, dict):
         return None
@@ -14113,13 +14323,7 @@ def _resolve_raw_image_path_for_job(*, runtime: config.Config, job: job_store.Jo
     candidate = _project_path_if_exists(row.get("image_path"))
     if candidate is not None and candidate.exists():
         return candidate
-    return _source_image_for_variant(
-        runtime=runtime,
-        book_number=int(job.book_number or 0),
-        variant=_safe_int(row.get("variant", row.get("variant_id", 0)), 0),
-        model=str(row.get("model", "") or ""),
-        record=row,
-    )
+    return None
 
 
 def _resolve_composite_image_path_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> Path | None:
@@ -14137,12 +14341,7 @@ def _resolve_composite_image_path_for_job(*, runtime: config.Config, job: job_st
         derived = _resolve_composited_candidate(source_image, runtime=runtime)
         if derived is not None and derived.exists():
             return derived
-    variant = _safe_int(row.get("variant", row.get("variant_id", 0)), 0)
-    variant_dir = _variant_output_dir(runtime=runtime, book_number=int(job.book_number or 0), variant=variant)
-    if variant_dir is None:
-        return None
-    jpg_rows = sorted(variant_dir.glob("*.jpg"))
-    return jpg_rows[0] if jpg_rows else None
+    return None
 
 
 def _display_filename_token(text: str, *, allow_en_dash: bool = True) -> str:
@@ -14167,6 +14366,66 @@ def _copy_image_with_format(source: Path, destination: Path, *, format_name: str
         rendered = img.convert("RGBA" if format_name.upper() == "PNG" else "RGB")
         rendered.save(destination, format=format_name)
     return destination
+
+
+def _copy_pdf_bytes_as_ai(source_pdf: Path, destination_ai: Path) -> Path:
+    destination_ai.parent.mkdir(parents=True, exist_ok=True)
+    destination_ai.write_bytes(source_pdf.read_bytes())
+    return destination_ai
+
+
+def _resolve_composite_companion_for_job(
+    *,
+    job: job_store.JobRecord,
+    suffix: str,
+) -> Path | None:
+    row = _primary_job_result_row(job)
+    if not isinstance(row, dict):
+        return None
+    key = "composited_pdf_path" if suffix == ".pdf" else "composited_ai_path"
+    candidate = _project_path_if_exists(row.get(key))
+    if candidate is not None and candidate.exists():
+        return candidate
+    composite_path = _project_path_if_exists(row.get("saved_composited_path")) or _project_path_if_exists(row.get("composited_path"))
+    if composite_path is None or not composite_path.exists():
+        return None
+    companion = _resolve_composited_companion(composite_path, suffix)
+    if companion is not None and companion.exists():
+        return companion
+    return None
+
+
+def _export_asset_triplet(
+    *,
+    source_image: Path | None,
+    existing_pdf: Path | None,
+    existing_ai: Path | None,
+    local_folder: Path,
+    base_filename: str,
+) -> list[str]:
+    if source_image is None or not source_image.exists():
+        return []
+
+    saved: list[str] = []
+    jpg_target = local_folder / f"{base_filename}.jpg"
+    pdf_target = local_folder / f"{base_filename}.pdf"
+    ai_target = local_folder / f"{base_filename}.ai"
+
+    saved.append(str(_copy_image_with_format(source_image, jpg_target, format_name="JPEG")))
+    if existing_pdf is not None and existing_pdf.exists():
+        shutil.copy2(existing_pdf, pdf_target)
+    else:
+        output_exporter.export_pdf(source_image, pdf_target)
+    saved.append(str(pdf_target))
+
+    if existing_ai is not None and existing_ai.exists():
+        shutil.copy2(existing_ai, ai_target)
+    elif pdf_target.exists():
+        _copy_pdf_bytes_as_ai(pdf_target, ai_target)
+    else:
+        output_exporter.export_ai(source_image, ai_target)
+    saved.append(str(ai_target))
+    return saved
 
 
 def _local_save_raw_root(*, runtime: config.Config) -> Path:
@@ -14423,6 +14682,8 @@ def _save_raw_context_for_job(*, runtime: config.Config, job: job_store.JobRecor
     file_stem = f"{title} – {author}"
     raw_source = _resolve_raw_image_path_for_job(runtime=runtime, job=job)
     comp_source = _resolve_composite_image_path_for_job(runtime=runtime, job=job)
+    comp_pdf_source = _resolve_composite_companion_for_job(job=job, suffix=".pdf")
+    comp_ai_source = _resolve_composite_companion_for_job(job=job, suffix=".ai")
     if raw_source is None and comp_source is None:
         raise FileNotFoundError("No raw or composite image found for job")
     return {
@@ -14431,9 +14692,11 @@ def _save_raw_context_for_job(*, runtime: config.Config, job: job_store.JobRecor
         "folder_name": folder_name,
         "local_folder": _local_save_raw_root(runtime=runtime) / folder_name,
         "raw_source": raw_source,
-        "raw_filename": f"{file_stem} (generated raw).png",
+        "raw_basename": f"{file_stem} (generated raw)",
         "comp_source": comp_source,
-        "comp_filename": f"{file_stem}.jpg",
+        "comp_pdf_source": comp_pdf_source,
+        "comp_ai_source": comp_ai_source,
+        "comp_basename": file_stem,
     }
 
 
@@ -14447,18 +14710,44 @@ def _materialize_save_raw_package(*, runtime: config.Config, job: job_store.JobR
 
     raw_source = context["raw_source"]
     if isinstance(raw_source, Path) and raw_source.exists():
-        raw_target = _copy_image_with_format(raw_source, local_folder / str(context["raw_filename"]), format_name="PNG")
-        saved_files.append(str(raw_target))
+        saved_files.extend(
+            _export_asset_triplet(
+                source_image=raw_source,
+                existing_pdf=None,
+                existing_ai=None,
+                local_folder=local_folder,
+                base_filename=str(context["raw_basename"]),
+            )
+        )
     else:
-        missing_files.append(str(context["raw_filename"]))
+        missing_files.extend(
+            [
+                f"{context['raw_basename']}.jpg",
+                f"{context['raw_basename']}.pdf",
+                f"{context['raw_basename']}.ai",
+            ]
+        )
         warnings.append("Generated raw image not found.")
 
     comp_source = context["comp_source"]
     if isinstance(comp_source, Path) and comp_source.exists():
-        comp_target = _copy_image_with_format(comp_source, local_folder / str(context["comp_filename"]), format_name="JPEG")
-        saved_files.append(str(comp_target))
+        saved_files.extend(
+            _export_asset_triplet(
+                source_image=comp_source,
+                existing_pdf=context.get("comp_pdf_source"),
+                existing_ai=context.get("comp_ai_source"),
+                local_folder=local_folder,
+                base_filename=str(context["comp_basename"]),
+            )
+        )
     else:
-        missing_files.append(str(context["comp_filename"]))
+        missing_files.extend(
+            [
+                f"{context['comp_basename']}.jpg",
+                f"{context['comp_basename']}.pdf",
+                f"{context['comp_basename']}.ai",
+            ]
+        )
         warnings.append("Composite image not found.")
 
     if not saved_files:

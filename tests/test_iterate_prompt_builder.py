@@ -82,8 +82,8 @@ def _run_iterate_default_mood(book: dict) -> str:
     return _run_iterate_hook("defaultMoodForBook", book)
 
 
-def _run_iterate_ensure_enriched_prompt(prompt_text: str, book: dict) -> str:
-    return _run_iterate_hook("ensureEnrichedPrompt", {"promptText": prompt_text, "book": book})
+def _run_iterate_ensure_enriched_prompt(prompt_text: str, book: dict, scene_override: str = "") -> str:
+    return _run_iterate_hook("ensureEnrichedPrompt", {"promptText": prompt_text, "book": book, "sceneOverride": scene_override})
 
 
 def test_iterate_prompt_builder_keeps_library_prompt_precomposed():
@@ -232,6 +232,27 @@ def test_ensure_enriched_prompt_replaces_generic_scene_and_mood():
     assert "A pivotal dramatic moment from the literary work" not in resolved
     assert "Gulliver wakes on the beach bound by hundreds of tiny ropes" in resolved
     assert "satirical wonder with unease" in resolved
+
+
+def test_ensure_enriched_prompt_honors_scene_override_for_rotated_variant():
+    resolved = _run_iterate_ensure_enriched_prompt(
+        'Book cover illustration only. A pivotal dramatic moment from the literary work "Gulliver\'s Travels" by Jonathan Swift. Mood: classical, timeless, evocative.',
+        {
+            "title": "Gulliver's Travels",
+            "author": "Jonathan Swift",
+            "enrichment": {
+                "iconic_scenes": [
+                    "Gulliver wakes on the beach bound by hundreds of tiny ropes while Lilliputians climb over him",
+                    "Gulliver towers over the court of Brobdingnag as nobles stare up in awe",
+                ],
+                "emotional_tone": "satirical wonder with unease",
+            },
+        },
+        "Gulliver towers over the court of Brobdingnag as nobles stare up in awe",
+    )
+
+    assert "Brobdingnag" in resolved
+    assert "Lilliputians climb over him" not in resolved
 
 
 def test_build_scene_pool_uses_enrichment_sources_and_variation_prefixes():

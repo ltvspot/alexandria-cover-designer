@@ -131,6 +131,10 @@ GENERIC_SCENE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 GENERIC_MOOD_PATTERN = re.compile(r"classical,\s+timeless,\s+evocative", re.IGNORECASE)
+GENERIC_SCENE_FALLBACK_PATTERN = re.compile(
+    r"iconic turning point|central protagonist|atmospheric setting moment|dramatic emotional conflict",
+    re.IGNORECASE,
+)
 MAX_CONTENT_VIOLATION_SCORE = 0.24
 TEXT_ARTIFACT_HARD_SCORE_FLOOR = 0.20
 TEXT_ARTIFACT_HARD_TEXT_PENALTY = 0.62
@@ -470,7 +474,104 @@ def _enriched_book_lookup(runtime: config.Config) -> dict[int, dict[str, Any]]:
     return lookup
 
 
-def _ensure_prompt_enrichment(prompt: str, *, runtime: config.Config, book_number: int, title: str, author: str) -> str:
+def _scene_pool_for_enrichment(
+    *,
+    enrichment: dict[str, Any],
+    title: str,
+    count: int = 1,
+) -> list[str]:
+    total = max(1, int(count or 1))
+    pool: list[str] = []
+    seen: set[str] = set()
+
+    def _push_unique(value: Any) -> None:
+        trimmed = re.sub(r"\s+", " ", str(value or "")).strip()
+        if not trimmed or len(trimmed) < 20 or GENERIC_SCENE_FALLBACK_PATTERN.search(trimmed):
+            return
+        token = trimmed.lower()
+        if token in seen:
+            return
+        seen.add(token)
+        pool.append(trimmed)
+
+    iconic_scenes = enrichment.get("iconic_scenes", []) if isinstance(enrichment.get("iconic_scenes"), list) else []
+    for scene in iconic_scenes:
+        _push_unique(scene)
+
+    protagonist = str(enrichment.get("protagonist", "") or "").strip()
+    setting = str(enrichment.get("setting_primary", "") or "").strip()
+    raw_setting_details = enrichment.get("setting_details", "")
+    if isinstance(raw_setting_details, list):
+        setting_details = ", ".join(str(item or "").strip() for item in raw_setting_details if str(item or "").strip())
+    else:
+        setting_details = str(raw_setting_details or "").strip()
+    if protagonist:
+        _push_unique(
+            f"{protagonist} in a pivotal moment"
+            f"{f' set in {setting}' if setting else ' from the story'}"
+        )
+    if setting:
+        _push_unique(f"{setting}{f', {setting_details}' if setting_details else ''} — establishing atmosphere of the story's world")
+
+    motifs = enrichment.get("visual_motifs", []) if isinstance(enrichment.get("visual_motifs"), list) else []
+    symbols = enrichment.get("symbolic_elements", []) if isinstance(enrichment.get("symbolic_elements"), list) else []
+    symbolic_pool = [
+        str(item or "").strip()
+        for item in [*motifs, *symbols]
+        if str(item or "").strip()
+    ][:4]
+    if len(symbolic_pool) >= 2:
+        _push_unique(f"symbolic arrangement of {', '.join(symbolic_pool)} — visual metaphor for the story's themes")
+
+    if not pool:
+        _push_unique(f'a pivotal scene from "{title or "the story"}"')
+
+    variation_prefixes = [
+        "",
+        "intimate close-up view of ",
+        "wide panoramic establishing shot of ",
+        "dramatic chiaroscuro lighting on ",
+        "serene contemplative depiction of ",
+        "dynamic action-filled moment of ",
+    ]
+    results: list[str] = []
+    for index in range(total):
+        if index < len(pool):
+            results.append(pool[index])
+            continue
+        base_scene = pool[index % len(pool)] if pool else ""
+        prefix = variation_prefixes[(index // max(1, len(pool))) % len(variation_prefixes)] if pool else ""
+        results.append(f"{prefix}{base_scene}".strip())
+    return [scene for scene in results if scene]
+
+
+def _scene_for_variant(
+    *,
+    enrichment: dict[str, Any],
+    title: str,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
+    override = re.sub(r"\s+", " ", str(scene_override or "")).strip()
+    if override:
+        return override
+    pool = _scene_pool_for_enrichment(enrichment=enrichment, title=title, count=max(1, int(variant_index) + 1))
+    if not pool:
+        return ""
+    clamped_index = max(0, int(variant_index))
+    return str(pool[clamped_index if clamped_index < len(pool) else 0] or "").strip()
+
+
+def _ensure_prompt_enrichment(
+    prompt: str,
+    *,
+    runtime: config.Config,
+    book_number: int,
+    title: str,
+    author: str,
+    variant_index: int = 0,
+    scene_override: str = "",
+) -> str:
     text = str(prompt or "").strip()
     enrichment = _enriched_book_lookup(runtime).get(int(book_number), {})
     if not isinstance(enrichment, dict):
@@ -480,7 +581,12 @@ def _ensure_prompt_enrichment(prompt: str, *, runtime: config.Config, book_numbe
         for item in (enrichment.get("iconic_scenes", []) if isinstance(enrichment.get("iconic_scenes"), list) else [])
         if str(item or "").strip()
     ]
-    first_scene = populated_scenes[0] if populated_scenes else ""
+    first_scene = _scene_for_variant(
+        enrichment=enrichment,
+        title=title,
+        variant_index=variant_index,
+        scene_override=scene_override,
+    )
     scene_sentence = first_scene.rstrip(" .!?")
     protagonist = str(enrichment.get("protagonist", "") or "").strip()
     setting = str(enrichment.get("setting_primary", "") or "").strip()
@@ -494,7 +600,9 @@ def _ensure_prompt_enrichment(prompt: str, *, runtime: config.Config, book_numbe
 
     result = GENERIC_SCENE_PATTERN.sub(first_scene, text)
     lowered = result.lower()
-    scene_present = any(scene[:30].lower() in lowered for scene in populated_scenes[:3] if scene[:30].strip())
+    scene_present = bool(first_scene[:30].strip()) and first_scene[:30].lower() in lowered
+    if not scene_present and populated_scenes:
+        scene_present = any(scene[:30].lower() in lowered for scene in populated_scenes[:3] if scene[:30].strip())
     if not scene_present:
         parts = [f"The illustration must depict: {scene_sentence or first_scene}."]
         if protagonist:
@@ -1559,6 +1667,16 @@ def generate_all_models(
                     book_title=book_title,
                     book_author=book_author,
                 )
+            diversified_prompt = _sanitize_prompt_text(
+                _ensure_prompt_enrichment(
+                    diversified_prompt,
+                    runtime=runtime,
+                    book_number=book_number,
+                    title=book_title,
+                    author=book_author,
+                    variant_index=max(0, variant - 1),
+                )
+            )
             seed = _variant_seed(rng=rng, book_number=book_number, model=model, variant=variant)
             if resume and image_path.exists():
                 logger.info(
@@ -1904,15 +2022,6 @@ def generate_single_book(
     if not selected_prompt:
         selected_prompt = str(base_variant.get("prompt", "")).strip()
     selected_prompt = _sanitize_prompt_text(str(selected_prompt or ""))
-    selected_prompt = _sanitize_prompt_text(
-        _ensure_prompt_enrichment(
-            selected_prompt,
-            runtime=runtime,
-            book_number=book_number,
-            title=title,
-            author=author,
-        )
-    )
 
     active_models = models[:] if models else runtime.all_models[:]
     if not active_models:
@@ -1986,6 +2095,16 @@ def generate_batch(
             completed += 1
             variant_id = int(variant_entry.get("variant_id", completed))
             prompt = _sanitize_prompt_text(str(variant_entry.get("prompt", "")))
+            prompt = _sanitize_prompt_text(
+                _ensure_prompt_enrichment(
+                    prompt,
+                    runtime=runtime,
+                    book_number=book_number,
+                    title=title,
+                    author=str(book_entry.get("author", "")).strip(),
+                    variant_index=max(0, variant_id - 1),
+                )
+            )
             negative_prompt = str(variant_entry.get("negative_prompt", ""))
             image_path = output_dir / str(book_number) / f"variant_{variant_id}.png"
 

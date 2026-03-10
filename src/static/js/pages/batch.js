@@ -7,36 +7,95 @@ function _batchEnrichment(book) {
   return (book && typeof book.enrichment === 'object' && book.enrichment) ? book.enrichment : {};
 }
 
-function defaultBatchPrompt(book) {
+function _batchDefaultScene(book) {
+  const row = (book && typeof book === 'object') ? book : {};
+  return `A pivotal dramatic moment from the literary work "${String(row.title || 'the story').trim()}" by ${String(row.author || 'Unknown author').trim()}`;
+}
+
+function _batchScenePool(book, count = 1) {
+  const total = Math.max(1, Number(count || 1));
+  const row = (book && typeof book === 'object') ? book : {};
+  const enrichment = _batchEnrichment(row);
+  const pool = [];
+  const seen = new Set();
+  const genericPattern = /iconic turning point|central protagonist|atmospheric setting moment|dramatic emotional conflict/i;
+  const pushUnique = (value) => {
+    const trimmed = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!trimmed || trimmed.length < 20 || genericPattern.test(trimmed)) return;
+    const token = trimmed.toLowerCase();
+    if (seen.has(token)) return;
+    seen.add(token);
+    pool.push(trimmed);
+  };
+
+  const iconicScenes = Array.isArray(enrichment.iconic_scenes) ? enrichment.iconic_scenes : [];
+  iconicScenes.forEach((scene) => pushUnique(scene));
+
+  const protagonist = String(enrichment.protagonist || '').trim();
+  const setting = String(enrichment.setting_primary || '').trim();
+  const settingDetails = Array.isArray(enrichment.setting_details)
+    ? enrichment.setting_details.map((item) => String(item || '').trim()).filter(Boolean).join(', ')
+    : String(enrichment.setting_details || '').trim();
+  if (protagonist) {
+    pushUnique(`${protagonist} in a pivotal moment${setting ? ` set in ${setting}` : ' from the story'}`);
+  }
+  if (setting) {
+    pushUnique(`${setting}${settingDetails ? `, ${settingDetails}` : ''} — establishing atmosphere of the story's world`);
+  }
+
+  if (!pool.length) {
+    pushUnique(_batchDefaultScene(row));
+  }
+
+  const variationPrefixes = [
+    '',
+    'intimate close-up view of ',
+    'wide panoramic establishing shot of ',
+    'dramatic chiaroscuro lighting on ',
+    'serene contemplative depiction of ',
+    'dynamic action-filled moment of ',
+  ];
+  const results = [];
+  for (let index = 0; index < total; index += 1) {
+    if (index < pool.length) {
+      results.push(pool[index]);
+      continue;
+    }
+    const baseScene = pool[index % pool.length] || _batchDefaultScene(row);
+    const prefix = variationPrefixes[Math.floor(index / pool.length) % variationPrefixes.length] || '';
+    results.push(prefix ? `${prefix}${baseScene}` : baseScene);
+  }
+  return results;
+}
+
+function defaultBatchPrompt(book, variant = 1, variantCount = 1) {
   const row = (book && typeof book === 'object') ? book : {};
   const enrichment = _batchEnrichment(row);
   const title = String(row.title || 'the story').trim();
   const author = String(row.author || 'Unknown author').trim();
-  const iconicScenes = Array.isArray(enrichment.iconic_scenes) ? enrichment.iconic_scenes : [];
-  const firstScene = iconicScenes.find((item) => String(item || '').trim());
   const protagonist = String(enrichment.protagonist || '').trim();
   const setting = String(enrichment.setting_primary || '').trim();
   const mood = String(enrichment.emotional_tone || 'dramatic, atmospheric').trim();
   const era = String(enrichment.era || '').trim();
+  const scenePool = _batchScenePool(row, variantCount);
+  const resolvedScene = scenePool[Math.max(0, Number(variant || 1) - 1)] || scenePool[0] || _batchDefaultScene(row);
 
-  let sceneDescription = String(firstScene || `a pivotal scene from "${title}"`).trim();
-  if (!firstScene && protagonist && setting) {
-    sceneDescription = `${protagonist} in ${setting}, depicting: ${sceneDescription}`;
-  } else if (protagonist && setting) {
+  let sceneDescription = String(resolvedScene || `a pivotal scene from "${title}"`).trim();
+  if (protagonist && setting && !sceneDescription.toLowerCase().includes(protagonist.toLowerCase())) {
     sceneDescription = `${protagonist} in ${setting}, depicting: ${sceneDescription}`;
   }
 
   return `Create a beautiful, highly detailed circular medallion illustration for "${title}" by ${author}. The illustration must depict: ${sceneDescription}. Mood: ${mood}.${era ? ` Era: ${era}.` : ''} The subject must be centred and fully contained within the circle, edges fading softly into empty space. Highly detailed, painterly, suitable for a luxury book cover. No text, no letters, no words.`;
 }
 
-function buildBatchJob(book, model, variant) {
+function buildBatchJob(book, model, variant, variantCount = 1) {
   return {
     id: uuid(),
     book_id: Number(book?.id || 0),
     model,
     variant,
     status: 'queued',
-    prompt: defaultBatchPrompt(book),
+    prompt: defaultBatchPrompt(book, variant, variantCount),
     prompt_source: 'custom',
     backend_prompt_source: 'custom',
     compose_prompt: false,
@@ -49,8 +108,11 @@ function buildBatchJob(book, model, variant) {
 }
 
 window.__BATCH_TEST_HOOKS__ = window.__BATCH_TEST_HOOKS__ || {};
-window.__BATCH_TEST_HOOKS__.defaultBatchPrompt = (book) => defaultBatchPrompt(book);
-window.__BATCH_TEST_HOOKS__.buildBatchJob = ({ book, model, variant }) => buildBatchJob(book, model, variant);
+window.__BATCH_TEST_HOOKS__.defaultBatchPrompt = ({ book, variant, variantCount, ...rawBook }) => {
+  const targetBook = book && typeof book === 'object' ? book : rawBook;
+  return defaultBatchPrompt(targetBook, variant, variantCount);
+};
+window.__BATCH_TEST_HOOKS__.buildBatchJob = ({ book, model, variant, variantCount }) => buildBatchJob(book, model, variant, variantCount);
 
 window.Pages.batch = {
   async render() {
@@ -211,7 +273,7 @@ window.Pages.batch = {
       const book = books.find((b) => Number(b.id) === Number(bookId));
       if (!book) return;
       for (let variant = 1; variant <= variantCount; variant += 1) {
-        jobs.push(buildBatchJob(book, model, variant));
+        jobs.push(buildBatchJob(book, model, variant, variantCount));
       }
     });
 

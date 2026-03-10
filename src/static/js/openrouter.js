@@ -112,6 +112,7 @@ window.OpenRouter = {
       book: Number(options.book_id || options.bookNumber || options.book || 0),
       models: [model],
       variants: requestedVariants,
+      variant: requestedVariant,
       prompt_source: options.prompt_source || 'custom',
       prompt,
       cover_source: options.cover_source || 'drive',

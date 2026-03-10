@@ -8,6 +8,7 @@ The modified PDF is then rendered to the final composite JPG.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 import zlib
@@ -24,6 +25,10 @@ DEFAULT_FEATHER_PX = 20
 DEFAULT_BORDER_TRIM_RATIO = 0.05
 JPEG_QUALITY = 100
 RENDER_DPI = 300
+TAGLINE_VERTICAL_LIMIT_RATIO = 0.55
+TAGLINE_RIGHT_COLUMN_MIN_RATIO = 0.45
+TAGLINE_RIGHT_EDGE_MIN_RATIO = 0.55
+TAGLINE_PADDING_PT = 6.0
 
 
 def composite_via_pdf_swap(
@@ -126,6 +131,7 @@ def composite_via_pdf_swap(
         output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
         pdf.save(str(output_pdf_path))
 
+    _blank_top_right_tagline(output_pdf_path)
     _render_pdf_to_jpg(
         source_pdf_path=output_pdf_path,
         output_jpg_path=output_jpg_path,
@@ -148,6 +154,135 @@ def detect_blend_radius_from_smask(smask_arr: np.ndarray) -> int:
     if smask_arr.ndim != 2:
         raise ValueError("SMask array must be 2D")
     return DEFAULT_BLEND_RADIUS
+
+
+def _text_is_all_caps(text: str) -> bool:
+    letters = [char for char in str(text or "") if char.isalpha()]
+    return bool(letters) and all(char.upper() == char for char in letters)
+
+
+def _text_has_mixed_case(text: str) -> bool:
+    letters = [char for char in str(text or "") if char.isalpha()]
+    if len(letters) < 6:
+        return False
+    return any(char.islower() for char in letters) and any(char.isupper() for char in letters)
+
+
+def _select_tagline_block_rects(
+    blocks: list[tuple[float, float, float, float, str]],
+    *,
+    page_width: float,
+    page_height: float,
+) -> list[tuple[float, float, float, float]]:
+    candidates: list[dict[str, float | str]] = []
+    for x0, y0, x1, y1, text in blocks:
+        cleaned = re.sub(r"\s+", " ", str(text or "")).strip()
+        if not cleaned:
+            continue
+        if x0 < page_width * TAGLINE_RIGHT_COLUMN_MIN_RATIO or x1 < page_width * TAGLINE_RIGHT_EDGE_MIN_RATIO:
+            continue
+        if y0 > page_height * TAGLINE_VERTICAL_LIMIT_RATIO:
+            continue
+        if (x1 - x0) < 80 or (y1 - y0) < 10:
+            continue
+        candidates.append({
+            "x0": float(x0),
+            "y0": float(y0),
+            "x1": float(x1),
+            "y1": float(y1),
+            "text": cleaned,
+        })
+
+    author_top = page_height * TAGLINE_VERTICAL_LIMIT_RATIO
+    author_candidates = [
+        block
+        for block in candidates
+        if _text_is_all_caps(str(block["text"]))
+        and float(block["y0"]) >= page_height * 0.38
+    ]
+    if author_candidates:
+        author_top = min(float(block["y0"]) for block in author_candidates)
+
+    selected: list[tuple[float, float, float, float]] = []
+    for block in candidates:
+        text = str(block["text"])
+        if not _text_has_mixed_case(text):
+            continue
+        x0 = max(0.0, float(block["x0"]) - TAGLINE_PADDING_PT)
+        y0 = max(0.0, float(block["y0"]) - TAGLINE_PADDING_PT)
+        x1 = min(page_width, float(block["x1"]) + TAGLINE_PADDING_PT)
+        y1 = min(page_height, float(block["y1"]) + TAGLINE_PADDING_PT)
+        if y1 > author_top:
+            continue
+        selected.append((x0, y0, x1, y1))
+    return selected
+
+
+def _sample_fill_color(page: "fitz.Page", rects: list[tuple[float, float, float, float]]) -> tuple[float, float, float]:
+    import fitz  # type: ignore
+
+    matrix = fitz.Matrix(2, 2)
+    pix = page.get_pixmap(matrix=matrix, alpha=False)
+    array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+    scale_x = pix.width / max(1.0, float(page.rect.width))
+    scale_y = pix.height / max(1.0, float(page.rect.height))
+
+    samples: list[np.ndarray] = []
+    for x0, y0, x1, y1 in rects:
+        rx0 = max(0, int(np.floor(x0 * scale_x)))
+        ry0 = max(0, int(np.floor(y0 * scale_y)))
+        rx1 = min(pix.width, int(np.ceil(x1 * scale_x)))
+        ry1 = min(pix.height, int(np.ceil(y1 * scale_y)))
+        pad = max(2, int(round(4 * max(scale_x, scale_y))))
+        regions = [
+            array[max(0, ry0 - pad):ry0, rx0:rx1],
+            array[ry1:min(pix.height, ry1 + pad), rx0:rx1],
+            array[ry0:ry1, max(0, rx0 - pad):rx0],
+            array[ry0:ry1, rx1:min(pix.width, rx1 + pad)],
+        ]
+        for region in regions:
+            if region.size:
+                samples.append(region.reshape(-1, pix.n))
+    if not samples:
+        return (1.0, 1.0, 1.0)
+    merged = np.concatenate(samples, axis=0)
+    rgb = np.median(merged[:, :3], axis=0) / 255.0
+    return (float(rgb[0]), float(rgb[1]), float(rgb[2]))
+
+
+def _blank_top_right_tagline(output_pdf_path: Path) -> None:
+    try:
+        import fitz  # type: ignore
+    except ImportError:  # pragma: no cover
+        logger.warning("PyMuPDF unavailable; skipping tagline blanking for %s", output_pdf_path.name)
+        return
+
+    doc = fitz.open(str(output_pdf_path))
+    try:
+        if doc.page_count <= 0:
+            return
+        page = doc[0]
+        raw_blocks = page.get_text("blocks")
+        blocks = [
+            (float(x0), float(y0), float(x1), float(y1), str(text or ""))
+            for x0, y0, x1, y1, text, *_rest in raw_blocks
+        ]
+        rects = _select_tagline_block_rects(
+            blocks,
+            page_width=float(page.rect.width),
+            page_height=float(page.rect.height),
+        )
+        if not rects:
+            return
+        fill_color = _sample_fill_color(page, rects)
+        for x0, y0, x1, y1 in rects:
+            page.draw_rect(fitz.Rect(x0, y0, x1, y1), color=fill_color, fill=fill_color, overlay=True)
+        temp_output = output_pdf_path.with_suffix(".tagline.tmp.pdf")
+        doc.save(str(temp_output), garbage=4, deflate=True)
+    finally:
+        doc.close()
+
+    temp_output.replace(output_pdf_path)
 
 
 def _build_art_mask(*, width: int, height: int, outer_radius: int, feather_px: int) -> np.ndarray:

@@ -52,20 +52,27 @@ def test_default_batch_prompt_uses_enrichment_scene_mood_and_era():
     prompt = _run_batch_hook(
         "defaultBatchPrompt",
         {
-            "id": 52,
-            "title": "Gulliver's Travels",
-            "author": "Jonathan Swift",
-            "enrichment": {
-                "iconic_scenes": ["Gulliver bound by tiny ropes in Lilliput"],
-                "emotional_tone": "satirical wonder with unease",
-                "era": "18th-century voyage literature",
-                "protagonist": "Lemuel Gulliver",
-                "setting_primary": "the shores of Lilliput",
+            "book": {
+                "id": 52,
+                "title": "Gulliver's Travels",
+                "author": "Jonathan Swift",
+                "enrichment": {
+                    "iconic_scenes": [
+                        "Gulliver bound by tiny ropes in Lilliput",
+                        "Gulliver stands in the court of Brobdingnag while giant courtiers gather around him",
+                    ],
+                    "emotional_tone": "satirical wonder with unease",
+                    "era": "18th-century voyage literature",
+                    "protagonist": "Lemuel Gulliver",
+                    "setting_primary": "the shores of Lilliput",
+                },
             },
+            "variant": 2,
+            "variantCount": 2,
         },
     )
 
-    assert "Gulliver bound by tiny ropes in Lilliput" in prompt
+    assert "Brobdingnag" in prompt
     assert "satirical wonder with unease" in prompt
     assert "18th-century voyage literature" in prompt
     assert "No text, no letters, no words." in prompt
@@ -80,12 +87,16 @@ def test_build_batch_job_marks_prompt_as_precomposed_custom():
                 "title": "Gulliver's Travels",
                 "author": "Jonathan Swift",
                 "enrichment": {
-                    "iconic_scenes": ["Gulliver bound by tiny ropes in Lilliput"],
+                    "iconic_scenes": [
+                        "Gulliver bound by tiny ropes in Lilliput",
+                        "Gulliver stands in the court of Brobdingnag while giant courtiers gather around him",
+                    ],
                     "emotional_tone": "satirical wonder with unease",
                 },
             },
             "model": "openrouter/google/gemini-3-pro-image-preview",
-            "variant": 1,
+            "variant": 2,
+            "variantCount": 2,
         },
     )
 
@@ -93,4 +104,4 @@ def test_build_batch_job_marks_prompt_as_precomposed_custom():
     assert job["prompt_source"] == "custom"
     assert job["backend_prompt_source"] == "custom"
     assert job["compose_prompt"] is False
-    assert "Gulliver bound by tiny ropes in Lilliput" in job["prompt"]
+    assert "Brobdingnag" in job["prompt"]
