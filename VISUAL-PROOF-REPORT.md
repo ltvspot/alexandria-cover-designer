@@ -111,3 +111,78 @@ The prompt-system goals are working, but the live browser proof surfaced an olde
 2. Because of that, several live result cards show blank preview placeholders even when result metadata and action buttons are present.
 
 That is a real runtime artifact-preview issue. It does not invalidate the prompt-catalog expansion, daily rotation, or prompt-validation work, but it should not be misrepresented as fixed by this release.
+
+---
+
+# Hotfix Update: Result-card preview hardening
+
+Date: `2026-03-10`
+
+Hotfix commit:
+
+- `c1f36bb` — `Harden asset and thumbnail preview delivery`
+
+Hotfix Railway deployment:
+
+- `eaf38c15-b08b-4174-8127-557b5682c7c4`
+- status: `SUCCESS`
+
+## What changed
+
+1. Added server-side normalization for asset and thumbnail `path` tokens so encoded local paths and stale cache-buster suffixes no longer break lookup.
+2. Added `/api/asset?path=...` as the safe full-resolution file endpoint for runtime artifacts.
+3. Reworked Iterate preview/download/full-view URL generation so project-relative paths resolve through `/api/thumbnail` and `/api/asset` without double-encoding or leaking `?v=...` into the `path` payload.
+4. Added regression coverage for:
+   - encoded `path` tokens with cache-busters
+   - Iterate preview source ordering
+   - full-resolution asset resolution in the app shell
+   - server smoke for `/api/asset` and `/api/thumbnail`
+
+## Hotfix verification
+
+Passed:
+
+- `node --check src/static/js/app.js`
+- `node --check src/static/js/pages/iterate.js`
+- `pytest tests/test_thumbnail_server.py tests/test_app_asset_helpers.py tests/test_iterate_prompt_builder.py -q`
+- `pytest tests/test_quality_review_server_smoke.py -q -k 'thumbnail_endpoint_rejects_non_image_and_disallowed_paths or asset_and_thumbnail_endpoints_accept_encoded_cachebuster_paths'`
+
+Live verification on the deployed app:
+
+1. `GET /api/health` returned:
+   - `status=ok`
+   - `healthy=true`
+   - `books_cataloged=2397`
+2. A real live Iterate run was queued and completed for book `4` (`Emma`) on the hotfix deployment.
+3. The live result card rendered a real image preview instead of the previous empty fallback placeholder.
+4. Opening the live result card rendered the full cover in the preview modal.
+5. Captured network log shows:
+   - `GET /api/asset?...saved_composites... => [200]`
+   - no captured `404`, `500`, `502`, or `403` requests in the proof session
+6. `Save Raw` still works after the hotfix:
+   - live `POST /api/save-raw => [200]`
+   - button state rerendered to `✓ Saved`
+   - Google Drive folder link was present on the saved button state
+
+## Hotfix visual artifacts
+
+Live result card with restored preview:
+
+- [`live-result-card-preview-fixed.png`](/private/tmp/alexandria-prompt40-relevance/output/playwright/preview-hardening/live-result-card-preview-fixed.png)
+
+Live full-preview modal:
+
+- [`live-full-preview-modal.png`](/private/tmp/alexandria-prompt40-relevance/output/playwright/preview-hardening/live-full-preview-modal.png)
+
+Live result card after `Save Raw`:
+
+- [`live-result-card-saved-state.png`](/private/tmp/alexandria-prompt40-relevance/output/playwright/preview-hardening/live-result-card-saved-state.png)
+
+Supporting logs:
+
+- [`live-network-preview.log`](/private/tmp/alexandria-prompt40-relevance/output/playwright/preview-hardening/live-network-preview.log)
+- [`live-console-preview.log`](/private/tmp/alexandria-prompt40-relevance/output/playwright/preview-hardening/live-console-preview.log)
+
+## Resolution status
+
+The specific live issue called out above is resolved by this hotfix. Result-card preview delivery is now working on the deployed app, and the proof session did not reproduce the prior blank-card failure.

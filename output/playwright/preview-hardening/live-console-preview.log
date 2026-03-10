@@ -1,0 +1,4 @@
+Total messages: 2 (Errors: 0, Warnings: 1)
+
+[LOG] [Compositor] Loaded geometry for 99 covers @ https://web-production-900a7.up.railway.app/static/js/compositor.js?v=20260304-modelcards09g:538
+[WARNING] Resolved thumbnail composite path to full-resolution source. {original: /Output Covers/saved_composites/4/34ad2608-183d-46…_openrouter_google_gemini-3-pro-image-preview.jpg, resolved: /api/asset?path=Output%20Covers%2Fsaved_composites…_openrouter_google_gemini-3-pro-image-preview.jpg} @ https://web-production-900a7.up.railway.app/static/js/app.js?v=20260304-modelcards09g:469
