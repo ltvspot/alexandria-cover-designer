@@ -1,25 +1,29 @@
-# PROMPT-35 Visual Proof Report
+# PROMPT-36 Visual Proof Report
 
 ## Release
 
-- Functional PROMPT-35 commit: `be957a0` (`Implement prompt 35 scene rotation and save raw exports`)
-- Follow-up functional fix: `db2c1c3` (`Fix prompt 35 preserve path and add template measurement script`)
-- Railway deployment: `75c8e391-5104-4b64-a87d-d0414aead198` (`SUCCESS`)
+- Functional PROMPT-36 commit: `34171d7` (`Revert compositor blanking and stale 99-book defaults`)
+- Railway deployment: `2d404ac4-7075-4b1c-8fa4-7ffb493c33a2` (`SUCCESS`)
 - Live app: [https://web-production-900a7.up.railway.app](https://web-production-900a7.up.railway.app)
 
 ## Verification
 
 Passed locally:
 
-- `python3 -m py_compile src/image_generator.py scripts/measure_template_regions.py`
-- `node --check src/static/js/pages/iterate.js`
-- `node --check src/static/js/pages/batch.js`
-- `node --check src/static/js/openrouter.js`
-- `pytest tests/test_image_generator_module.py -q -k preserve_prompt_text_skips_backend_diversification`
-- `pytest tests/test_iterate_prompt_builder.py tests/test_batch_prompt_builder.py tests/test_pdf_swap_compositor.py tests/test_quality_review_utils.py -q`
+- `python3 -m py_compile src/pdf_swap_compositor.py src/config.py src/prompt_generator.py scripts/quality_review.py`
+- `pytest tests/test_pdf_swap_compositor.py tests/test_config_module.py tests/test_prompt_generator_module.py tests/test_iterate_prompt_builder.py tests/test_batch_prompt_builder.py tests/test_quality_review_utils.py -q`
 - `pytest tests/test_quality_review_server_smoke.py -q -k 'generate_dry_run_resolves_placeholder_prompt_from_enrichment or save_raw'`
-- `pytest tests/test_image_generator_module.py -q -k 'generate_single_book_and_batch or generate_single_book_default_prompt_and_model_fallback or generate_single_book_forwards_preserve_prompt_text or generate_batch_dry_run_failure_append_and_scope_limit'`
-- `python scripts/measure_template_regions.py '/Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/Input Covers/3. Gulliver’s Travels into Several Remote Regions of the World - Jonathan Swift copy'`
+- `rg -n "blank_description|get_text\\(|99 book|99 title|99 cover|book_count\\\": 99|books=99|total_books\\\":99|value=\\\"99\\\"" src scripts tests -S`
+  - zero matches
+
+Strict local compositor smoke:
+
+- Source PDF: `Input Covers/1. A Room with a View - E. M. Forster copy/A Room with a View - E. M. Forster.pdf`
+- Raw art: `Output Covers/raw_art/1/variant_1_openrouter_openai_gpt-5-image.png`
+- Output JPG: `/tmp/alexandria-proof-live-prompt36-local/book1-pdf-swap.jpg`
+- Output PDF: `/tmp/alexandria-proof-live-prompt36-local/book1-pdf-swap.pdf`
+- `python scripts/verify_composite.py /tmp/alexandria-proof-live-prompt36-local/book1-pdf-swap.jpg --source-pdf '...A Room with a View - E. M. Forster.pdf' --output-pdf /tmp/alexandria-proof-live-prompt36-local/book1-pdf-swap.pdf --strict`
+  - result: `ALL CHECKS PASSED - safe to commit`
 
 Full-suite honesty check:
 
@@ -30,31 +34,39 @@ Full-suite honesty check:
 
 ## Live Proof
 
-- Post-deploy readiness check:
-  - `GET /api/healthz` returned `status=ok`, `healthy=true`, `startup.status=ready`, `uptime_seconds=51`
-- Live Iterate run used book `3` (`Gulliver’s Travels into Several Remote Regions of the World`) and completed `10/10`
-- Live `Save Raw` for backend job `c364656f-6611-4dfb-8c26-0677b5144340` returned:
+- Post-deploy readiness:
+  - `GET /api/health` returned `status=ok`, `healthy=true`, `uptime_seconds=65`, `books_cataloged=2397`
+  - startup check included `save_raw_drive_write_access = Drive upload: OK (Shared Drive)`
+- Live Iterate run used book `3` (`Gulliver’s Travels into Several Remote Regions of the World`)
+- Live `/api/jobs` snapshot during proof showed multiple completed variants with distinct scenes and prompt families
+- Live `POST /api/save-raw` for backend job `cd05fa79-b6cc-46ba-b071-bad9e3681529` returned:
   - `status=saved`
   - `drive_ok=true`
   - `saved_files=6`
-  - `missing_files=[]`
-  - Drive folder `1lK0ADZvLcSuKTkHiK8CAYpWYJDL6samY`
+  - `drive_uploaded=6`
+  - `drive_folder_id=1lK0ADZvLcSuKTkHiK8CAYpWYJDL6samY`
 
-### Scene Rotation + Saved State
+### Book 1 Text Intact
 
-![PROMPT-35 live iterate proof](/tmp/alexandria-proof-live-prompt35/live-iterate-scene-rotation-prompt35.png)
+This is the strict local smoke proof for the reverted compositor path. The top-right title/subtitle region remains intact; PROMPT-36 removed the PROMPT-35 blanking logic entirely.
 
-### Save Raw 6-file Proof
+![PROMPT-36 book 1 text proof](/tmp/alexandria-proof-live-prompt36-local/book1-text-proof-prompt36.png)
 
-![PROMPT-35 save raw proof](/tmp/alexandria-proof-live-prompt35/live-save-raw-proof-prompt35.png)
+### Live Scene Variation
 
-### Subtitle Blanking Proof
+This proof board is assembled from the live deployed `/api/jobs` payload plus the actual deployed composited JPGs served by the app.
 
-This before/after crop uses the shipped compositor path against the real Gulliver template PDF. The browser result thumbnails are too small to inspect this text band reliably, so the proof below isolates the exact affected region.
+![PROMPT-36 live scene variation proof](/tmp/alexandria-proof-live-prompt36/live-scene-variation-proof-prompt36.png)
 
-![PROMPT-35 subtitle blanking proof](/tmp/alexandria-proof-live-prompt35/live-subtitle-blanking-proof.png)
+### Live Save Raw 6-file Proof
+
+![PROMPT-36 live save raw proof](/tmp/alexandria-proof-live-prompt36/live-save-raw-proof-prompt36.png)
+
+### Live Health Proof
+
+![PROMPT-36 live health proof](/tmp/alexandria-proof-live-prompt36/live-health-proof-prompt36.png)
 
 ## Notes
 
-- The live visual proof run was captured on the deployed PROMPT-35 runtime before the `db2c1c3` follow-up redeploy completed. That follow-up only fixes the `preserve_prompt_text=True` regression found by the full-suite run and adds the requested measurement script; it does not change the PROMPT-35 scene-rotation, subtitle-blanking, or save-raw user path already proven above.
-- `GET /api/health` can briefly report `status=starting` on a freshly replaced Railway instance even while `GET /api/healthz` already reports `startup.status=ready`. The latter was the stable readiness signal during this deploy.
+- Honest live residual issue: one smart-rotation wildcard job failed during proof with `OpenRouter error 400` wrapping `User location is not supported for the API use.` This is provider/runtime behavior on that live route, not a PROMPT-36 compositor regression.
+- Despite that provider failure, the deployed app still produced multiple completed distinct variants for book `3`, and `Save Raw` completed successfully with all `6` exports uploaded to Drive.
