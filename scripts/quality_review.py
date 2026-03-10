@@ -1940,7 +1940,7 @@ def _serialize_generation_results(
 
 
 def _generation_artifact_job_token(*, job_id: str = "", row: dict[str, Any] | None = None) -> str:
-    explicit = re.sub(r"[^A-Za-z0-9_-]+", "", str(job_id or "").strip())[:24]
+    explicit = re.sub(r"[^A-Za-z0-9_-]+", "", str(job_id or "").strip())[:64]
     if explicit:
         return explicit
     if isinstance(row, dict):
@@ -1949,7 +1949,7 @@ def _generation_artifact_job_token(*, job_id: str = "", row: dict[str, Any] | No
             stem = Path(raw_art_path).stem
             match = re.match(r"(?P<token>.+?)_variant_\d+_", stem)
             if match:
-                token = re.sub(r"[^A-Za-z0-9_-]+", "", str(match.group("token") or "").strip())[:24]
+                token = re.sub(r"[^A-Za-z0-9_-]+", "", str(match.group("token") or "").strip())[:64]
                 if token:
                     return token
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
@@ -3270,6 +3270,15 @@ def _job_result_rows(job: job_store.JobRecord | None) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         return []
     return [row for row in rows if isinstance(row, dict)]
+
+
+class SaveRawIntegrityError(RuntimeError):
+    """Raised when Save Raw cannot safely map a UI selection to immutable artifacts."""
+
+    def __init__(self, message: str, *, code: str, details: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = str(code or "SAVE_RAW_INTEGRITY_ERROR")
+        self.details = details if isinstance(details, dict) else {}
 
 
 def _job_result_cost_total(job: job_store.JobRecord | None) -> float:
@@ -10998,8 +11007,9 @@ def serve_review_webapp(
                         status=HTTPStatus.NOT_FOUND,
                         endpoint=path,
                     )
+                expected_selection = _save_raw_expectation_from_payload(body)
                 try:
-                    payload = _save_raw_payload_for_job(runtime=runtime_req, job=job)
+                    payload = _save_raw_payload_for_job(runtime=runtime_req, job=job, expected=expected_selection)
                 except LookupError:
                     return self._send_error(
                         code="BOOK_NOT_FOUND",
@@ -11014,6 +11024,14 @@ def serve_review_webapp(
                         message="No raw or composite image found for job",
                         details={"job_id": job_id},
                         status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                except SaveRawIntegrityError as exc:
+                    return self._send_error(
+                        code=exc.code,
+                        message=str(exc),
+                        details=exc.details,
+                        status=HTTPStatus.CONFLICT,
                         endpoint=path,
                     )
                 return self._send_json(payload)
@@ -11036,8 +11054,9 @@ def serve_review_webapp(
                         status=HTTPStatus.NOT_FOUND,
                         endpoint=path,
                     )
+                expected_selection = _save_raw_expectation_from_payload(body)
                 try:
-                    payload = _save_raw_payload_for_job(runtime=runtime_req, job=job)
+                    payload = _save_raw_payload_for_job(runtime=runtime_req, job=job, expected=expected_selection)
                 except LookupError:
                     return self._send_error(
                         code="BOOK_NOT_FOUND",
@@ -11052,6 +11071,14 @@ def serve_review_webapp(
                         message="No raw or composite image found for job",
                         details={"job_id": job_id},
                         status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                except SaveRawIntegrityError as exc:
+                    return self._send_error(
+                        code=exc.code,
+                        message=str(exc),
+                        details=exc.details,
+                        status=HTTPStatus.CONFLICT,
                         endpoint=path,
                     )
                 payload["retried"] = True
@@ -14372,6 +14399,138 @@ def _primary_job_result_row(job: job_store.JobRecord | None) -> dict[str, Any] |
     return rows[0]
 
 
+def _row_variant_number(row: dict[str, Any] | None) -> int:
+    if not isinstance(row, dict):
+        return 0
+    return _safe_int(row.get("variant"), _safe_int(row.get("variant_id"), 0))
+
+
+def _save_raw_expectation_from_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+    source = payload if isinstance(payload, dict) else {}
+    variant_value = source.get("expected_variant", source.get("variant", 0))
+    model_value = source.get("expected_model", source.get("model", ""))
+    raw_art_value = source.get("expected_raw_art_path", source.get("raw_art_path", ""))
+    saved_composited_value = source.get("expected_saved_composited_path", source.get("saved_composited_path", ""))
+    return {
+        "variant": max(0, _safe_int(variant_value, 0)),
+        "model": str(model_value or "").strip(),
+        "raw_art_path": str(raw_art_value or "").strip(),
+        "saved_composited_path": str(saved_composited_value or "").strip(),
+    }
+
+
+def _row_matches_save_raw_expectation(row: dict[str, Any], expected: dict[str, Any]) -> bool:
+    if not isinstance(row, dict):
+        return False
+    variant = _safe_int(expected.get("variant"), 0)
+    if variant > 0 and _row_variant_number(row) != variant:
+        return False
+    model = str(expected.get("model", "") or "").strip()
+    if model and str(row.get("model", "") or "").strip() != model:
+        return False
+    raw_art_path = str(expected.get("raw_art_path", "") or "").strip()
+    if raw_art_path and str(row.get("raw_art_path", "") or "").strip() != raw_art_path:
+        return False
+    saved_composited_path = str(expected.get("saved_composited_path", "") or "").strip()
+    if saved_composited_path and str(row.get("saved_composited_path", "") or "").strip() != saved_composited_path:
+        return False
+    return True
+
+
+def _row_for_save_raw(*, job: job_store.JobRecord, expected: dict[str, Any] | None = None) -> dict[str, Any]:
+    rows = _job_result_rows(job)
+    if not rows:
+        raise FileNotFoundError("No job results found")
+    success_rows = [row for row in rows if bool(row.get("success", False))]
+    pool = success_rows or rows
+    normalized_expected = _save_raw_expectation_from_payload(expected)
+    has_selector = any(
+        [
+            int(normalized_expected.get("variant", 0)) > 0,
+            bool(str(normalized_expected.get("model", "") or "").strip()),
+            bool(str(normalized_expected.get("raw_art_path", "") or "").strip()),
+            bool(str(normalized_expected.get("saved_composited_path", "") or "").strip()),
+        ]
+    )
+    if has_selector:
+        matches = [row for row in pool if _row_matches_save_raw_expectation(row, normalized_expected)]
+        if len(matches) == 1:
+            return matches[0]
+        details = {
+            "job_id": str(job.id or "").strip(),
+            "result_count": len(pool),
+            "expected": normalized_expected,
+            "available": [
+                {
+                    "variant": _row_variant_number(row),
+                    "model": str(row.get("model", "") or "").strip(),
+                    "raw_art_path": str(row.get("raw_art_path", "") or "").strip(),
+                    "saved_composited_path": str(row.get("saved_composited_path", "") or "").strip(),
+                }
+                for row in pool
+            ],
+        }
+        if not matches:
+            raise SaveRawIntegrityError(
+                "Save Raw refused because the selected result card does not match the backend job artifacts.",
+                code="SAVE_RAW_SELECTION_MISMATCH",
+                details=details,
+            )
+        raise SaveRawIntegrityError(
+            "Save Raw refused because the backend job selection is ambiguous.",
+            code="SAVE_RAW_SELECTION_AMBIGUOUS",
+            details=details,
+        )
+    if len(pool) == 1:
+        return pool[0]
+    raise SaveRawIntegrityError(
+        "Save Raw refused because this backend job contains multiple results and no exact selector was provided.",
+        code="SAVE_RAW_SELECTION_REQUIRED",
+        details={
+            "job_id": str(job.id or "").strip(),
+            "result_count": len(pool),
+        },
+    )
+
+
+def _is_descendant_path(candidate: Path, parent: Path) -> bool:
+    try:
+        candidate.resolve().relative_to(parent.resolve())
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_durable_raw_image_path(*, runtime: config.Config, row: dict[str, Any]) -> Path | None:
+    raw_root = runtime.output_dir / "raw_art"
+    for token in (row.get("raw_art_path"), row.get("image_path")):
+        candidate = _project_path_if_exists(token)
+        if candidate is None or not candidate.exists():
+            continue
+        if _is_descendant_path(candidate, raw_root):
+            return candidate
+    return None
+
+
+def _resolve_durable_composite_image_path(*, runtime: config.Config, row: dict[str, Any]) -> Path | None:
+    composite_root = runtime.output_dir / "saved_composites"
+    for token in (row.get("saved_composited_path"), row.get("composited_path")):
+        candidate = _project_path_if_exists(token)
+        if candidate is None or not candidate.exists():
+            continue
+        if _is_descendant_path(candidate, composite_root):
+            return candidate
+    return None
+
+
+def _save_raw_package_folder_name(*, job: job_store.JobRecord, row: dict[str, Any]) -> str:
+    job_token = _generation_artifact_job_token(job_id=str(job.id or "").strip(), row=row)
+    variant = max(1, _row_variant_number(row))
+    model_token = image_generator._model_to_directory(str(row.get("model", "") or "unknown"))  # type: ignore[attr-defined]
+    safe_model_token = _display_filename_token(model_token, allow_en_dash=False).replace(" ", "_")
+    return f"save-raw__{job_token}__variant-{variant}__{safe_model_token}"
+
+
 def _resolve_raw_image_path_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> Path | None:
     del runtime
     row = _primary_job_result_row(job)
@@ -14630,13 +14789,27 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
             }
 
 
-def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folder_name: str, parent_folder_id: str) -> dict[str, Any]:
+def _upload_folder_to_drive(
+    *,
+    runtime: config.Config,
+    local_folder: Path,
+    folder_name: str = "",
+    folder_parts: list[str] | None = None,
+    parent_folder_id: str,
+) -> dict[str, Any]:
     local_files = [file_path for file_path in sorted(local_folder.iterdir()) if file_path.is_file()]
+    normalized_parts = [
+        str(part or "").strip()
+        for part in (folder_parts if isinstance(folder_parts, list) and folder_parts else [folder_name])
+        if str(part or "").strip()
+    ]
+    leaf_folder_name = normalized_parts[-1] if normalized_parts else str(folder_name or "").strip()
     service, credentials_path, mode, credentials_meta, connection_error = _drive_service_for_runtime(runtime)
     result: dict[str, Any] = {
         "ok": False,
         "mode": mode,
-        "folder_name": str(folder_name),
+        "folder_name": leaf_folder_name,
+        "folder_parts": normalized_parts,
         "parent_folder_id": str(parent_folder_id),
         "folder_id": "",
         "drive_url": None,
@@ -14669,11 +14842,14 @@ def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folde
         return result
 
     try:
-        child_folder_id = _ensure_drive_child_folder(
-            service=service,
-            parent_folder_id=parent_folder_id,
-            folder_name=folder_name,
-        )
+        current_parent_folder_id = str(parent_folder_id)
+        for part in normalized_parts:
+            current_parent_folder_id = _ensure_drive_child_folder(
+                service=service,
+                parent_folder_id=current_parent_folder_id,
+                folder_name=part,
+            )
+        child_folder_id = current_parent_folder_id
     except Exception as exc:
         details = _drive_error_details(exc)
         result["error"] = details["message"]
@@ -14725,11 +14901,17 @@ def _upload_folder_to_drive(*, runtime: config.Config, local_folder: Path, folde
     return result
 
 
-def _save_raw_context_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> dict[str, Any]:
+def _save_raw_context_for_job(
+    *,
+    runtime: config.Config,
+    job: job_store.JobRecord,
+    expected: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     book = _book_row_for_number(runtime=runtime, book_number=int(job.book_number or 0))
     if not isinstance(book, dict):
         raise LookupError("book not found for job")
 
+    selected_row = _row_for_save_raw(job=job, expected=expected)
     title = _display_filename_token(str(book.get("title", f"Book {int(job.book_number or 0)}")))
     author = _display_filename_token(str(book.get("author", "Unknown")))
     catalog_number = str(
@@ -14738,30 +14920,47 @@ def _save_raw_context_for_job(*, runtime: config.Config, job: job_store.JobRecor
         or job.book_number
         or "0"
     ).strip()
-    folder_name = f"{catalog_number}. {title} - {author}"
+    book_folder_name = f"{catalog_number}. {title} - {author}"
     file_stem = f"{title} – {author}"
-    raw_source = _resolve_raw_image_path_for_job(runtime=runtime, job=job)
-    comp_source = _resolve_composite_image_path_for_job(runtime=runtime, job=job)
-    comp_pdf_source = _resolve_composite_companion_for_job(job=job, suffix=".pdf")
-    comp_ai_source = _resolve_composite_companion_for_job(job=job, suffix=".ai")
+    package_folder_name = _save_raw_package_folder_name(job=job, row=selected_row)
+    raw_source = _resolve_durable_raw_image_path(runtime=runtime, row=selected_row)
+    comp_source = _resolve_durable_composite_image_path(runtime=runtime, row=selected_row)
     if raw_source is None and comp_source is None:
-        raise FileNotFoundError("No raw or composite image found for job")
+        raise SaveRawIntegrityError(
+            "Save Raw refused because this result does not have immutable job-scoped artifacts. Regenerate the result before saving.",
+            code="SAVE_RAW_IMMUTABLE_ARTIFACTS_REQUIRED",
+            details={
+                "job_id": str(job.id or "").strip(),
+                "variant": _row_variant_number(selected_row),
+                "model": str(selected_row.get("model", "") or "").strip(),
+                "raw_art_path": str(selected_row.get("raw_art_path", "") or "").strip(),
+                "saved_composited_path": str(selected_row.get("saved_composited_path", "") or "").strip(),
+            },
+        )
     return {
         "job_id": str(job.id or "").strip(),
         "book_number": int(job.book_number or 0),
-        "folder_name": folder_name,
-        "local_folder": _local_save_raw_root(runtime=runtime) / folder_name,
+        "book_folder_name": book_folder_name,
+        "package_folder_name": package_folder_name,
+        "folder_name": package_folder_name,
+        "local_folder": _local_save_raw_root(runtime=runtime) / book_folder_name / package_folder_name,
         "raw_source": raw_source,
         "raw_basename": f"{file_stem} (generated raw)",
         "comp_source": comp_source,
-        "comp_pdf_source": comp_pdf_source,
-        "comp_ai_source": comp_ai_source,
         "comp_basename": file_stem,
+        "variant": _row_variant_number(selected_row),
+        "model": str(selected_row.get("model", "") or "").strip(),
+        "selected_row": selected_row,
     }
 
 
-def _materialize_save_raw_package(*, runtime: config.Config, job: job_store.JobRecord) -> dict[str, Any]:
-    context = _save_raw_context_for_job(runtime=runtime, job=job)
+def _materialize_save_raw_package(
+    *,
+    runtime: config.Config,
+    job: job_store.JobRecord,
+    expected: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    context = _save_raw_context_for_job(runtime=runtime, job=job, expected=expected)
     local_folder = Path(context["local_folder"])
     local_folder.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
@@ -14794,8 +14993,8 @@ def _materialize_save_raw_package(*, runtime: config.Config, job: job_store.JobR
         saved_files.extend(
             _export_asset_triplet(
                 source_image=comp_source,
-                existing_pdf=context.get("comp_pdf_source"),
-                existing_ai=context.get("comp_ai_source"),
+                existing_pdf=None,
+                existing_ai=None,
                 local_folder=local_folder,
                 base_filename=str(context["comp_basename"]),
             )
@@ -14816,20 +15015,32 @@ def _materialize_save_raw_package(*, runtime: config.Config, job: job_store.JobR
     return {
         "job_id": context["job_id"],
         "book_number": context["book_number"],
+        "book_folder_name": context["book_folder_name"],
+        "package_folder_name": context["package_folder_name"],
         "folder_name": context["folder_name"],
         "local_folder": str(local_folder),
         "saved_files": saved_files,
         "missing_files": missing_files,
         "warning": " ".join(warnings).strip() or None,
+        "variant": context["variant"],
+        "model": context["model"],
     }
 
 
-def _save_raw_payload_for_job(*, runtime: config.Config, job: job_store.JobRecord) -> dict[str, Any]:
-    local_payload = _materialize_save_raw_package(runtime=runtime, job=job)
+def _save_raw_payload_for_job(
+    *,
+    runtime: config.Config,
+    job: job_store.JobRecord,
+    expected: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    local_payload = _materialize_save_raw_package(runtime=runtime, job=job, expected=expected)
     drive_payload = _upload_folder_to_drive(
         runtime=runtime,
         local_folder=Path(local_payload["local_folder"]),
-        folder_name=str(local_payload["folder_name"]),
+        folder_parts=[
+            str(local_payload.get("book_folder_name", "") or "").strip(),
+            str(local_payload.get("package_folder_name", "") or "").strip(),
+        ],
         parent_folder_id=SAVE_RAW_DRIVE_FOLDER_ID,
     )
     warnings = [
@@ -14845,10 +15056,14 @@ def _save_raw_payload_for_job(*, runtime: config.Config, job: job_store.JobRecor
         "ok": True,
         "job_id": local_payload["job_id"],
         "book_number": local_payload["book_number"],
+        "book_folder_name": local_payload["book_folder_name"],
+        "package_folder_name": local_payload["package_folder_name"],
         "folder_name": local_payload["folder_name"],
         "local_folder": local_payload["local_folder"],
         "saved_files": local_payload["saved_files"],
         "missing_files": local_payload["missing_files"],
+        "variant": local_payload["variant"],
+        "model": local_payload["model"],
         "status": saved_status,
         "drive_ok": bool(drive_payload.get("ok", False)),
         "drive_url": drive_payload.get("drive_url"),

@@ -806,6 +806,26 @@ function backendJobIdForJob(job) {
   }
 }
 
+function backendResultRowForJob(job) {
+  try {
+    const parsed = JSON.parse(String(job?.results_json || '{}'));
+    return parsed?.result && typeof parsed.result === 'object' ? parsed.result : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveRawRequestPayloadForJob(job) {
+  const row = backendResultRowForJob(job) || {};
+  return {
+    job_id: backendJobIdForJob(job),
+    expected_variant: Number(row?.variant || job?.variant || 0) || 0,
+    expected_model: String(row?.model || job?.model || '').trim(),
+    expected_raw_art_path: String(row?.raw_art_path || '').trim(),
+    expected_saved_composited_path: String(row?.saved_composited_path || '').trim(),
+  };
+}
+
 function escapeHtml(value) {
   return String(value || '')
     .replaceAll('&', '&amp;')
@@ -2151,9 +2171,13 @@ window.Pages.iterate = {
       window.open(existingDriveUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    const backendJobId = backendJobIdForJob(job);
-    if (!backendJobId) {
+    const requestPayload = saveRawRequestPayloadForJob(job);
+    if (!requestPayload.job_id) {
       Toast.error('Save Raw failed: backend job id is missing.');
+      return;
+    }
+    if (!requestPayload.expected_raw_art_path && !requestPayload.expected_saved_composited_path) {
+      Toast.error('Save Raw refused: this result does not have immutable saved artifacts. Regenerate it before saving.');
       return;
     }
 
@@ -2168,7 +2192,7 @@ window.Pages.iterate = {
       const resp = await fetch(retryMode ? '/api/retry-drive-upload' : '/api/save-raw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id: backendJobId }),
+        body: JSON.stringify(requestPayload),
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {

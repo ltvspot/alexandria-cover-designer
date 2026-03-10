@@ -1131,8 +1131,8 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
         json.dumps([{"number": 7, "title": "Temple Dawn", "author": "A. Writer"}]),
         encoding="utf-8",
     )
-    raw_path = cfg.tmp_dir / "generated" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.png"
-    comp_path = cfg.tmp_dir / "composited" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.jpg"
+    raw_path = cfg.output_dir / "raw_art" / "7" / "job-raw-partial_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_path = cfg.output_dir / "saved_composites" / "7" / "job-raw-partial_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     comp_path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (64, 64), (12, 34, 56)).save(raw_path, format="PNG")
@@ -1151,8 +1151,8 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
                     "success": True,
                     "variant": 1,
                     "model": "openrouter/google/gemini-3-pro-image-preview",
-                    "image_path": str(raw_path),
-                    "composited_path": str(comp_path),
+                    "raw_art_path": qr._to_project_relative(raw_path),
+                    "saved_composited_path": qr._to_project_relative(comp_path),
                 }
             ]
         },
@@ -1190,6 +1190,313 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
     assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
     assert all(Path(path).exists() for path in payload["saved_files"])
     assert "Drive upload partially completed" in str(payload["warning"])
+
+
+def test_save_raw_context_uses_unique_package_folder_per_result(tmp_path: Path):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 7, "title": "Temple Dawn", "author": "A. Writer"}]),
+        encoding="utf-8",
+    )
+
+    def _make_job(job_id: str, raw_color: tuple[int, int, int], comp_color: tuple[int, int, int]):
+        raw_path = cfg.output_dir / "raw_art" / "7" / f"{job_id}_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+        comp_path = cfg.output_dir / "saved_composites" / "7" / f"{job_id}_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        comp_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (64, 64), raw_color).save(raw_path, format="PNG")
+        Image.new("RGB", (64, 64), comp_color).save(comp_path, format="JPEG")
+        return qr.job_store.JobRecord(
+            id=job_id,
+            idempotency_key=f"idem-{job_id}",
+            job_type="generate_cover",
+            status="completed",
+            catalog_id="classics",
+            book_number=7,
+            payload={},
+            result={
+                "results": [
+                    {
+                        "success": True,
+                        "variant": 1,
+                        "model": "openrouter/google/gemini-3-pro-image-preview",
+                        "raw_art_path": qr._to_project_relative(raw_path),
+                        "saved_composited_path": qr._to_project_relative(comp_path),
+                    }
+                ]
+            },
+            error={},
+            attempts=1,
+            max_attempts=3,
+            priority=100,
+            retry_after="",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            started_at=datetime.now(timezone.utc).isoformat(),
+            finished_at=datetime.now(timezone.utc).isoformat(),
+            worker_id="",
+        )
+
+    first = _make_job("job-alpha", (12, 34, 56), (56, 34, 12))
+    second = _make_job("job-beta", (23, 45, 67), (67, 45, 23))
+
+    first_context = qr._save_raw_context_for_job(runtime=cfg, job=first)
+    second_context = qr._save_raw_context_for_job(runtime=cfg, job=second)
+
+    assert first_context["book_folder_name"] == second_context["book_folder_name"]
+    assert first_context["package_folder_name"] != second_context["package_folder_name"]
+    assert Path(first_context["local_folder"]) != Path(second_context["local_folder"])
+    assert "job-alpha" in str(first_context["package_folder_name"])
+    assert "job-beta" in str(second_context["package_folder_name"])
+
+
+def test_save_raw_context_refuses_mutable_tmp_only_artifacts(tmp_path: Path):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 7, "title": "Temple Dawn", "author": "A. Writer"}]),
+        encoding="utf-8",
+    )
+    raw_path = cfg.tmp_dir / "generated" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.png"
+    comp_path = cfg.tmp_dir / "composited" / "7" / "openrouter__google__gemini-3-pro-image-preview" / "variant_1.jpg"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (12, 34, 56)).save(raw_path, format="PNG")
+    Image.new("RGB", (64, 64), (56, 34, 12)).save(comp_path, format="JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-mutable-only",
+        idempotency_key="idem-mutable-only",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=7,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 1,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "image_path": qr._to_project_relative(raw_path),
+                    "composited_path": qr._to_project_relative(comp_path),
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    with pytest.raises(qr.SaveRawIntegrityError) as exc_info:
+        qr._save_raw_context_for_job(runtime=cfg, job=job)
+    assert exc_info.value.code == "SAVE_RAW_IMMUTABLE_ARTIFACTS_REQUIRED"
+
+
+def test_row_for_save_raw_requires_exact_selector_for_multi_result_job(tmp_path: Path):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 7, "title": "Temple Dawn", "author": "A. Writer"}]),
+        encoding="utf-8",
+    )
+    raw_one = cfg.output_dir / "raw_art" / "7" / "job-multi_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_one = cfg.output_dir / "saved_composites" / "7" / "job-multi_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+    raw_two = cfg.output_dir / "raw_art" / "7" / "job-multi_variant_2_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_two = cfg.output_dir / "saved_composites" / "7" / "job-multi_variant_2_openrouter_google_gemini-3-pro-image-preview.jpg"
+    for path, color in (
+        (raw_one, (12, 34, 56)),
+        (comp_one, (56, 34, 12)),
+        (raw_two, (22, 44, 66)),
+        (comp_two, (66, 44, 22)),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (64, 64), color).save(path, format="PNG" if path.suffix.lower() == ".png" else "JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-multi",
+        idempotency_key="idem-job-multi",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=7,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 1,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "raw_art_path": qr._to_project_relative(raw_one),
+                    "saved_composited_path": qr._to_project_relative(comp_one),
+                },
+                {
+                    "success": True,
+                    "variant": 2,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "raw_art_path": qr._to_project_relative(raw_two),
+                    "saved_composited_path": qr._to_project_relative(comp_two),
+                },
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    with pytest.raises(qr.SaveRawIntegrityError) as exc_info:
+        qr._row_for_save_raw(job=job)
+    assert exc_info.value.code == "SAVE_RAW_SELECTION_REQUIRED"
+
+    selected = qr._row_for_save_raw(
+        job=job,
+        expected={
+            "expected_variant": 2,
+            "expected_model": "openrouter/google/gemini-3-pro-image-preview",
+            "expected_raw_art_path": qr._to_project_relative(raw_two),
+            "expected_saved_composited_path": qr._to_project_relative(comp_two),
+        },
+    )
+    assert qr._row_variant_number(selected) == 2
+    assert str(selected["saved_composited_path"]) == qr._to_project_relative(comp_two)
+
+
+def test_row_for_save_raw_rejects_mismatch_with_pre_normalized_selector(tmp_path: Path):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 7, "title": "Temple Dawn", "author": "A. Writer"}]),
+        encoding="utf-8",
+    )
+    raw_path = cfg.output_dir / "raw_art" / "7" / "job-single_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_path = cfg.output_dir / "saved_composites" / "7" / "job-single_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (15, 35, 55)).save(raw_path, format="PNG")
+    Image.new("RGB", (64, 64), (55, 35, 15)).save(comp_path, format="JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-single",
+        idempotency_key="idem-job-single",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=7,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 1,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "raw_art_path": qr._to_project_relative(raw_path),
+                    "saved_composited_path": qr._to_project_relative(comp_path),
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    with pytest.raises(qr.SaveRawIntegrityError) as exc_info:
+        qr._row_for_save_raw(
+            job=job,
+            expected={
+                "variant": 1,
+                "model": "openrouter/google/gemini-3-pro-image-preview",
+                "raw_art_path": qr._to_project_relative(raw_path),
+                "saved_composited_path": qr._to_project_relative(comp_path.with_name("wrong-card.jpg")),
+            },
+        )
+    assert exc_info.value.code == "SAVE_RAW_SELECTION_MISMATCH"
+
+
+def test_save_raw_payload_uses_nested_drive_folder_parts_per_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 4, "title": "Emma", "author": "Jane Austen"}]),
+        encoding="utf-8",
+    )
+    raw_path = cfg.output_dir / "raw_art" / "4" / "job-emma_variant_3_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_path = cfg.output_dir / "saved_composites" / "4" / "job-emma_variant_3_openrouter_google_gemini-3-pro-image-preview.jpg"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (13, 23, 33)).save(raw_path, format="PNG")
+    Image.new("RGB", (64, 64), (43, 53, 63)).save(comp_path, format="JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-emma",
+        idempotency_key="idem-job-emma",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=4,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 3,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "raw_art_path": qr._to_project_relative(raw_path),
+                    "saved_composited_path": qr._to_project_relative(comp_path),
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    captured: dict[str, Any] = {}
+
+    def _fake_upload_folder_to_drive(**kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return {
+            "ok": True,
+            "folder_id": "drive-folder-1",
+            "drive_url": "https://drive.google.com/drive/folders/drive-folder-1",
+            "uploaded": [],
+            "failed": [],
+            "warning": None,
+        }
+
+    monkeypatch.setattr(qr, "_upload_folder_to_drive", _fake_upload_folder_to_drive)
+
+    payload = qr._save_raw_payload_for_job(runtime=cfg, job=job)
+
+    assert payload["status"] == "saved"
+    assert captured["folder_parts"][0] == "4. Emma - Jane Austen"
+    assert captured["folder_parts"][1].startswith("save-raw__job-emma__variant-3__")
 
 
 def test_save_raw_drive_status_payload_reports_parent_folder_access(

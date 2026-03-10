@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import signal
@@ -13,6 +14,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from PIL import Image
+
+from src import job_store
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -79,6 +82,7 @@ def _wait_for_health(base_url: str, *, path: str = "/api/health", timeout_second
 def _start_server(
     *,
     extra_args: list[str] | None = None,
+    extra_env: dict[str, str] | None = None,
     wait_path: str = "/api/health",
     timeout_seconds: float = 45.0,
 ) -> tuple[subprocess.Popen[bytes], str]:
@@ -87,6 +91,8 @@ def _start_server(
     env = os.environ.copy()
     env.setdefault("JOB_WORKER_MODE", "disabled")
     env.setdefault("SLO_MONITOR_INTERVAL_SECONDS", "0")
+    if extra_env:
+        env.update({str(key): str(value) for key, value in extra_env.items()})
     args = [sys.executable, "scripts/quality_review.py", "--serve", "--port", str(port)]
     if extra_args:
         args.extend(extra_args)
@@ -116,6 +122,88 @@ def _stop_server(process: subprocess.Popen[bytes]) -> None:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=8)
+
+
+def _write_image(path: Path, color: tuple[int, int, int], *, format_name: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (80, 80), color).save(path, format=format_name)
+
+
+def _seed_completed_save_raw_job(
+    *,
+    jobs_db_path: Path,
+    job_id: str,
+    book_number: int,
+    variant: int,
+    model: str,
+    raw_art_path: Path,
+    saved_composited_path: Path,
+) -> None:
+    store = job_store.JobStore(jobs_db_path)
+    now = datetime.now(timezone.utc).isoformat()
+    store.create_or_get_job(
+        job_id=job_id,
+        idempotency_key=f"idem-{job_id}",
+        job_type="generate_cover",
+        catalog_id="classics",
+        book_number=book_number,
+        payload={},
+    )
+    completed = store.mark_completed(
+        job_id,
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "book_number": book_number,
+                    "variant": variant,
+                    "model": model,
+                    "raw_art_path": str(raw_art_path),
+                    "saved_composited_path": str(saved_composited_path),
+                    "timestamp": now,
+                }
+            ]
+        },
+    )
+    assert completed is not None
+
+
+def _write_save_raw_smoke_config(*, config_dir: Path, input_dir: Path, output_dir: Path) -> None:
+    config_dir.mkdir(parents=True, exist_ok=True)
+    input_dir.mkdir(parents=True, exist_ok=True)
+    book_catalog_path = config_dir / "book_catalog.json"
+    prompts_path = config_dir / "book_prompts.json"
+    prompt_library_path = config_dir / "prompt_library.json"
+    prompt_templates_path = config_dir / "prompt_templates.json"
+    catalogs_path = config_dir / "catalogs.json"
+
+    book_catalog_path.write_text(
+        json.dumps([{"number": 4, "title": "Emma", "author": "Jane Austen"}]),
+        encoding="utf-8",
+    )
+    prompts_path.write_text("[]", encoding="utf-8")
+    prompt_library_path.write_text(json.dumps({"prompts": []}), encoding="utf-8")
+    prompt_templates_path.write_text(json.dumps({"templates": []}), encoding="utf-8")
+    catalogs_path.write_text(
+        json.dumps(
+            {
+                "default_catalog": "save-raw-smoke",
+                "catalogs": [
+                    {
+                        "id": "save-raw-smoke",
+                        "name": "Save Raw Smoke",
+                        "catalog_file": str(book_catalog_path),
+                        "prompts_file": str(prompts_path),
+                        "input_covers_dir": str(input_dir),
+                        "output_covers_dir": str(output_dir),
+                        "cover_style": "navy_gold_medallion",
+                        "status": "complete",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_quality_review_server_primary_routes_smoke():
@@ -247,6 +335,156 @@ def test_quality_review_server_drive_and_provider_connectivity_payloads():
         assert isinstance(connectivity_1.get("providers"), dict)
         assert connectivity_2.get("cached") is True
         assert connectivity_force.get("cached") is False
+    finally:
+        _stop_server(process)
+
+
+def test_quality_review_server_save_raw_rejects_mismatched_card_selector(tmp_path: Path):
+    config_dir = tmp_path / "config"
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    tmp_dir = tmp_path / "tmp"
+    data_dir = tmp_path / "data"
+    jobs_db_path = data_dir / "jobs.sqlite3"
+    _write_save_raw_smoke_config(config_dir=config_dir, input_dir=input_dir, output_dir=output_dir)
+    raw_art_path = output_dir / "raw_art" / "4" / "job-emma-a_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    saved_composited_path = output_dir / "saved_composites" / "4" / "job-emma-a_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+    _write_image(raw_art_path, (24, 44, 84), format_name="PNG")
+    _write_image(saved_composited_path, (84, 44, 24), format_name="JPEG")
+    _seed_completed_save_raw_job(
+        jobs_db_path=jobs_db_path,
+        job_id="job-emma-a",
+        book_number=4,
+        variant=1,
+        model="openrouter/google/gemini-3-pro-image-preview",
+        raw_art_path=raw_art_path,
+        saved_composited_path=saved_composited_path,
+    )
+
+    process, base_url = _start_server(
+        extra_env={
+            "CATALOG_ID": "save-raw-smoke",
+            "CONFIG_DIR": str(config_dir),
+            "OUTPUT_DIR": str(output_dir),
+            "TMP_DIR": str(tmp_dir),
+            "DATA_DIR": str(data_dir),
+            "JOBS_DB_PATH": str(jobs_db_path),
+            "GOOGLE_CREDENTIALS_PATH": str(tmp_path / "missing-drive-creds.json"),
+            "GOOGLE_CREDENTIALS_JSON": "",
+        }
+    )
+    try:
+        status, payload = _request_json(
+            base_url,
+            "/api/save-raw",
+            method="POST",
+            payload={
+                "job_id": "job-emma-a",
+                "expected_variant": 1,
+                "expected_model": "openrouter/google/gemini-3-pro-image-preview",
+                "expected_raw_art_path": str(raw_art_path),
+                "expected_saved_composited_path": str(saved_composited_path.with_name("wrong-card.jpg")),
+            },
+        )
+        assert status == 409
+        assert payload.get("ok") is False
+        assert payload.get("error_code") == "SAVE_RAW_SELECTION_MISMATCH"
+        assert payload.get("success") is False
+    finally:
+        _stop_server(process)
+
+
+def test_quality_review_server_save_raw_separates_same_book_results_into_unique_packages(tmp_path: Path):
+    config_dir = tmp_path / "config"
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    tmp_dir = tmp_path / "tmp"
+    data_dir = tmp_path / "data"
+    jobs_db_path = data_dir / "jobs.sqlite3"
+    _write_save_raw_smoke_config(config_dir=config_dir, input_dir=input_dir, output_dir=output_dir)
+
+    raw_a = output_dir / "raw_art" / "4" / "job-emma-a_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_a = output_dir / "saved_composites" / "4" / "job-emma-a_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+    raw_b = output_dir / "raw_art" / "4" / "job-emma-b_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    comp_b = output_dir / "saved_composites" / "4" / "job-emma-b_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+    _write_image(raw_a, (16, 36, 96), format_name="PNG")
+    _write_image(comp_a, (96, 36, 16), format_name="JPEG")
+    _write_image(raw_b, (33, 63, 123), format_name="PNG")
+    _write_image(comp_b, (123, 63, 33), format_name="JPEG")
+
+    _seed_completed_save_raw_job(
+        jobs_db_path=jobs_db_path,
+        job_id="job-emma-a",
+        book_number=4,
+        variant=1,
+        model="openrouter/google/gemini-3-pro-image-preview",
+        raw_art_path=raw_a,
+        saved_composited_path=comp_a,
+    )
+    _seed_completed_save_raw_job(
+        jobs_db_path=jobs_db_path,
+        job_id="job-emma-b",
+        book_number=4,
+        variant=1,
+        model="openrouter/google/gemini-3-pro-image-preview",
+        raw_art_path=raw_b,
+        saved_composited_path=comp_b,
+    )
+
+    process, base_url = _start_server(
+        extra_env={
+            "CATALOG_ID": "save-raw-smoke",
+            "CONFIG_DIR": str(config_dir),
+            "OUTPUT_DIR": str(output_dir),
+            "TMP_DIR": str(tmp_dir),
+            "DATA_DIR": str(data_dir),
+            "JOBS_DB_PATH": str(jobs_db_path),
+            "GOOGLE_CREDENTIALS_PATH": str(tmp_path / "missing-drive-creds.json"),
+            "GOOGLE_CREDENTIALS_JSON": "",
+        }
+    )
+    try:
+        status_a, payload_a = _request_json(
+            base_url,
+            "/api/save-raw",
+            method="POST",
+            payload={
+                "job_id": "job-emma-a",
+                "expected_variant": 1,
+                "expected_model": "openrouter/google/gemini-3-pro-image-preview",
+                "expected_raw_art_path": str(raw_a),
+                "expected_saved_composited_path": str(comp_a),
+            },
+        )
+        status_b, payload_b = _request_json(
+            base_url,
+            "/api/save-raw",
+            method="POST",
+            payload={
+                "job_id": "job-emma-b",
+                "expected_variant": 1,
+                "expected_model": "openrouter/google/gemini-3-pro-image-preview",
+                "expected_raw_art_path": str(raw_b),
+                "expected_saved_composited_path": str(comp_b),
+            },
+        )
+
+        assert status_a == 200
+        assert status_b == 200
+        assert payload_a.get("status") == "partial"
+        assert payload_b.get("status") == "partial"
+        assert payload_a.get("book_folder_name") == "4. Emma - Jane Austen"
+        assert payload_b.get("book_folder_name") == "4. Emma - Jane Austen"
+        assert payload_a.get("package_folder_name") != payload_b.get("package_folder_name")
+        assert str(payload_a.get("package_folder_name", "")).startswith("save-raw__job-emma-a__variant-1__")
+        assert str(payload_b.get("package_folder_name", "")).startswith("save-raw__job-emma-b__variant-1__")
+        assert payload_a.get("local_folder") != payload_b.get("local_folder")
+        assert payload_a.get("drive_ok") is False
+        assert payload_b.get("drive_ok") is False
+        assert len(payload_a.get("saved_files", [])) == 6
+        assert len(payload_b.get("saved_files", [])) == 6
+        assert all(Path(path).exists() for path in payload_a.get("saved_files", []))
+        assert all(Path(path).exists() for path in payload_b.get("saved_files", []))
     finally:
         _stop_server(process)
 
