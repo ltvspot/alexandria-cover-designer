@@ -8,10 +8,7 @@ let _lastVisibleModelIds = [];
 let _defaultSelectedModelIds = [];
 let _variantPromptPlan = [];
 let _activeVariantPrompt = 1;
-let _sequentialRunState = null;
-let _lastGeneratedJobIds = [];
-const DEFAULT_VARIANT_COUNT = 10;
-const SEQUENTIAL_BATCH_SIZE = 4;
+const DEFAULT_VARIANT_COUNT = 4;
 const AUTO_ROTATE_PROMPT_OPTION_LABEL = 'Auto-Rotate (Recommended)';
 const AUTO_ROTATE_PROMPT_INFO = 'Automatically varies artistic styles and scenes across your covers.';
 const PREFERRED_DEFAULT_MODELS = [
@@ -70,13 +67,6 @@ const ALEXANDRIA_BASE_PROMPT_IDS = {
   romanticRealism: 'alexandria-base-romantic-realism',
   esotericMysticism: 'alexandria-base-esoteric-mysticism',
 };
-const ALL_ALEXANDRIA_BASE_PROMPT_IDS = [
-  ALEXANDRIA_BASE_PROMPT_IDS.romanticRealism,
-  ALEXANDRIA_BASE_PROMPT_IDS.classicalDevotion,
-  ALEXANDRIA_BASE_PROMPT_IDS.gothicAtmosphere,
-  ALEXANDRIA_BASE_PROMPT_IDS.esotericMysticism,
-  ALEXANDRIA_BASE_PROMPT_IDS.philosophicalGravitas,
-];
 const PROMPT_ID_ALIASES = {
   'alexandria-wildcard-antique-map-illustration': 'alexandria-wildcard-antique-map',
   'alexandria-wildcard-baroque-chiaroscuro': 'alexandria-wildcard-baroque-dramatic',
@@ -759,123 +749,6 @@ function buildScenePool(book) {
   return pool.length ? pool : [_fallbackSceneForBook(book)];
 }
 
-function _splitSpecificFragments(value) {
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => _splitSpecificFragments(item));
-  }
-  const text = String(value || '').trim();
-  if (!text) return [];
-  return text
-    .split(/[;|]/)
-    .map((item) => _normalizePromptText(item))
-    .filter(Boolean);
-}
-
-function buildExpandedScenePool(book, minimumCount = 1) {
-  const basePool = buildScenePool(book);
-  const targetCount = Math.max(1, Number(minimumCount || 1));
-  if (basePool.length >= targetCount) return basePool;
-
-  const enrichment = _bookEnrichment(book);
-  const context = _bookPromptContext(book);
-  const protagonist = defaultProtagonistForBook(book) || _normalizePromptText(book?.title || 'the book');
-  const title = _normalizePromptText(book?.title || 'the book');
-  const settingFragments = _dedupeNonGeneric([
-    ..._splitSpecificFragments(context.setting),
-    ..._splitSpecificFragments(enrichment.setting_primary),
-    ..._splitSpecificFragments(enrichment.setting_details),
-  ]);
-  const characterFragments = _dedupeNonGeneric([
-    ...(Array.isArray(enrichment.key_characters) ? enrichment.key_characters : []),
-  ]).filter((item) => item.toLowerCase() !== protagonist.toLowerCase());
-  const symbolFragments = _dedupeNonGeneric(Array.isArray(enrichment.symbolic_elements) ? enrichment.symbolic_elements : []);
-  const mood = defaultMoodForBook(book);
-  const out = [...basePool];
-  const seen = new Set(out.map((item) => item.toLowerCase()));
-  const atmosphereFragments = _dedupeNonGeneric([
-    ...(Array.isArray(enrichment.tones) ? enrichment.tones : []),
-    enrichment.emotional_tone,
-    mood,
-    'at dawn',
-    'at dusk',
-    'under stormlight',
-    'by candlelight',
-    'in solemn stillness',
-    'amid rising tension',
-    'with ceremonial grandeur',
-    'with voyage-worn detail',
-    'with quiet aftermath',
-  ]);
-  const fallbackSetting = _normalizePromptText(context.setting || enrichment.setting_primary || `the world of ${title}`);
-  const addScene = (value) => {
-    const text = _normalizePromptText(value);
-    if (!text || _isGenericContent(text)) return;
-    const key = text.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(text);
-  };
-
-  settingFragments.forEach((setting) => {
-    addScene(`${protagonist} moving through ${setting}.`);
-  });
-  characterFragments.forEach((character, index) => {
-    const setting = settingFragments[index % Math.max(1, settingFragments.length)] || _normalizePromptText(context.setting || enrichment.setting_primary || '');
-    if (setting) {
-      addScene(`${protagonist} encountering ${character} in ${setting}.`);
-    }
-  });
-  symbolFragments.forEach((symbol, index) => {
-    const setting = settingFragments[index % Math.max(1, settingFragments.length)] || _normalizePromptText(context.setting || enrichment.setting_primary || '');
-    if (setting) {
-      addScene(`${protagonist} framed by ${symbol} in ${setting}.`);
-    }
-  });
-
-  const templates = [
-    ({ setting, atmosphere }) => `${protagonist} within ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} returning through ${setting} with emphasis on ${title}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} crossing ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} pausing inside ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} emerging from ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} silhouetted against ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} at the threshold of ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} surveying ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${title} distilled into ${protagonist} set before ${setting}, ${atmosphere}.`,
-    ({ setting, atmosphere }) => `${protagonist} carried through ${setting}, ${atmosphere}.`,
-  ];
-  if (characterFragments.length) {
-    templates.push(
-      ({ setting, character, atmosphere }) => `${protagonist} encountering ${character} in ${setting}, ${atmosphere}.`,
-      ({ setting, character, atmosphere }) => `${character} guiding ${protagonist} through ${setting}, ${atmosphere}.`,
-    );
-  }
-  if (symbolFragments.length) {
-    templates.push(
-      ({ setting, symbol, atmosphere }) => `${protagonist} framed by ${symbol} in ${setting}, ${atmosphere}.`,
-      ({ setting, symbol, atmosphere }) => `${protagonist} confronting ${symbol} in ${setting}, ${atmosphere}.`,
-    );
-  }
-  const maxAttempts = Math.max(targetCount * templates.length * 2, 24);
-  let attempt = 0;
-  while (out.length < targetCount && attempt < maxAttempts) {
-    const setting = settingFragments[attempt % Math.max(1, settingFragments.length)] || fallbackSetting;
-    const character = characterFragments[attempt % Math.max(1, characterFragments.length)] || '';
-    const symbol = symbolFragments[attempt % Math.max(1, symbolFragments.length)] || '';
-    const atmosphere = atmosphereFragments[attempt % Math.max(1, atmosphereFragments.length)] || mood;
-    const template = templates[attempt % templates.length];
-    addScene(template({
-      setting,
-      character,
-      symbol,
-      atmosphere,
-    }));
-    attempt += 1;
-  }
-
-  return out.slice(0, targetCount);
-}
-
 function defaultSceneForBook(book) {
   const context = _bookPromptContext(book);
   const contextScene = _normalizePromptText(context.scene);
@@ -912,7 +785,7 @@ function defaultEraForBook(book) {
 function sceneForVariant(book, variant, explicitScene = '') {
   const chosen = _normalizePromptText(explicitScene);
   if (chosen && !_isGenericContent(chosen)) return chosen;
-  const pool = buildExpandedScenePool(book, Number(variant || 1));
+  const pool = buildScenePool(book);
   if (!pool.length) return _fallbackSceneForBook(book);
   const index = Math.max(0, Number(variant || 1) - 1) % pool.length;
   return pool[index] || pool[0];
@@ -1132,9 +1005,6 @@ window.__ITERATE_TEST_HOOKS__.iterateUiDefaults = () => ({
   autoRotateLabel: AUTO_ROTATE_PROMPT_OPTION_LABEL,
 });
 window.__ITERATE_TEST_HOOKS__.buildScenePool = buildScenePool;
-window.__ITERATE_TEST_HOOKS__.buildExpandedScenePool = ({ book, minimumCount }) => (
-  buildExpandedScenePool(book, minimumCount)
-);
 window.__ITERATE_TEST_HOOKS__.defaultSceneForBook = defaultSceneForBook;
 window.__ITERATE_TEST_HOOKS__.applyPromptPlaceholders = applyPromptPlaceholders;
 window.__ITERATE_TEST_HOOKS__.validatePromptBeforeGeneration = validatePromptBeforeGeneration;
@@ -1234,45 +1104,6 @@ function defaultAutoPromptConfigForBook(book) {
   };
 }
 
-function buildExpandedBasePromptIds(primaryBaseId) {
-  const preferred = resolvePromptIdAlias(primaryBaseId || '');
-  const ordered = preferred ? [preferred] : [];
-  ALL_ALEXANDRIA_BASE_PROMPT_IDS.forEach((promptId) => {
-    const resolved = resolvePromptIdAlias(promptId);
-    if (resolved && !ordered.includes(resolved)) ordered.push(resolved);
-  });
-  return ordered;
-}
-
-function buildExpandedPromptSequence({ basePromptId, wildcardIds }) {
-  const baseIds = buildExpandedBasePromptIds(basePromptId);
-  const uniqueWildcards = Array.from(new Set((Array.isArray(wildcardIds) ? wildcardIds : []).filter(Boolean)));
-  const sequence = [];
-  const pushPrompt = (value) => {
-    const resolved = resolvePromptIdAlias(value || '');
-    if (resolved && !sequence.includes(resolved)) sequence.push(resolved);
-  };
-  const preferredOrder = [
-    ['base', 0],
-    ['wild', 0],
-    ['wild', 1],
-    ['base', 1],
-    ['wild', 2],
-    ['base', 2],
-    ['wild', 3],
-    ['base', 3],
-    ['wild', 4],
-    ['base', 4],
-  ];
-  preferredOrder.forEach(([kind, index]) => {
-    if (kind === 'base') pushPrompt(baseIds[index] || '');
-    else pushPrompt(uniqueWildcards[index] || '');
-  });
-  uniqueWildcards.forEach((promptId) => pushPrompt(promptId));
-  baseIds.forEach((promptId) => pushPrompt(promptId));
-  return sequence;
-}
-
 function buildVariantPromptAssignments({ book, variantCount, referenceDate = new Date() }) {
   const total = Math.max(1, Number(variantCount || 1));
   const config = defaultAutoPromptConfigForBook(book);
@@ -1283,20 +1114,12 @@ function buildVariantPromptAssignments({ book, variantCount, referenceDate = new
   const wildcardSeed = wildcardIds.length
     ? (_hashString(`${book?.title || ''}::${book?.author || ''}`) + _dayOfYear(referenceDate)) % wildcardIds.length
     : 0;
-  const rotatedWildcards = wildcardIds.length
-    ? Array.from({ length: wildcardIds.length }, (_, index) => wildcardIds[(wildcardSeed + index) % wildcardIds.length])
-    : [];
-  const expandedPromptSequence = total > (rotatedWildcards.length + 1)
-    ? buildExpandedPromptSequence({ basePromptId, wildcardIds: rotatedWildcards })
-    : [];
 
   return Array.from({ length: total }, (_, index) => {
     const variant = index + 1;
-    const promptId = expandedPromptSequence.length
-      ? (expandedPromptSequence[index % expandedPromptSequence.length] || basePromptId)
-      : (variant === 1 || !rotatedWildcards.length
-        ? basePromptId
-        : (rotatedWildcards[(variant - 2) % rotatedWildcards.length] || basePromptId));
+    const promptId = variant === 1 || !wildcardIds.length
+      ? basePromptId
+      : (wildcardIds[(wildcardSeed + variant - 2) % wildcardIds.length] || basePromptId);
     return {
       variant,
       promptId,
@@ -1369,15 +1192,6 @@ function backendJobIdForJob(job) {
   }
 }
 
-function resultRowForJob(job) {
-  try {
-    const parsed = JSON.parse(String(job?.results_json || '{}'));
-    return (parsed?.result && typeof parsed.result === 'object') ? parsed.result : {};
-  } catch {
-    return {};
-  }
-}
-
 function escapeHtml(value) {
   return String(value || '')
     .replaceAll('&', '&amp;')
@@ -1420,58 +1234,6 @@ function saveRawButtonState(job) {
     driveUrl: '',
     status: '',
   };
-}
-
-function saveResultButtonState(job) {
-  const status = String(job?.save_result_status || '').trim().toLowerCase();
-  const driveUrl = String(job?.save_result_drive_url || '').trim();
-  const warning = String(job?.save_result_warning || '').trim();
-  const truncatedWarning = warning.length > 220 ? `${warning.slice(0, 220)}…` : warning;
-
-  if (status === 'saved' && driveUrl) {
-    return {
-      label: 'Saved',
-      style: 'background:#2d6a4f;color:#fff;font-weight:600;',
-      title: 'Click to open the saved cover in Google Drive',
-      driveUrl,
-      status,
-    };
-  }
-
-  if (status === 'partial') {
-    return {
-      label: 'Retry Save',
-      style: 'background:#d4af37;color:#0a1628;font-weight:600;',
-      title: truncatedWarning || 'Saved locally, but Drive upload failed. Click to retry.',
-      driveUrl: '',
-      status,
-    };
-  }
-
-  return {
-    label: 'Save',
-    style: 'background:#d4af37;color:#0a1628;font-weight:600;',
-    title: '',
-    driveUrl: '',
-    status: '',
-  };
-}
-
-function updateSequentialBatchProgressUi() {
-  const batchProgressEl = document.getElementById('iterBatchProgress');
-  if (!batchProgressEl) return;
-  if (!_sequentialRunState || !_sequentialRunState.active) {
-    batchProgressEl.textContent = '';
-    return;
-  }
-  const currentBatch = Number(_sequentialRunState.currentBatch || 1);
-  const totalBatches = Number(_sequentialRunState.totalBatches || 1);
-  const currentSize = Number(_sequentialRunState.currentBatchSize || 0);
-  const completed = Number(_sequentialRunState.completedJobs || 0);
-  const totalJobs = Number(_sequentialRunState.totalJobs || 0);
-  batchProgressEl.textContent = _sequentialRunState.cancelled
-    ? 'Cancelling remaining batches…'
-    : `Generating batch ${currentBatch}/${totalBatches} (${currentSize} cover${currentSize === 1 ? '' : 's'})… ${completed}/${totalJobs} finished.`;
 }
 
 function normalizedModelId(model) {
@@ -1594,43 +1356,6 @@ function renderModelCards({ models, selectedIds, activeFilter, searchText }) {
   return { html, visibleIds, visibleCount: orderedVisible.length, filteredCount: filteredByChip.length };
 }
 
-function buildModelSelectOptions(models) {
-  const rows = Array.isArray(models) ? models : [];
-  const preferredId = _defaultModelId || defaultSelectedModelIds(rows)[0] || '';
-  const groups = [];
-  const recommended = rows.find((model) => normalizedModelId(model) === preferredId);
-  if (recommended) {
-    groups.push({
-      label: 'Recommended',
-      models: [recommended],
-    });
-  }
-
-  const remaining = rows.filter((model) => normalizedModelId(model) !== preferredId);
-  const byProvider = new Map();
-  remaining.forEach((model) => {
-    const provider = providerFromModel(model.id);
-    const key = provider === 'google'
-      ? 'Google Direct'
-      : (provider === 'openrouter'
-        ? 'OpenRouter'
-        : (provider === 'openai' ? 'OpenAI' : provider.toUpperCase()));
-    if (!byProvider.has(key)) byProvider.set(key, []);
-    byProvider.get(key).push(model);
-  });
-  Array.from(byProvider.entries()).forEach(([label, providerModels]) => {
-    groups.push({ label, models: providerModels });
-  });
-
-  return groups.map((group) => {
-    const options = group.models.map((model) => {
-      const modelId = normalizedModelId(model);
-      return `<option value="${escapeHtml(modelId)}">${escapeHtml(model.label || modelId)} ($${Number(model.cost || 0).toFixed(3)})</option>`;
-    }).join('');
-    return `<optgroup label="${escapeHtml(group.label)}">${options}</optgroup>`;
-  }).join('');
-}
-
 window.Pages.iterate = {
   async render() {
     const content = document.getElementById('content');
@@ -1645,7 +1370,6 @@ window.Pages.iterate = {
       }
     }
     await DB.loadPrompts(catalogId);
-    await OpenRouter.init();
 
     const prompts = sortPromptsForUI(DB.dbGetAll('prompts'));
     const options = books
@@ -1661,7 +1385,7 @@ window.Pages.iterate = {
         <div class="card-header iterate-card-header">
           <div>
             <h3 class="card-title">Generate Illustrations</h3>
-            <p class="text-sm text-muted iterate-flow-note">Book → Variants → Style → Model → Generate.</p>
+            <p class="text-sm text-muted iterate-flow-note">Book → Variants → Style → Generate. Model changes and prompt customization live under Advanced.</p>
           </div>
           <button class="btn btn-secondary btn-sm" id="iterAdvancedToggle" type="button" aria-expanded="false">Advanced</button>
         </div>
@@ -1702,20 +1426,8 @@ window.Pages.iterate = {
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Model</label>
-          <select class="form-select" id="iterModelSelect">
-            <option value="">Loading models…</option>
-          </select>
-          <p class="text-xs text-muted mt-8" id="iterModelSummary">Loading recommended model…</p>
-          <p class="text-xs text-muted mt-8" id="iterCostBreakdown">Cost breakdown will update when a model is selected.</p>
-        </div>
-
         <div class="flex justify-between items-center iterate-primary-actions">
-          <div>
-            <div class="text-muted" id="iterCostEst">Est. cost: $0.000</div>
-            <div class="text-xs text-muted mt-8" id="iterBatchProgress"></div>
-          </div>
+          <span class="text-muted" id="iterCostEst">Est. cost: $0.000</span>
           <div class="flex gap-8">
             <button class="btn btn-secondary" id="iterCancelBtn">Cancel All</button>
             <button class="btn btn-primary" id="iterGenBtn">Generate</button>
@@ -1724,7 +1436,32 @@ window.Pages.iterate = {
 
         <div class="iterate-variant-summary hidden" id="iterVariantSummary"></div>
 
+        <div class="iterate-model-summary-card mt-16">
+          <div>
+            <div class="form-label iterate-inline-label">Model</div>
+            <div class="iterate-model-selected" id="iterModelCollapsedValue">Loading recommended model…</div>
+          </div>
+          <button class="btn-link" id="iterModelToggle" type="button" aria-expanded="false">Change model</button>
+        </div>
+
         <div id="iterAdvanced" class="hidden mt-16">
+          <div class="advanced-block hidden" id="iterModelControls">
+            <label class="form-label">Models (best → budget, top → bottom)</label>
+            <input class="form-input model-search-input" id="iterModelSearch" placeholder="Search model name / provider / id..." />
+            <div class="model-toolbar mt-8">
+              <button class="filter-chip active" type="button" data-model-filter="recommended">Recommended</button>
+              <button class="filter-chip" type="button" data-model-filter="all">All</button>
+              <button class="filter-chip" type="button" data-model-filter="openrouter">OpenRouter</button>
+              <button class="filter-chip" type="button" data-model-filter="gemini">Gemini</button>
+              <button class="filter-chip" type="button" data-model-filter="nano">Nano Pro only</button>
+              <button class="filter-chip" type="button" data-model-action="select-visible">Select visible</button>
+              <button class="filter-chip" type="button" data-model-action="clear">Clear</button>
+            </div>
+            <p class="text-xs text-muted mt-8" id="iterModelSummary"></p>
+            <p class="text-xs text-muted mt-8" id="iterCostBreakdown"></p>
+            <div class="model-card-grid" id="iterModelGrid"></div>
+          </div>
+
           <details class="advanced-block" id="iterCustomizePanel">
             <summary>Customize variants</summary>
             <div class="advanced-panel-body">
@@ -1771,11 +1508,8 @@ window.Pages.iterate = {
 
       <div class="card">
         <div class="card-header">
-          <div>
-            <h3 class="card-title">Recent Results</h3>
-            <span class="text-muted" id="iterResultCount">0 results</span>
-          </div>
-          <div class="flex gap-8" id="iterResultsActions"></div>
+          <h3 class="card-title">Recent Results</h3>
+          <span class="text-muted" id="iterResultCount">0 results</span>
         </div>
         <div class="grid-auto" id="resultsGrid"></div>
       </div>
@@ -1789,7 +1523,9 @@ window.Pages.iterate = {
     const enrichmentSummaryEl = document.getElementById('iterEnrichmentSummary');
     const advancedToggleBtn = document.getElementById('iterAdvancedToggle');
     const advanced = document.getElementById('iterAdvanced');
-    const modelSelectEl = document.getElementById('iterModelSelect');
+    const modelToggleBtn = document.getElementById('iterModelToggle');
+    const modelControlsEl = document.getElementById('iterModelControls');
+    const modelCollapsedValueEl = document.getElementById('iterModelCollapsedValue');
     const variantsEl = document.getElementById('iterVariants');
     const promptSelEl = document.getElementById('iterPromptSel');
     const promptRotationInfoEl = document.getElementById('iterPromptRotationInfo');
@@ -1805,9 +1541,11 @@ window.Pages.iterate = {
     const variantPlanSummaryEl = document.getElementById('iterVariantPlanSummary');
     const variantEditorLabelEl = document.getElementById('iterVariantEditorLabel');
     const variantSummaryEl = document.getElementById('iterVariantSummary');
+    const modelSearchEl = document.getElementById('iterModelSearch');
+    const modelGridEl = document.getElementById('iterModelGrid');
     const modelSummaryEl = document.getElementById('iterModelSummary');
-    const batchProgressEl = document.getElementById('iterBatchProgress');
-    const resultsActionsEl = document.getElementById('iterResultsActions');
+    const modelFilterButtons = Array.from(content.querySelectorAll('[data-model-filter]'));
+    const modelActionButtons = Array.from(content.querySelectorAll('[data-model-action]'));
     let latestEnrichmentHealth = null;
 
     const renderEnrichmentHealth = (payload) => {
@@ -1967,7 +1705,14 @@ window.Pages.iterate = {
       }
     };
 
-    const updateBatchProgress = () => updateSequentialBatchProgressUi();
+    const syncModelControlVisibility = (expanded) => {
+      const shouldShow = Boolean(expanded);
+      modelControlsEl?.classList.toggle('hidden', !shouldShow);
+      if (modelToggleBtn) {
+        modelToggleBtn.textContent = shouldShow ? 'Hide models' : 'Change model';
+        modelToggleBtn.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
+      }
+    };
 
     const updatePromptRotationInfo = (promptId = '') => {
       if (!promptRotationInfoEl) return;
@@ -2105,10 +1850,19 @@ window.Pages.iterate = {
     _defaultSelectedModelIds = defaultSelectedModelIds(OpenRouter.MODELS);
     _defaultModelId = _defaultSelectedModelIds[0] || normalizedModelId(OpenRouter.MODELS[0] || null) || null;
     _selectedModelIds = new Set(_defaultSelectedModelIds);
+    _lastVisibleModelIds = [];
+    let activeModelFilter = 'recommended';
+    let modelSearchText = '';
 
     advancedToggleBtn?.addEventListener('click', () => {
       const expanded = advanced?.classList.contains('hidden');
       syncAdvancedVisibility(expanded);
+    });
+
+    modelToggleBtn?.addEventListener('click', () => {
+      const expanded = modelControlsEl?.classList.contains('hidden');
+      syncAdvancedVisibility(true);
+      syncModelControlVisibility(expanded);
     });
 
     selectEl?.addEventListener('change', () => {
@@ -2201,43 +1955,89 @@ window.Pages.iterate = {
         if (!selected.length) {
           breakdown.textContent = 'No models selected.';
         } else {
-          const modelId = selected[0];
-          const unit = Number(OpenRouter.MODEL_COSTS[modelId] || 0);
-          breakdown.textContent = `Cost breakdown: ${modelIdToLabel(modelId)} ($${unit.toFixed(3)} × ${variants} = $${total.toFixed(3)}).`;
+          const parts = selected.map((modelId) => {
+            const unit = Number(OpenRouter.MODEL_COSTS[modelId] || 0);
+            const subtotal = unit * variants;
+            return `${modelIdToLabel(modelId)} ($${unit.toFixed(3)} × ${variants} = $${subtotal.toFixed(3)})`;
+          });
+          breakdown.textContent = `Cost breakdown: ${parts.join(' + ')} = $${total.toFixed(3)}.`;
         }
       }
     };
 
-    const updateModelSummary = () => {
-      if (!modelSummaryEl) return;
+    const updateCollapsedModelSummary = () => {
+      if (!modelCollapsedValueEl) return;
       const selected = Array.from(_selectedModelIds);
       if (!selected.length) {
-        modelSummaryEl.textContent = 'No model selected.';
+        modelCollapsedValueEl.textContent = 'No model selected';
         return;
       }
-      const modelId = selected[0];
-      const unit = Number(OpenRouter.MODEL_COSTS[modelId] || 0);
-      const provider = providerFromModel(modelId);
-      modelSummaryEl.textContent = `${modelIdToLabel(modelId)} · ${provider === 'google' ? 'Google Direct' : provider} · $${unit.toFixed(3)}/image`;
-    };
-
-    const renderModelSelect = () => {
-      if (!modelSelectEl) return;
-      modelSelectEl.innerHTML = buildModelSelectOptions(OpenRouter.MODELS) || '<option value="">No models available</option>';
-      const selectedId = Array.from(_selectedModelIds)[0] || _defaultModelId || normalizedModelId(OpenRouter.MODELS[0] || null) || '';
-      if (selectedId) {
-        _selectedModelIds = new Set([selectedId]);
-        modelSelectEl.value = selectedId;
+      if (selected.length === 1) {
+        const modelId = selected[0];
+        const unit = Number(OpenRouter.MODEL_COSTS[modelId] || 0);
+        modelCollapsedValueEl.textContent = `${modelIdToLabel(modelId)} ($${unit.toFixed(3)}/image)`;
+        return;
       }
-      updateCost();
-      updateModelSummary();
+      const unitTotal = selected.reduce((sum, modelId) => sum + Number(OpenRouter.MODEL_COSTS[modelId] || 0), 0);
+      modelCollapsedValueEl.textContent = `${selected.length} models selected ($${unitTotal.toFixed(3)}/variant)`;
     };
 
-    modelSelectEl?.addEventListener('change', () => {
-      const modelId = String(modelSelectEl.value || '').trim();
-      _selectedModelIds = modelId ? new Set([modelId]) : new Set();
+    const renderModels = () => {
+      if (!modelGridEl || !modelSummaryEl) return;
+      const rendered = renderModelCards({
+        models: OpenRouter.MODELS,
+        selectedIds: _selectedModelIds,
+        activeFilter: activeModelFilter,
+        searchText: modelSearchText,
+      });
+      _lastVisibleModelIds = rendered.visibleIds;
+      modelGridEl.innerHTML = rendered.html || '<div class="text-muted text-sm">No models match this filter.</div>';
+      const selectedLabels = Array.from(_selectedModelIds)
+        .map((id) => modelIdToLabel(id))
+        .slice(0, 4)
+        .join(', ');
+      const remaining = Math.max(0, _selectedModelIds.size - 4);
+      const selectedSuffix = remaining > 0 ? ` +${remaining} more` : '';
+      const defaultLabels = _defaultSelectedModelIds.map((id) => modelIdToLabel(id)).join(', ') || 'first model';
+      modelSummaryEl.textContent = `${_selectedModelIds.size} model selected · showing ${rendered.visibleCount}/${OpenRouter.MODELS.length}. Default selection: ${defaultLabels}. Selected: ${selectedLabels || 'none'}${selectedSuffix}.`;
       updateCost();
-      updateModelSummary();
+      updateCollapsedModelSummary();
+    };
+
+    modelSearchEl?.addEventListener('input', () => {
+      modelSearchText = String(modelSearchEl.value || '');
+      renderModels();
+    });
+
+    modelFilterButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeModelFilter = String(btn.dataset.modelFilter || 'recommended');
+        modelFilterButtons.forEach((node) => node.classList.toggle('active', node === btn));
+        renderModels();
+      });
+    });
+
+    modelActionButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const action = String(btn.dataset.modelAction || '');
+        if (action === 'select-visible') {
+          _lastVisibleModelIds.forEach((id) => _selectedModelIds.add(id));
+        } else if (action === 'clear') {
+          _selectedModelIds.clear();
+        }
+        renderModels();
+      });
+    });
+
+    modelGridEl?.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (!target.classList.contains('iter-model-check')) return;
+      const modelId = String(target.value || '').trim();
+      if (!modelId) return;
+      if (target.checked) _selectedModelIds.add(modelId);
+      else _selectedModelIds.delete(modelId);
+      renderModels();
     });
 
     variantPlanEl?.addEventListener('click', (event) => {
@@ -2306,28 +2106,16 @@ window.Pages.iterate = {
       if (item) item.eraVal = String(eraEl.value || '');
       updatePromptPreview();
     });
-    renderModelSelect();
+    renderModels();
     syncAdvancedVisibility(false);
-    updateBatchProgress();
+    syncModelControlVisibility(false);
     updatePromptRotationInfo(String(promptSelEl?.value || '').trim());
 
-    document.getElementById('iterCancelBtn')?.addEventListener('click', () => {
-      if (_sequentialRunState?.active) {
-        _sequentialRunState.cancelled = true;
-        updateBatchProgress();
-      }
-      JobQueue.cancelAll();
-    });
+    document.getElementById('iterCancelBtn')?.addEventListener('click', () => JobQueue.cancelAll());
     document.getElementById('iterGenBtn')?.addEventListener('click', () => this.handleGenerate());
 
     if (_unsubscribe) _unsubscribe();
     _unsubscribe = JobQueue.onChange((snapshot) => {
-      if (_sequentialRunState?.active) {
-        const runIds = new Set(Array.isArray(_sequentialRunState.jobIds) ? _sequentialRunState.jobIds : []);
-        const terminal = (snapshot.all || []).filter((job) => runIds.has(job.id) && ['completed', 'failed', 'cancelled'].includes(String(job.status || '')));
-        _sequentialRunState.completedJobs = terminal.length;
-        updateBatchProgress();
-      }
       this.updatePipeline(snapshot.all || []);
       this.loadExistingResults();
     });
@@ -2353,11 +2141,6 @@ window.Pages.iterate = {
   },
 
   async handleGenerate() {
-    if (_sequentialRunState?.active) {
-      Toast.warning('A generation run is already in progress.');
-      return;
-    }
-
     const bookId = Number(document.getElementById('iterBookSelect')?.value || 0);
     if (!bookId) {
       Toast.warning('Select a book first.');
@@ -2365,10 +2148,9 @@ window.Pages.iterate = {
     }
     const selectedModels = Array.from(_selectedModelIds);
     if (!selectedModels.length) {
-      Toast.warning('Select one image model.');
+      Toast.warning('Select at least one model.');
       return;
     }
-    const selectedModel = selectedModels[0];
 
     const variantCount = Number(document.getElementById('iterVariants')?.value || DEFAULT_VARIANT_COUNT);
     const books = DB.dbGetAll('books');
@@ -2397,47 +2179,49 @@ window.Pages.iterate = {
 
     const jobs = [];
     let validationError = '';
-    variantEntries.forEach((entry) => {
-      if (validationError) return;
-      const promptPayload = entry?.promptPayload || {};
-      const validation = validatePromptBeforeGeneration({ prompt: promptPayload.prompt, book });
-      if (!validation.ok) {
-        validationError = validation.errors[0];
-        return;
-      }
-      jobs.push({
-        id: uuid(),
-        book_id: bookId,
-        model: selectedModel,
-        variant: Number(entry?.variant || 1),
-        status: 'queued',
-        prompt: promptPayload.prompt,
-        style_id: promptPayload.styleId,
-        style_label: promptPayload.styleLabel,
-        prompt_source: promptPayload.promptSource,
-        backend_prompt_source: promptPayload.backendPromptSource,
-        compose_prompt: promptPayload.composePrompt,
-        preserve_prompt_text: promptPayload.preservePromptText,
-        library_prompt_id: promptPayload.libraryPromptId,
-        scene_description: String(entry?.assignedScene || '').trim(),
-        mood: String(entry?.assignedMood || '').trim(),
-        era: String(entry?.assignedEra || '').trim(),
-        selected_cover_id: selectedCoverId,
-        selected_cover_book_number: selectedCoverBookNumber,
-        quality_score: null,
-        cost_usd: 0,
-        generated_image_blob: null,
-        composited_image_blob: null,
-        started_at: null,
-        completed_at: null,
-        error: null,
-        results_json: null,
-        retries: 0,
-        _elapsed: 0,
-        _subStatus: '',
-        _compositeFailed: false,
-        _compositeError: null,
-        created_at: new Date().toISOString(),
+    selectedModels.forEach((model) => {
+      variantEntries.forEach((entry) => {
+        if (validationError) return;
+        const promptPayload = entry?.promptPayload || {};
+        const validation = validatePromptBeforeGeneration({ prompt: promptPayload.prompt, book });
+        if (!validation.ok) {
+          validationError = validation.errors[0];
+          return;
+        }
+        jobs.push({
+          id: uuid(),
+          book_id: bookId,
+          model,
+          variant: Number(entry?.variant || 1),
+          status: 'queued',
+          prompt: promptPayload.prompt,
+          style_id: promptPayload.styleId,
+          style_label: promptPayload.styleLabel,
+          prompt_source: promptPayload.promptSource,
+          backend_prompt_source: promptPayload.backendPromptSource,
+          compose_prompt: promptPayload.composePrompt,
+          preserve_prompt_text: promptPayload.preservePromptText,
+          library_prompt_id: promptPayload.libraryPromptId,
+          scene_description: String(entry?.assignedScene || '').trim(),
+          mood: String(entry?.assignedMood || '').trim(),
+          era: String(entry?.assignedEra || '').trim(),
+          selected_cover_id: selectedCoverId,
+          selected_cover_book_number: selectedCoverBookNumber,
+          quality_score: null,
+          cost_usd: 0,
+          generated_image_blob: null,
+          composited_image_blob: null,
+          started_at: null,
+          completed_at: null,
+          error: null,
+          results_json: null,
+          retries: 0,
+          _elapsed: 0,
+          _subStatus: '',
+          _compositeFailed: false,
+          _compositeError: null,
+          created_at: new Date().toISOString(),
+        });
       });
     });
 
@@ -2447,68 +2231,9 @@ window.Pages.iterate = {
     }
     if (!jobs.length) return;
 
-    const generateBtn = document.getElementById('iterGenBtn');
-    const originalGenerateText = String(generateBtn?.textContent || 'Generate');
-    if (generateBtn) {
-      generateBtn.disabled = true;
-      generateBtn.textContent = 'Generating…';
-    }
-
-    const waitForTerminalJobs = (jobIds) => new Promise((resolve) => {
-      const isTerminal = () => jobIds.every((jobId) => {
-        const row = DB.dbGet('jobs', jobId);
-        return row && ['completed', 'failed', 'cancelled'].includes(String(row.status || ''));
-      });
-      if (isTerminal()) {
-        resolve();
-        return;
-      }
-      const unsubscribe = JobQueue.onChange(() => {
-        if (isTerminal()) {
-          unsubscribe();
-          resolve();
-        }
-      });
-    });
-
-    const batches = Array.from({ length: Math.ceil(jobs.length / SEQUENTIAL_BATCH_SIZE) }, (_, index) => (
-      jobs.slice(index * SEQUENTIAL_BATCH_SIZE, (index + 1) * SEQUENTIAL_BATCH_SIZE)
-    ));
-    _lastGeneratedJobIds = jobs.map((job) => job.id);
-    _sequentialRunState = {
-      active: true,
-      cancelled: false,
-      totalJobs: jobs.length,
-      completedJobs: 0,
-      currentBatch: 1,
-      currentBatchSize: batches[0]?.length || 0,
-      totalBatches: batches.length,
-      jobIds: [..._lastGeneratedJobIds],
-    };
-    updateSequentialBatchProgressUi();
-
+    JobQueue.addBatch(jobs);
     document.getElementById('pipelineCard')?.classList.remove('hidden');
-    Toast.success(`${jobs.length} job(s) queued in ${batches.length} batch${batches.length === 1 ? '' : 'es'}.`);
-
-    try {
-      for (let index = 0; index < batches.length; index += 1) {
-        if (_sequentialRunState?.cancelled) break;
-        const batch = batches[index];
-        _sequentialRunState.currentBatch = index + 1;
-        _sequentialRunState.currentBatchSize = batch.length;
-        updateSequentialBatchProgressUi();
-        JobQueue.addBatch(batch);
-        await waitForTerminalJobs(batch.map((job) => job.id));
-      }
-    } finally {
-      if (generateBtn) {
-        generateBtn.disabled = false;
-        generateBtn.textContent = originalGenerateText;
-      }
-      _sequentialRunState = null;
-      updateSequentialBatchProgressUi();
-      this.loadExistingResults();
-    }
+    Toast.success(`${jobs.length} job(s) queued.`);
   },
 
   updatePipeline(allJobs) {
@@ -2540,13 +2265,9 @@ window.Pages.iterate = {
     const queueHint = queuedOrRunning > 0
       ? ` · backend heartbeat ${maxBackendStale}s ago${maxBackendStale >= 20 ? ' (waiting on queue/provider)' : ''}`
       : '';
-    const batchHint = _sequentialRunState?.active
-      ? `<div class="text-xs text-muted mt-8">Batch ${Number(_sequentialRunState.currentBatch || 1)}/${Number(_sequentialRunState.totalBatches || 1)} · ${Number(_sequentialRunState.completedJobs || 0)}/${Number(_sequentialRunState.totalJobs || 0)} finished.</div>`
-      : '';
     const summary = `
       <div class="pipeline-summary">
         <strong>Run status:</strong> ${completed}/${scoped.length} completed · ${queuedOrRunning} active/queued · ${failed} failed · ${cancelled} cancelled · $${totalCost.toFixed(3)}${queueHint}
-        ${batchHint}
       </div>
     `;
 
@@ -2593,11 +2314,9 @@ window.Pages.iterate = {
   loadExistingResults() {
     const grid = document.getElementById('resultsGrid');
     const count = document.getElementById('iterResultCount');
-    const resultsActionsEl = document.getElementById('iterResultsActions');
     if (!grid || !_selectedBookId) {
       if (grid) grid.innerHTML = '<div class="text-muted">Select a book and generate illustrations</div>';
       if (count) count.textContent = '0 results';
-      if (resultsActionsEl) resultsActionsEl.innerHTML = '';
       return;
     }
 
@@ -2608,22 +2327,11 @@ window.Pages.iterate = {
     if (!jobs.length) {
       grid.innerHTML = '<div class="text-muted">No results yet</div>';
       if (count) count.textContent = '0 results';
-      if (resultsActionsEl) resultsActionsEl.innerHTML = '';
       return;
     }
 
     const completed = jobs.filter((job) => job.status === 'completed').length;
     if (count) count.textContent = `${completed} completed · ${jobs.length} total`;
-    const recentRunIds = new Set(Array.isArray(_lastGeneratedJobIds) ? _lastGeneratedJobIds : []);
-    const saveAllJobs = (recentRunIds.size
-      ? jobs.filter((job) => recentRunIds.has(job.id))
-      : jobs)
-      .filter((job) => String(job.status || '') === 'completed');
-    if (resultsActionsEl) {
-      resultsActionsEl.innerHTML = saveAllJobs.length
-        ? `<button class="btn btn-secondary btn-sm" id="iterSaveAllBtn">Save All (${saveAllJobs.length})</button>`
-        : '';
-    }
     grid.innerHTML = jobs.map((job) => {
       const previewSources = resolveCompositePreviewSources(job, 'display');
       const src = previewSources[0] || '';
@@ -2634,7 +2342,6 @@ window.Pages.iterate = {
       const showDownloads = hasPreview && status === 'completed';
       const showComparison = Number(job.book_id || 0) > 0 && status === 'completed';
       const errorText = status === 'failed' ? String(job.error || '').trim() : '';
-      const saveResultState = saveResultButtonState(job);
       const saveRawState = saveRawButtonState(job);
       return `
         <div class="result-card ${hasPreview ? '' : 'result-card-empty'}" ${hasPreview ? `data-view="${job.id}"` : ''}>
@@ -2651,11 +2358,10 @@ window.Pages.iterate = {
             </div>
             <div class="card-meta">$${Number(job.cost_usd || 0).toFixed(3)} · ${job.style_label || 'Default'}</div>
             ${errorText ? `<div class="card-meta text-danger">${errorText}</div>` : ''}
-            <div class="flex gap-4 mt-8 result-card-actions">
+            <div class="flex gap-4 mt-8">
               <button class="btn btn-secondary btn-sm" data-dl-comp="${job.id}" ${showDownloads ? '' : 'disabled'}>⬇ Download</button>
               <button class="btn btn-secondary btn-sm" data-dl-raw="${job.id}" ${showDownloads ? '' : 'disabled'}>⬇ Raw</button>
               <button class="btn btn-secondary btn-sm" data-view-qa-book="${Number(job.book_id || 0)}" ${showComparison ? '' : 'disabled'}>Compare</button>
-              <button class="btn btn-sm" data-save-result="${job.id}" data-drive-url="${escapeHtml(saveResultState.driveUrl)}" data-save-status="${escapeHtml(saveResultState.status)}" ${showDownloads ? '' : 'disabled'} style="${saveResultState.style}" title="${escapeHtml(saveResultState.title)}">${escapeHtml(saveResultState.label)}</button>
               <button class="btn btn-sm" data-save-raw="${job.id}" data-drive-url="${escapeHtml(saveRawState.driveUrl)}" data-save-status="${escapeHtml(saveRawState.status)}" ${showDownloads ? '' : 'disabled'} style="${saveRawState.style}" title="${escapeHtml(saveRawState.title)}">${escapeHtml(saveRawState.label)}</button>
               <button class="btn btn-secondary btn-sm" data-save-prompt="${job.id}">💾 Prompt</button>
             </div>
@@ -2701,18 +2407,11 @@ window.Pages.iterate = {
       if (!Number.isFinite(book) || book <= 0) return;
       window.open(`/api/visual-qa/image/${book}?catalog=classics`, '_blank', 'noopener,noreferrer');
     }));
-    grid.querySelectorAll('[data-save-result]').forEach((btn) => btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await this.saveResult(btn.dataset.saveResult, btn);
-    }));
     grid.querySelectorAll('[data-save-raw]').forEach((btn) => btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       await this.saveRaw(btn.dataset.saveRaw, btn);
     }));
     grid.querySelectorAll('[data-save-prompt]').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); this.savePromptFromJob(btn.dataset.savePrompt); }));
-    document.getElementById('iterSaveAllBtn')?.addEventListener('click', async () => {
-      await this.saveAllResults(saveAllJobs);
-    });
   },
 
   viewFull(jobId, mode = 'composite') {
@@ -2845,116 +2544,6 @@ window.Pages.iterate = {
     a.href = href;
     a.download = `${number}. ${baseName} (illustration).jpg`;
     a.click();
-  },
-
-  async saveResult(jobId, button = null, options = {}) {
-    const job = DB.dbGet('jobs', jobId);
-    if (!job) return false;
-    const refresh = options.refresh !== false;
-    const showToast = options.showToast !== false;
-    const existingDriveUrl = String(button?.dataset?.driveUrl || job.save_result_drive_url || '').trim();
-    if (existingDriveUrl) {
-      if (button) window.open(existingDriveUrl, '_blank', 'noopener,noreferrer');
-      return true;
-    }
-    const backendJobId = backendJobIdForJob(job);
-    if (!backendJobId) {
-      Toast.error('Save failed: backend job id is missing.');
-      return false;
-    }
-
-    const resultRow = resultRowForJob(job);
-    const originalText = button ? String(button.textContent || 'Save') : '';
-    const originalBackground = button?.style?.background || '';
-    const originalColor = button?.style?.color || '';
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Saving...';
-    }
-
-    try {
-      const resp = await fetch('/api/save-result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          job_id: backendJobId,
-          style_label: String(job.style_label || '').trim(),
-          expected_variant: Number(job.variant || 0),
-          expected_model: String(job.model || '').trim(),
-          expected_raw_art_path: String(resultRow.raw_art_path || '').trim(),
-          expected_saved_composited_path: String(resultRow.saved_composited_path || resultRow.composited_path || '').trim(),
-        }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.ok) {
-        throw new Error(data.message || data.error || `HTTP ${resp.status}`);
-      }
-      if (!data.drive_url) {
-        throw new Error(data.warning || data.drive_warning || 'Google Drive upload failed');
-      }
-
-      job.save_result_status = 'saved';
-      job.save_result_warning = '';
-      job.save_result_drive_url = String(data.drive_url || '').trim();
-      job.save_result_local_path = String(data.local_path || '').trim();
-      job.save_result_file_name = String(data.file_name || '').trim();
-      job.save_result_saved_at = new Date().toISOString();
-      DB.dbPut('jobs', job);
-      if (refresh) this.loadExistingResults();
-      if (showToast) Toast.success('Cover saved to Drive.');
-      return true;
-    } catch (err) {
-      if (button) {
-        button.textContent = 'Retry Save';
-        button.style.background = '#d32f2f';
-        button.style.color = '#fff';
-        button.disabled = false;
-      }
-      job.save_result_status = 'partial';
-      job.save_result_warning = String(err?.message || err || '').trim();
-      job.save_result_drive_url = '';
-      DB.dbPut('jobs', job);
-      if (showToast) Toast.error(`Save failed: ${err.message || err}`);
-      if (button) {
-        setTimeout(() => {
-          button.textContent = originalText;
-          button.style.background = originalBackground;
-          button.style.color = originalColor;
-        }, 2500);
-      }
-      if (refresh) this.loadExistingResults();
-      return false;
-    }
-  },
-
-  async saveAllResults(jobs) {
-    const rows = Array.isArray(jobs) ? jobs.filter((job) => job && String(job.status || '') === 'completed') : [];
-    if (!rows.length) {
-      Toast.warning('No completed covers are ready to save.');
-      return;
-    }
-    const button = document.getElementById('iterSaveAllBtn');
-    const originalText = String(button?.textContent || `Save All (${rows.length})`);
-    if (button) {
-      button.disabled = true;
-      button.textContent = `Saving 0/${rows.length}...`;
-    }
-    let saved = 0;
-    for (let index = 0; index < rows.length; index += 1) {
-      if (button) button.textContent = `Saving ${index + 1}/${rows.length}...`;
-      const ok = await this.saveResult(rows[index].id, null, { refresh: false, showToast: false });
-      if (ok) saved += 1;
-    }
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalText;
-    }
-    if (saved === rows.length) {
-      Toast.success(`Saved ${saved}/${rows.length} cover${saved === 1 ? '' : 's'} to Drive.`);
-    } else {
-      Toast.warning(`Saved ${saved}/${rows.length}. Retry the remaining covers.`);
-    }
-    this.loadExistingResults();
   },
 
   async saveRaw(jobId, button) {

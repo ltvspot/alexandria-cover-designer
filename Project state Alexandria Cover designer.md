@@ -1,6 +1,6 @@
 # Alexandria Cover Designer — Project State
 
-Last updated: `2026-03-08` (updated: PROMPT-22 deployed ✅, PROMPT-23 ready — Rewrite prompts to scene-only)
+Last updated: `2026-03-04`
 Version track: `v2.1.x` (current runtime reports `2.1.1`)
 
 ## 1. Current Goal (Production)
@@ -40,53 +40,62 @@ Serving layer:
 - `src/static/shared.css` contains a design-lock block with `!important` sidebar/layout rules so legacy page CSS cannot revert to the old top-nav layout.
 
 ### 3.2 Medallion Safety (Art Behind Ornaments)
-**PROMPT-20 — Im0 Layer Swap Compositor (2026-03-05). Supersedes ALL previous compositor approaches (07–19).**
+**PDF-based compositor approach is now active (PROMPT-09 series, 2026-03-04). See `VERIFICATION-PROTOCOL.md`.**
 
-Approaches 07A through 19 all failed. Every approach from PROMPT-07 through PROMPT-19 tried pixel-level manipulation: extracting frame overlays, color-based metal detection, frame_mask.png, hole punching, SMask-guided compositing — all produced visually broken output that passed numerical tests but looked terrible to a human.
+Approaches 07A through 07H (raster pixel manipulation on flat JPGs) all failed visual inspection. The core problem: detecting and reconstructing the ornamental frame boundary from a flat JPG is structurally impossible at the required fidelity. The frame ring has semi-transparent edges, sub-pixel detail, and irregular boundaries varying from 378–480px radius.
 
-**Root Cause Discovery:** Source PDFs contain `/Im0` (2480×2470, CMYK) which holds BOTH the illustration art AND the gold ornamental frame as one combined image. An `/SMask` clips Im0 onto the cover. The frame is NOT a separate layer — it's baked into Im0.
+**The Discovery:** Analysis of the actual source PDF files from Google Drive revealed that each PDF contains the frame/illustration separation already encoded by the original designer:
+- **Im0** (2480×2470, CMYK): the complete medallion — frame ring + illustration
+- **SMask** (2480×2470, grayscale): transparency mask defining the exact frame boundary
+  - Values >250 = inner circle (illustration, fully visible) → replace with AI art
+  - Values 5–250 = ornamental frame ring (semi-transparent) → keep ORIGINAL pixels
+  - Values <5 = outer area (hidden by background) → replace with AI art (invisible anyway)
+- **Vector content**: all text, corner ornaments, spine decorations — completely untouched
 
-**PROMPT-20 — Im0 Layer Swap (CURRENT):**
-- New `src/pdf_swap_compositor.py` — works directly with Im0 inside the PDF
-- Opens source PDF with `pikepdf`, extracts Im0
-- Within Im0: replaces CENTER art area with new AI art (geometric circle, radius ~950 from Im0 center)
-- Keeps OUTER frame ring pixels from original Im0 untouched
-- New art is BEHIND the frame — within Im0 itself, frame pixels sit on top
-- Writes modified Im0 back into PDF, keeping original SMask completely unchanged
-- Renders modified PDF at 300 DPI using `pdftoppm` → final composite JPG
-- Falls back to legacy three-layer approach if PDF swap fails
-- Dependencies: `pikepdf>=8.0.0`, `poppler-utils` (for pdftoppm)
+**PROMPT-09A** — PDF-Based Compositor (CURRENT):
+- New `src/pdf_compositor.py` replaces the entire raster approach
+- Opens source PDF with `pikepdf`, extracts Im0 + SMask
+- Composites: AI art (RGB→CMYK) fills canvas, then frame ring pixels (SMask 5–250) restored from original
+- Writes composite back into Im0, keeping SMask unchanged
+- Renders PDF to JPG via PyMuPDF at 300 DPI
+- Three output formats: `.pdf` (lossless), `.jpg` (300 DPI render), `.ai` (PDF copy)
+- Falls back to old `cover_compositor.py` when only JPG is available
+- Dependencies: `pikepdf>=10.0.0`, `PyMuPDF>=1.24.0`
 
-**What this eliminates:**
-- `config/frame_mask.png` — no longer needed
-- `config/frame_overlays/` — not needed
-- `scripts/extract_frame_overlays.py` — bypassed entirely
-- Color-based frame metal detection — irrelevant
-- The `frame_mask_arr` override bug — bypassed
-- All hole-punching approaches — not used
+**PROMPT-09B** — Automated Verification Suite (PDF+JPG dual mode):
+- PDF mode: 7 checks including SMask bit-identical integrity + frame pixel byte-identical preservation
+- JPG mode: 5 checks (radial zone comparison fallback)
+- Integration test script: `scripts/test_compositor_integration.sh`
 
-**Key geometry (Im0 coordinate space):**
-- Im0 dimensions: 2480 × 2470 px (same across all 99 books)
-- Im0 center: (1240, 1235)
-- Blend radius: ~950 px from center (where frame ring starts)
-- Feather: 20 px smooth transition
-- SMask: preserved unchanged (handles scrollwork clipping automatically)
+**PROMPT-09C** — Download Naming + PDF/AI Output:
+- `resolveBookMetadataForJob()` uses `file_base` from catalog
+- ZIP includes `.pdf`, `.ai`, `.jpg`, and raw illustration
+- Folder structure mirrors source cover naming
 
-**Key geometry (page-level, unchanged):**
+Full history: `Codex Prompts/PROMPT-09-Approach-Report.pdf`
+
+Proof of concept validated: replaced illustration with solid teal fill in actual Fairy Tales PDF — ornamental frame perfectly intact, vector content untouched.
+
+**MANDATORY VERIFICATION (NON-NEGOTIABLE):**
+Every compositor change must pass `scripts/verify_composite.py --strict` before committing. See `VERIFICATION-PROTOCOL.md`. Both Claude Cowork and Codex must run this — no exceptions.
+
+PDF mode (7 checks): dimensions, ornament zone match (99.9%), art zone differ (95%), centering (3px), transition quality (<2%), SMask bit-identical (100%), frame pixels byte-identical (99.99%).
+
+JPG mode fallback (5 checks): dimensions, ornament zone (99.9%), art zone (95%), centering (3px), transition (<2%).
+
+Known constants (page-level):
 - Cover size: 3784 × 2777 @ 300 DPI
 - Medallion center: (2864, 1620)
 - Outer frame radius: 500px
+- Frame inner edge: 378–480px (varies by angle)
+- Art zone: r < 370px | Ornament zone: r > 480px
 
-**Source files:** All 99 books have .ai + .pdf + .jpg in `Input Covers/`. Google Drive: https://drive.google.com/drive/folders/1ybFYDJk7Y3VlbsEjRAh1LOfdyVsHM_cS
-
-**DO NOT:** Replace Im0 entirely (loses frame). Modify the SMask. Do color-based pixel detection. Use frame_mask.png. Punch holes.
-
-**Implementation prompt:** `Codex Prompts/PROMPT-20-IM0-LAYER-SWAP-COMPOSITOR.md`
-**Codex message:** `Codex Prompts/CODEX-MESSAGE-PROMPT-20.md`
-**Visual analysis PDF:** `Alexandria-Im0-Layer-Swap-Approach.pdf`
-
-**MANDATORY VERIFICATION (NON-NEGOTIABLE):**
-Every compositor change requires visual comparison grids committed to `qa_output/`. Tim's visual assessment is the final authority — numerical checks alone have repeatedly missed defects.
+Known constants (PDF-level):
+- Embedded image (Im0): 2480 × 2470, CMYK, xref 19
+- SMask: 2480 × 2470, grayscale, xref 24
+- Frame ring: SMask values 5–250
+- Compression: FlateDecode (zlib)
+- PDF filename quirk: trailing space before `.pdf` extension
 
 ### 3.3 Prompt/Generation Hardening
 `src/image_generator.py` + `src/prompt_generator.py` enforce:
@@ -214,60 +223,19 @@ Completed in this workspace session:
    - `scripts/verify_composite.py` updated with PDF mode: SMask bit-identical check + frame pixel byte-identical check.
    - Both agents must run `verify_composite.py --strict` before any compositor commit — no exceptions.
    - Implementation sequence: 09A (PDF compositor) → 09B (verification suite) → 09C (download naming).
-17. Frame damage quantification (2026-03-04):
-   - Ran pixel-level comparison across all 99 covers: original input JPG vs composited output JPG.
-   - **Result: 65.8% average frame ring pixels changed** (should be <1%). Average pixel delta 56.7 (should be <5). Outer area: 0.0% changed.
-   - Root cause confirmed: shared `frame_mask.png` cannot represent 99 unique ornamental frames.
-   - Visual comparison images generated: `tmp/verification/compare_{book_number}.jpg` for sample covers.
-   - PROMPT-13 written: batch verification system + hard rejection gate inside `composite_single()`.
-   - PROMPT-12 updated: ART_BLEED_PX corrected from 60→140, verification integration added.
-   - Implementation sequence revised: **PROMPT-13 (verification) → PROMPT-12 (RGBA overlays)**.
 
 ## 7. Known Constraints / Honest Caveats
 - In production, direct Google provider is currently failing key validation (`Your API key was reported as leaked`); these models are disabled in UI connectivity state until key replacement.
 - Provider-side image models can still occasionally emit pseudo-typography; current guardrails and retry hardening reduce this risk but cannot mathematically guarantee zero artifact probability from upstream model outputs.
 
 ## 8. Next Recommended Work
-
-**PROMPT-20: 🔴 READY TO SEND TO CODEX — Im0 Layer Swap Compositor (2026-03-05)**
-- This supersedes ALL previous compositor prompts (07–19). All of those failed.
-- Creates new `src/pdf_swap_compositor.py` that swaps center art within Im0 in source PDFs.
-- Keeps gold ornamental frame ring intact, new art placed BEHIND frame.
-- Falls back to legacy three-layer approach if PDF swap fails.
-- Prompt: `Codex Prompts/PROMPT-20-IM0-LAYER-SWAP-COMPOSITOR.md`
-- Codex message: `Codex Prompts/CODEX-MESSAGE-PROMPT-20.md`
-
-**⚠️ PROMPT-20 IMPLEMENTATION RESULT (2026-03-05):**
-Codex implemented PROMPT-20 but it shipped with two bugs:
-1. **Blend radius too large (938 instead of 840):** `detect_blend_radius_from_smask()` used SMask < 255 boundary — that's the OUTER edge of the medallion (r≈939), not the inner edge of the frame ornaments (r≈870). Cross-book pixel analysis (comparing Im0 across books 1/2/50) proves frame starts at r≈870. Correct blend radius = 840 (30px safety margin).
-2. **Content guardrail false rejections:** `hard_frame_artifact` threshold (0.22) and individual `ring_penalty`/`frame_penalty` thresholds (0.14) reject AI art with strong linear structures (ship masts, architecture) as frame artifacts. Moby Dick's whale/ship scene scored 0.261 and was falsely rejected.
-
-**PROMPT-21 — Fix Blend Radius & Guardrail (2026-03-05):**
-- Prompt: `Codex Prompts/PROMPT-21-FIX-BLEND-RADIUS-AND-GUARDRAIL.md`
-- Codex message: `Codex Prompts/CODEX-MESSAGE-PROMPT-21.md`
-- Only 2 files change: `src/pdf_swap_compositor.py` and `src/image_generator.py`
-- Deployed: commit e55e53d, Railway deployment dbeb6051 (SUCCESS)
-
-**⚠️ PROMPT-21 DEPLOYMENT RESULT (2026-03-06):**
-PROMPT-21 code changes verified correct. QA comparison sheets with synthetic gradient test images show frame preserved correctly. **However, live production generations with real AI art still exhibit the same compositor issue — the gold ornamental frame is not correctly preserved.** The problem persists despite the blend radius fix. A developer hire is in progress to resolve this.
-
-**⚠️ CRITICAL PROCESS LESSON (2026-03-04):**
-Every compositor prompt from PROMPT-07 through PROMPT-21 passed its own programmatic/QA tests while producing visually broken output in production. The gap between test conditions (synthetic gradients) and real production conditions (actual AI art) continues to mask the defect. Tim's visual assessment is the final authority. See `CLAUDE.md` mandatory visual validation section.
-
-**PROMPT-22 (2026-03-08) — READY TO SEND:**
-Three tasks in one prompt:
-1. **Fix Nano Banana Pro model routing** — UI label maps to `openrouter/google/gemini-2.5-flash-image` (Gemini 2.5 Flash, WRONG). Actual model is `openrouter/google/gemini-3-pro-image-preview`. Files: `openrouter.js`, `iterate.js`, `config.py`.
-2. **Implement 10 Alexandria prompts** (5 base + 5 wildcard) with {SCENE}/{MOOD}/{ERA} variable injection, genre-to-prompt auto-mapping, hardcoded negative prompt for no-text rule.
-3. **Add Save Raw button** in Recent Results → `POST /api/save-raw` → Google Drive upload to "Chosen Winner Generated Covers" (ID: 1SHzAaDU1pN0ECC61KCRtYijv4dp4IR59). Folder naming uses hyphen, file naming uses en-dash.
-
-Prompt: `Codex Prompts/PROMPT-22-MODEL-FIX-PROMPTS-SAVE-RAW.md`
-Codex message: `Codex Prompts/CODEX-MESSAGE-PROMPT-22.md`
-
-**Outstanding work (requires developer):**
-1. **Compositor frame preservation** — Still broken with real AI art despite PROMPT-21 fixes. Developer hire in progress.
-2. **Searchable book selector** — replace flat `<select>` dropdown with search-by-number/title/author (PROMPT-08).
-3. Lazy cover file download from Drive (JPG/PDF on demand, not all pre-downloaded).
-4. Keep the revision token centralized in one constant to avoid accidental per-page drift.
+1. **PROMPT-09A deployed via Codex** — PDF-based compositor (Codex currently working on this).
+2. **Deploy PROMPT-09B via Codex** — automated verification suite with PDF+JPG dual mode. Must run after 09A.
+3. **Deploy PROMPT-09C via Codex** — download naming + PDF/AI output in ZIP. Must run after 09A.
+4. **Fix prompt variation** — `_motif_for_book()` in `src/prompt_generator.py` only covers ~25 books; ~70+ get generic "period costume" prompts. Needs book-specific content diversity.
+5. **Fix dropdown titles** — many books show as "Untitled" in the iterate page dropdown.
+6. Run a live canary (10-book sample) with active provider keys and capture fresh composited proofs.
+7. Keep the revision token centralized in one constant to avoid accidental per-page drift.
 
 ## 9. Mandatory Delivery Protocol
 For every user-facing completion message:

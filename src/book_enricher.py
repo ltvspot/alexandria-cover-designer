@@ -928,29 +928,19 @@ def _generic_retry_guidance(*, row: dict[str, Any], description: str) -> str:
     return " ".join(guidance)
 
 
-def _enrichment_generic_reasons(enrichment: dict[str, Any]) -> list[str]:
-    reasons: list[str] = []
-    if not isinstance(enrichment, dict) or not enrichment:
-        return ["missing enrichment"]
-
+def _has_generic_content(enrichment: dict[str, Any]) -> bool:
+    if not isinstance(enrichment, dict):
+        return True
     serialized = json.dumps(enrichment, ensure_ascii=False).lower()
     if any(phrase in serialized for phrase in BANNED_GENERIC_PHRASES):
-        reasons.append("contains placeholder language")
-
+        return True
     protagonist = str(enrichment.get("protagonist", "") or "").strip().lower()
     if protagonist in GENERIC_PROTAGONISTS:
-        reasons.append("generic protagonist")
-
+        return True
     scenes = enrichment.get("iconic_scenes", [])
-    scene_count = len([scene for scene in scenes if str(scene).strip()]) if isinstance(scenes, list) else 0
-    if scene_count < 1:
-        reasons.append("missing specific iconic scenes")
-
-    return reasons
-
-
-def _has_generic_content(enrichment: dict[str, Any]) -> bool:
-    return bool(_enrichment_generic_reasons(enrichment))
+    if not isinstance(scenes, list) or len([scene for scene in scenes if str(scene).strip()]) < 3:
+        return True
+    return False
 
 
 def validate_enrichment_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:

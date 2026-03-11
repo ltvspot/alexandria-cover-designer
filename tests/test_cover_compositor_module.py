@@ -313,46 +313,6 @@ def test_validate_composite_output_detects_alignment_and_bleed(tmp_path: Path):
     assert validation.valid is False
 
 
-def test_validate_composite_output_allows_under_frame_overlap_for_canonical_circle(tmp_path: Path):
-    cover = Image.new("RGB", (cc.FALLBACK_COVER_WIDTH, cc.FALLBACK_COVER_HEIGHT), (20, 30, 40))
-    composite = cover.copy()
-    draw = ImageDraw.Draw(composite)
-    overlap_radius = cc.FRAME_HOLE_RADIUS + 1
-    draw.ellipse(
-        (
-            cc.FALLBACK_CENTER_X - overlap_radius,
-            cc.FALLBACK_CENTER_Y - overlap_radius,
-            cc.FALLBACK_CENTER_X + overlap_radius,
-            cc.FALLBACK_CENTER_Y + overlap_radius,
-        ),
-        fill=(230, 210, 170),
-    )
-    out = tmp_path / "canonical.jpg"
-    composite.save(out, format="JPEG", dpi=(300, 300), quality=95)
-
-    region = cc.Region(
-        center_x=cc.FALLBACK_CENTER_X,
-        center_y=cc.FALLBACK_CENTER_Y,
-        radius=cc.FALLBACK_RADIUS,
-        frame_bbox=(
-            cc.FALLBACK_CENTER_X - cc.FALLBACK_RADIUS,
-            cc.FALLBACK_CENTER_Y - cc.FALLBACK_RADIUS,
-            cc.FALLBACK_CENTER_X + cc.FALLBACK_RADIUS,
-            cc.FALLBACK_CENTER_Y + cc.FALLBACK_RADIUS,
-        ),
-    )
-    validation = cc.validate_composite_output(
-        cover=cover,
-        composited=composite,
-        region=region,
-        output_path=out,
-    )
-
-    assert validation.valid is True
-    assert validation.border_bleed_ok is True
-    assert validation.edge_artifacts_ok is True
-
-
 def test_global_compositing_mask_is_used_only_for_canonical_size():
     assert cc._load_global_compositing_mask((700, 500)) is None
     mask = cc._load_global_compositing_mask((3784, 2777))

@@ -20,12 +20,10 @@ try:
     from src import config
     from src import pipeline
     from src.logger import get_logger
-    from src.prompt_library import PromptLibrary
 except ModuleNotFoundError:  # pragma: no cover
     from src import config  # type: ignore
     from src import pipeline  # type: ignore
     from src.logger import get_logger  # type: ignore
-    from src.prompt_library import PromptLibrary  # type: ignore
 
 logger = get_logger(__name__)
 
@@ -116,7 +114,6 @@ def run_checks() -> list[dict[str, Any]]:
     add("compositing_mask exists", mask_path.exists(), str(mask_path))
 
     try:
-        PromptLibrary(runtime.prompt_library_path)
         _load_json(runtime.prompt_library_path)
         add("prompt_library is valid JSON", True, str(runtime.prompt_library_path))
     except Exception as exc:

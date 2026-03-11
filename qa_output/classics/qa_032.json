@@ -1,29 +1,27 @@
 {
   "book_number": 32,
   "book_title": "The Blue Castle' a novel",
-  "passed": false,
-  "failed_checks": [
-    "frame_ring_integrity"
-  ],
+  "passed": true,
+  "failed_checks": [],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": false,
-      "value": "5.72% changed, delta 3.37",
+      "passed": true,
+      "value": "0.00% changed, delta 0.22",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.15% outer pixels changed",
+      "value": "0.00% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "96.92% inner pixels changed",
+      "value": "99.05% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -37,7 +35,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=959x958, ratio=1.001",
+      "value": "bbox=911x912, ratio=0.999",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -50,15 +48,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 5.7202,
-    "frame_mean_delta": 3.3659,
-    "outer_changed_pct": 0.1492,
-    "inner_changed_pct": 96.9218,
-    "changed_bbox_width": 959,
-    "changed_bbox_height": 958,
-    "changed_bbox_aspect_ratio": 1.001
+    "frame_changed_pct": 0.0,
+    "frame_mean_delta": 0.218,
+    "outer_changed_pct": 0.0,
+    "inner_changed_pct": 99.0521,
+    "changed_bbox_width": 911,
+    "changed_bbox_height": 912,
+    "changed_bbox_aspect_ratio": 0.9989
   },
-  "generated_at": "2026-03-05T09:03:07.079564+00:00",
+  "generated_at": "2026-03-05T06:54:45.453193+00:00",
   "original_path": "Input Covers/32. The Blue Castle_ a novel — L. M. Montgomery copy/The Blue Castle a novel - L. M. Montgomery.jpg",
   "composite_path": "tmp/composited/32/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

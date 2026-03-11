@@ -1,0 +1,511 @@
+[06:42:19] [[32mINFO[0m] src.cover_compositor: Frame overlays already present for all 99 covers
+[06:42:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Room with a View - E. M. Forster.jpg: changed=0.0%, mean_delta=0.0
+[06:42:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Moby Dick_ Or, The Whale - Herman Melville.jpg: changed=0.0%, mean_delta=0.0
+[06:42:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Gulliver’s Travels into Several Remote Regions of the World - Jonathan Swift.jpg: changed=0.0%, mean_delta=0.0
+[06:42:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Emma - Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:42:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Emma - Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:42:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Emma - Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:42:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Emma - Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:42:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Emma - Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:42:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:37] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus- Mary Wollstonecraft Shelley.jpg: changed=0.0%, mean_delta=0.0
+[06:42:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Modest Proposal - Jonathan Swift.jpg: changed=0.0%, mean_delta=0.0
+[06:42:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Modest Proposal - Jonathan Swift.jpg: changed=0.0%, mean_delta=0.0
+[06:42:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Modest Proposal - Jonathan Swift.jpg: changed=0.0%, mean_delta=0.0
+[06:42:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Modest Proposal - Jonathan Swift.jpg: changed=0.0%, mean_delta=0.0
+[06:42:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Modest Proposal - Jonathan Swift.jpg: changed=0.0%, mean_delta=0.0
+[06:42:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Complete Works of William Shakespeare - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:42:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Complete Works of William Shakespeare - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:42:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Complete Works of William Shakespeare - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:42:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Complete Works of William Shakespeare - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:42:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Complete Works of William Shakespeare - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:42:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Mysterious Stranger, and Other Stories - Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:42:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Mysterious Stranger, and Other Stories - Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:42:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Mysterious Stranger, and Other Stories - Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:42:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Mysterious Stranger, and Other Stories - Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:42:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Mysterious Stranger, and Other Stories - Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:42:58] [[33mWARNING[0m] src.cover_compositor: Cover /Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/Input Covers/9. Right Ho, Jeeves - P. G. Wodehouse copy/Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg has unexpected size (3781, 2777)
+[06:42:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg: changed=0.0%, mean_delta=0.0
+[06:43:00] [[33mWARNING[0m] src.cover_compositor: Cover /Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/Input Covers/9. Right Ho, Jeeves - P. G. Wodehouse copy/Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg has unexpected size (3781, 2777)
+[06:43:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg: changed=0.0%, mean_delta=0.0
+[06:43:01] [[33mWARNING[0m] src.cover_compositor: Cover /Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/Input Covers/9. Right Ho, Jeeves - P. G. Wodehouse copy/Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg has unexpected size (3781, 2777)
+[06:43:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg: changed=0.0%, mean_delta=0.0
+[06:43:03] [[33mWARNING[0m] src.cover_compositor: Cover /Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/Input Covers/9. Right Ho, Jeeves - P. G. Wodehouse copy/Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg has unexpected size (3781, 2777)
+[06:43:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg: changed=0.0%, mean_delta=0.0
+[06:43:04] [[33mWARNING[0m] src.cover_compositor: Cover /Users/timzengerink/Documents/Coding Folder/Alexandria Cover designer/Input Covers/9. Right Ho, Jeeves - P. G. Wodehouse copy/Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg has unexpected size (3781, 2777)
+[06:43:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Right Ho, Jeeves - P. G. Wodehouse_Монтажная область 1.jpg: changed=0.0%, mean_delta=0.0
+[06:43:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:08] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:10] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:13] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Enchanted April - Elizabeth Von Arnim.jpg: changed=0.0%, mean_delta=0.0
+[06:43:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Romeo and Juliet - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:43:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Romeo and Juliet - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:43:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Romeo and Juliet - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:43:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Romeo and Juliet - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:43:23] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Romeo and Juliet - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:43:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Cranford - Elizabeth Cleghorn Gaskell.jpg: changed=0.0%, mean_delta=0.0
+[06:43:27] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Expedition of Humphry Clinker - Tobias Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:43:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Expedition of Humphry Clinker - Tobias Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:43:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Expedition of Humphry Clinker - Tobias Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:43:31] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Expedition of Humphry Clinker - Tobias Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:43:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Expedition of Humphry Clinker - Tobias Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:43:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:39] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for History of Tom Jones, a Foundling — Henry Fielding.jpg: changed=0.0%, mean_delta=0.0
+[06:43:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Pickwick Papers — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:43:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Pickwick Papers — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:43:47] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Pickwick Papers — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:43:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Pickwick Papers — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:43:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Pickwick Papers — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:43:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Wind in the Willows — Kenneth Grahame.jpg: changed=0.0%, mean_delta=0.0
+[06:43:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Wind in the Willows — Kenneth Grahame.jpg: changed=0.0%, mean_delta=0.0
+[06:43:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Wind in the Willows — Kenneth Grahame.jpg: changed=0.0%, mean_delta=0.0
+[06:43:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Wind in the Willows — Kenneth Grahame.jpg: changed=0.0%, mean_delta=0.0
+[06:43:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Wind in the Willows — Kenneth Grahame.jpg: changed=0.0%, mean_delta=0.0
+[06:43:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Journey to the Centre of the Earth — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:44:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Journey to the Centre of the Earth — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:44:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Journey to the Centre of the Earth — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:44:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Journey to the Centre of the Earth — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:44:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Journey to the Centre of the Earth — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:44:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Crime and Punishment - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:44:08] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Crime and Punishment - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:44:09] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Crime and Punishment - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:44:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Crime and Punishment - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:44:12] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Crime and Punishment - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:44:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:23] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Middlemarch — George Eliot.jpg: changed=0.0%, mean_delta=0.0
+[06:44:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady with the Dog and Other Stories — Anton Pavlovich Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:44:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady with the Dog and Other Stories — Anton Pavlovich Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:44:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady with the Dog and Other Stories — Anton Pavlovich Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:44:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady with the Dog and Other Stories — Anton Pavlovich Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:44:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady with the Dog and Other Stories — Anton Pavlovich Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:44:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady of the Lake — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady of the Lake — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:37] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady of the Lake — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:39] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady of the Lake — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Lady of the Lake — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Satyricon - Complete — Petronius Arbiter.jpg: changed=0.0%, mean_delta=0.0
+[06:44:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Satyricon - Complete — Petronius Arbiter.jpg: changed=0.0%, mean_delta=0.0
+[06:44:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Satyricon - Complete — Petronius Arbiter.jpg: changed=0.0%, mean_delta=0.0
+[06:44:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Satyricon - Complete — Petronius Arbiter.jpg: changed=0.0%, mean_delta=0.0
+[06:44:47] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Satyricon - Complete — Petronius Arbiter.jpg: changed=0.0%, mean_delta=0.0
+[06:44:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Little Women_ Or, Meg, Jo, Beth, and Amy — Louisa May Alcott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Little Women_ Or, Meg, Jo, Beth, and Amy — Louisa May Alcott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Little Women_ Or, Meg, Jo, Beth, and Amy — Louisa May Alcott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Little Women_ Or, Meg, Jo, Beth, and Amy — Louisa May Alcott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Little Women_ Or, Meg, Jo, Beth, and Amy — Louisa May Alcott.jpg: changed=0.0%, mean_delta=0.0
+[06:44:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Eyes Have It — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:44:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Eyes Have It — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:45:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Eyes Have It — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:45:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Eyes Have It — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:45:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Eyes Have It — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:45:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Alice_s Adventures in Wonderland — Lewis Carroll.jpg: changed=0.0%, mean_delta=0.0
+[06:45:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Alice_s Adventures in Wonderland — Lewis Carroll.jpg: changed=0.0%, mean_delta=0.0
+[06:45:08] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Alice_s Adventures in Wonderland — Lewis Carroll.jpg: changed=0.0%, mean_delta=0.0
+[06:45:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Alice_s Adventures in Wonderland — Lewis Carroll.jpg: changed=0.0%, mean_delta=0.0
+[06:45:12] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Alice_s Adventures in Wonderland — Lewis Carroll.jpg: changed=0.0%, mean_delta=0.0
+[06:45:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pride and Prejudice — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:45:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pride and Prejudice — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:45:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pride and Prejudice — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:45:19] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pride and Prejudice — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:45:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pride and Prejudice — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:45:23] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Laughter An Essay on the Meaning of the Comic — Henri Bergson.jpg: changed=0.0%, mean_delta=0.0
+[06:45:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Laughter An Essay on the Meaning of the Comic — Henri Bergson.jpg: changed=0.0%, mean_delta=0.0
+[06:45:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Laughter An Essay on the Meaning of the Comic — Henri Bergson.jpg: changed=0.0%, mean_delta=0.0
+[06:45:27] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Laughter An Essay on the Meaning of the Comic — Henri Bergson.jpg: changed=0.0%, mean_delta=0.0
+[06:45:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Laughter An Essay on the Meaning of the Comic — Henri Bergson.jpg: changed=0.0%, mean_delta=0.0
+[06:45:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Eve_s Diary, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:45:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Eve_s Diary, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:45:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Eve_s Diary, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:45:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Eve_s Diary, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:45:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Eve_s Diary, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:45:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sky Trap — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:45:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sky Trap — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:45:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sky Trap — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:45:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sky Trap — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:45:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sky Trap — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:45:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Picture of Dorian Gray — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:45:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Picture of Dorian Gray — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:45:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Picture of Dorian Gray — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:45:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Picture of Dorian Gray — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:45:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Picture of Dorian Gray — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:45:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Blue Castle a novel - L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:45:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Blue Castle a novel - L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:45:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Blue Castle a novel - L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:45:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Blue Castle a novel - L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:46:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Blue Castle a novel - L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:46:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Thousand Leagues under the Sea - Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:46:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Thousand Leagues under the Sea - Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:46:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Thousand Leagues under the Sea - Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:46:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Thousand Leagues under the Sea - Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:46:09] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Thousand Leagues under the Sea - Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:46:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:12] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Three Men in a Boat (To Say Nothing of the Dog) - Jerome K. Jerome.jpg: changed=0.0%, mean_delta=0.0
+[06:46:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Three Men in a Boat (To Say Nothing of the Dog) - Jerome K. Jerome.jpg: changed=0.0%, mean_delta=0.0
+[06:46:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Three Men in a Boat (To Say Nothing of the Dog) - Jerome K. Jerome.jpg: changed=0.0%, mean_delta=0.0
+[06:46:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Three Men in a Boat (To Say Nothing of the Dog) - Jerome K. Jerome.jpg: changed=0.0%, mean_delta=0.0
+[06:46:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Three Men in a Boat (To Say Nothing of the Dog) - Jerome K. Jerome.jpg: changed=0.0%, mean_delta=0.0
+[06:46:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Doll_s House A Play — Henrik Ibsen.jpg: changed=0.0%, mean_delta=0.0
+[06:46:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Doll_s House A Play — Henrik Ibsen.jpg: changed=0.0%, mean_delta=0.0
+[06:46:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Doll_s House A Play — Henrik Ibsen.jpg: changed=0.0%, mean_delta=0.0
+[06:46:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Doll_s House A Play — Henrik Ibsen.jpg: changed=0.0%, mean_delta=0.0
+[06:46:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Doll_s House A Play — Henrik Ibsen.jpg: changed=0.0%, mean_delta=0.0
+[06:46:31] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Roderick Random — T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Roderick Random — T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Roderick Random — T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Roderick Random — T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Roderick Random — T. Smollett.jpg: changed=0.0%, mean_delta=0.0
+[06:46:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Call of the Wild — Jack London.jpg: changed=0.0%, mean_delta=0.0
+[06:46:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Call of the Wild — Jack London.jpg: changed=0.0%, mean_delta=0.0
+[06:46:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Call of the Wild — Jack London.jpg: changed=0.0%, mean_delta=0.0
+[06:46:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Call of the Wild — Jack London.jpg: changed=0.0%, mean_delta=0.0
+[06:46:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Call of the Wild — Jack London.jpg: changed=0.0%, mean_delta=0.0
+[06:46:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Tom Sawyer, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:46:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Tom Sawyer, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:46:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Tom Sawyer, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:46:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Tom Sawyer, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:46:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Adventures of Tom Sawyer, Complete — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:46:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Years After — Alexandre Dumas Auguste Maquet.jpg: changed=0.0%, mean_delta=0.0
+[06:46:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Years After — Alexandre Dumas Auguste Maquet.jpg: changed=0.0%, mean_delta=0.0
+[06:46:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Years After — Alexandre Dumas Auguste Maquet.jpg: changed=0.0%, mean_delta=0.0
+[06:46:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Years After — Alexandre Dumas Auguste Maquet.jpg: changed=0.0%, mean_delta=0.0
+[06:47:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Twenty Years After — Alexandre Dumas Auguste Maquet.jpg: changed=0.0%, mean_delta=0.0
+[06:47:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lady Chatterley_s Lover — D. H. Lawrence.jpg: changed=0.0%, mean_delta=0.0
+[06:47:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lady Chatterley_s Lover — D. H. Lawrence.jpg: changed=0.0%, mean_delta=0.0
+[06:47:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lady Chatterley_s Lover — D. H. Lawrence.jpg: changed=0.0%, mean_delta=0.0
+[06:47:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lady Chatterley_s Lover — D. H. Lawrence.jpg: changed=0.0%, mean_delta=0.0
+[06:47:07] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lady Chatterley_s Lover — D. H. Lawrence.jpg: changed=0.0%, mean_delta=0.0
+[06:47:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for She Stoops to Conquer_ Or, The Mistakes of a Night A Comedy — Oliver Goldsmith.jpg: changed=0.0%, mean_delta=0.0
+[06:47:12] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for She Stoops to Conquer_ Or, The Mistakes of a Night A Comedy — Oliver Goldsmith.jpg: changed=0.0%, mean_delta=0.0
+[06:47:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for She Stoops to Conquer_ Or, The Mistakes of a Night A Comedy — Oliver Goldsmith.jpg: changed=0.0%, mean_delta=0.0
+[06:47:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for She Stoops to Conquer_ Or, The Mistakes of a Night A Comedy — Oliver Goldsmith.jpg: changed=0.0%, mean_delta=0.0
+[06:47:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for She Stoops to Conquer_ Or, The Mistakes of a Night A Comedy — Oliver Goldsmith.jpg: changed=0.0%, mean_delta=0.0
+[06:47:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Sketches New and Old — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:47:19] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Sketches New and Old — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:47:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Sketches New and Old — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:47:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Sketches New and Old — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:47:23] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Sketches New and Old — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:47:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Der Struwwelpeter — Heinrich Hoffmann.jpg: changed=0.0%, mean_delta=0.0
+[06:47:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Der Struwwelpeter — Heinrich Hoffmann.jpg: changed=0.0%, mean_delta=0.0
+[06:47:27] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Der Struwwelpeter — Heinrich Hoffmann.jpg: changed=0.0%, mean_delta=0.0
+[06:47:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Der Struwwelpeter — Heinrich Hoffmann.jpg: changed=0.0%, mean_delta=0.0
+[06:47:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Der Struwwelpeter — Heinrich Hoffmann.jpg: changed=0.0%, mean_delta=0.0
+[06:47:31] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The History of John Bull — John Arbuthnot.jpg: changed=0.0%, mean_delta=0.0
+[06:47:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The History of John Bull — John Arbuthnot.jpg: changed=0.0%, mean_delta=0.0
+[06:47:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The History of John Bull — John Arbuthnot.jpg: changed=0.0%, mean_delta=0.0
+[06:47:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The History of John Bull — John Arbuthnot.jpg: changed=0.0%, mean_delta=0.0
+[06:47:37] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The History of John Bull — John Arbuthnot.jpg: changed=0.0%, mean_delta=0.0
+[06:47:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Reign of Greed — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:47:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Reign of Greed — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:47:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Reign of Greed — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:47:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Reign of Greed — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:47:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Reign of Greed — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:47:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anthem — Ayn Rand.jpg: changed=0.0%, mean_delta=0.0
+[06:47:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anthem — Ayn Rand.jpg: changed=0.0%, mean_delta=0.0
+[06:47:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anthem — Ayn Rand.jpg: changed=0.0%, mean_delta=0.0
+[06:47:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anthem — Ayn Rand.jpg: changed=0.0%, mean_delta=0.0
+[06:47:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anthem — Ayn Rand.jpg: changed=0.0%, mean_delta=0.0
+[06:47:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Là-bas — J.-K. Huysmans.jpg: changed=0.0%, mean_delta=0.0
+[06:47:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Là-bas — J.-K. Huysmans.jpg: changed=0.0%, mean_delta=0.0
+[06:47:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Là-bas — J.-K. Huysmans.jpg: changed=0.0%, mean_delta=0.0
+[06:47:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Là-bas — J.-K. Huysmans.jpg: changed=0.0%, mean_delta=0.0
+[06:47:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Là-bas — J.-K. Huysmans.jpg: changed=0.0%, mean_delta=0.0
+[06:47:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for 2 B R 0 2 B — Kurt Vonnegut.jpg: changed=0.0%, mean_delta=0.0
+[06:48:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for 2 B R 0 2 B — Kurt Vonnegut.jpg: changed=0.0%, mean_delta=0.0
+[06:48:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for 2 B R 0 2 B — Kurt Vonnegut.jpg: changed=0.0%, mean_delta=0.0
+[06:48:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for 2 B R 0 2 B — Kurt Vonnegut.jpg: changed=0.0%, mean_delta=0.0
+[06:48:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for 2 B R 0 2 B — Kurt Vonnegut.jpg: changed=0.0%, mean_delta=0.0
+[06:48:09] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Man from Time — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:48:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Vibration Wasps — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:48:13] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Vibration Wasps — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:48:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Vibration Wasps — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:48:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Vibration Wasps — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:48:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Vibration Wasps — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:48:19] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Dracula — Bram Stoker.jpg: changed=0.0%, mean_delta=0.0
+[06:48:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Dracula — Bram Stoker.jpg: changed=0.0%, mean_delta=0.0
+[06:48:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Dracula — Bram Stoker.jpg: changed=0.0%, mean_delta=0.0
+[06:48:23] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Dracula — Bram Stoker.jpg: changed=0.0%, mean_delta=0.0
+[06:48:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Dracula — Bram Stoker.jpg: changed=0.0%, mean_delta=0.0
+[06:48:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 2.jpg: changed=0.0%, mean_delta=0.0
+[06:48:27] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 2.jpg: changed=0.0%, mean_delta=0.0
+[06:48:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 2.jpg: changed=0.0%, mean_delta=0.0
+[06:48:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 2.jpg: changed=0.0%, mean_delta=0.0
+[06:48:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 2.jpg: changed=0.0%, mean_delta=0.0
+[06:48:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Les Misérables Tome I Fantine — Victor Hugo.jpg: changed=0.0%, mean_delta=0.0
+[06:48:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Les Misérables Tome I Fantine — Victor Hugo.jpg: changed=0.0%, mean_delta=0.0
+[06:48:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Les Misérables Tome I Fantine — Victor Hugo.jpg: changed=0.0%, mean_delta=0.0
+[06:48:37] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Les Misérables Tome I Fantine — Victor Hugo.jpg: changed=0.0%, mean_delta=0.0
+[06:48:39] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Les Misérables Tome I Fantine — Victor Hugo.jpg: changed=0.0%, mean_delta=0.0
+[06:48:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for David Copperfield — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:48:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for David Copperfield — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:48:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for David Copperfield — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:48:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for David Copperfield — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:48:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for David Copperfield — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:48:47] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Murder of Roger Ackroyd — Agatha Christie.jpg: changed=0.0%, mean_delta=0.0
+[06:48:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Murder of Roger Ackroyd — Agatha Christie.jpg: changed=0.0%, mean_delta=0.0
+[06:48:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Murder of Roger Ackroyd — Agatha Christie.jpg: changed=0.0%, mean_delta=0.0
+[06:48:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Murder of Roger Ackroyd — Agatha Christie.jpg: changed=0.0%, mean_delta=0.0
+[06:48:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Murder of Roger Ackroyd — Agatha Christie.jpg: changed=0.0%, mean_delta=0.0
+[06:48:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Adventures of Robinson Crusoe — Daniel Defoe.jpg: changed=0.0%, mean_delta=0.0
+[06:48:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Adventures of Robinson Crusoe — Daniel Defoe.jpg: changed=0.0%, mean_delta=0.0
+[06:48:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Adventures of Robinson Crusoe — Daniel Defoe.jpg: changed=0.0%, mean_delta=0.0
+[06:48:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Adventures of Robinson Crusoe — Daniel Defoe.jpg: changed=0.0%, mean_delta=0.0
+[06:48:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Adventures of Robinson Crusoe — Daniel Defoe.jpg: changed=0.0%, mean_delta=0.0
+[06:49:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Project Gutenberg Compilation of Short Stories — Anton Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:49:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Project Gutenberg Compilation of Short Stories — Anton Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:49:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Project Gutenberg Compilation of Short Stories — Anton Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:49:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Project Gutenberg Compilation of Short Stories — Anton Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:49:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Project Gutenberg Compilation of Short Stories — Anton Chekhov.jpg: changed=0.0%, mean_delta=0.0
+[06:49:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Memoirs of Fanny Hill — John Cleland.jpg: changed=0.0%, mean_delta=0.0
+[06:49:08] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Memoirs of Fanny Hill — John Cleland.jpg: changed=0.0%, mean_delta=0.0
+[06:49:10] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Memoirs of Fanny Hill — John Cleland.jpg: changed=0.0%, mean_delta=0.0
+[06:49:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Memoirs of Fanny Hill — John Cleland.jpg: changed=0.0%, mean_delta=0.0
+[06:49:13] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Memoirs of Fanny Hill — John Cleland.jpg: changed=0.0%, mean_delta=0.0
+[06:49:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Jungle Book — Rudyard Kipling.jpg: changed=0.0%, mean_delta=0.0
+[06:49:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Jungle Book — Rudyard Kipling.jpg: changed=0.0%, mean_delta=0.0
+[06:49:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Jungle Book — Rudyard Kipling.jpg: changed=0.0%, mean_delta=0.0
+[06:49:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Jungle Book — Rudyard Kipling.jpg: changed=0.0%, mean_delta=0.0
+[06:49:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Jungle Book — Rudyard Kipling.jpg: changed=0.0%, mean_delta=0.0
+[06:49:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Oedipus King of Thebes — Sophocles.jpg: changed=0.0%, mean_delta=0.0
+[06:49:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Oedipus King of Thebes — Sophocles.jpg: changed=0.0%, mean_delta=0.0
+[06:49:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Oedipus King of Thebes — Sophocles.jpg: changed=0.0%, mean_delta=0.0
+[06:49:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Oedipus King of Thebes — Sophocles.jpg: changed=0.0%, mean_delta=0.0
+[06:49:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Oedipus King of Thebes — Sophocles.jpg: changed=0.0%, mean_delta=0.0
+[06:49:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Idiot - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:49:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Idiot - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:49:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Idiot - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:49:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Idiot - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:49:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Idiot - Fyodor Dostoyevsky.jpg: changed=0.0%, mean_delta=0.0
+[06:49:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Time Machine — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:49:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Time Machine — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:49:37] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Time Machine — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:49:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Time Machine — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:49:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Time Machine — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:49:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Justice — John Galsworthy.jpg: changed=0.0%, mean_delta=0.0
+[06:49:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Justice — John Galsworthy.jpg: changed=0.0%, mean_delta=0.0
+[06:49:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Justice — John Galsworthy.jpg: changed=0.0%, mean_delta=0.0
+[06:49:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Justice — John Galsworthy.jpg: changed=0.0%, mean_delta=0.0
+[06:49:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Justice — John Galsworthy.jpg: changed=0.0%, mean_delta=0.0
+[06:49:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Noli Me Tangere — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:49:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Noli Me Tangere — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:49:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Noli Me Tangere — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:49:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Noli Me Tangere — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:49:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Noli Me Tangere — José Rizal.jpg: changed=0.0%, mean_delta=0.0
+[06:49:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Beautiful and Damned — F. Scott Fitzgerald.jpg: changed=0.0%, mean_delta=0.0
+[06:49:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Beautiful and Damned — F. Scott Fitzgerald.jpg: changed=0.0%, mean_delta=0.0
+[06:49:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Beautiful and Damned — F. Scott Fitzgerald.jpg: changed=0.0%, mean_delta=0.0
+[06:49:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Beautiful and Damned — F. Scott Fitzgerald.jpg: changed=0.0%, mean_delta=0.0
+[06:50:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Beautiful and Damned — F. Scott Fitzgerald.jpg: changed=0.0%, mean_delta=0.0
+[06:50:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Vanity Fair — William Makepeace Thackeray.jpg: changed=0.0%, mean_delta=0.0
+[06:50:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Vanity Fair — William Makepeace Thackeray.jpg: changed=0.0%, mean_delta=0.0
+[06:50:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Vanity Fair — William Makepeace Thackeray.jpg: changed=0.0%, mean_delta=0.0
+[06:50:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Vanity Fair — William Makepeace Thackeray.jpg: changed=0.0%, mean_delta=0.0
+[06:50:07] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Vanity Fair — William Makepeace Thackeray.jpg: changed=0.0%, mean_delta=0.0
+[06:50:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Second Variety — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:50:13] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Second Variety — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:50:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Second Variety — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:50:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Second Variety — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:50:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Second Variety — Philip K. Dick.jpg: changed=0.0%, mean_delta=0.0
+[06:50:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Prince and the Pauper — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:50:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Prince and the Pauper — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:50:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Prince and the Pauper — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:50:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Prince and the Pauper — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:50:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Prince and the Pauper — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:50:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Around the World in Eighty Days — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:50:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Around the World in Eighty Days — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:50:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Around the World in Eighty Days — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:50:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Around the World in Eighty Days — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:50:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Around the World in Eighty Days — Jules Verne.jpg: changed=0.0%, mean_delta=0.0
+[06:50:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sign of the Four — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sign of the Four — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sign of the Four — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sign of the Four — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sign of the Four — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Works of Edgar Allan Poe — Volume 1 — Edgar Allan Poe.jpg: changed=0.0%, mean_delta=0.0
+[06:50:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Works of Edgar Allan Poe — Volume 1 — Edgar Allan Poe.jpg: changed=0.0%, mean_delta=0.0
+[06:50:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Works of Edgar Allan Poe — Volume 1 — Edgar Allan Poe.jpg: changed=0.0%, mean_delta=0.0
+[06:50:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Works of Edgar Allan Poe — Volume 1 — Edgar Allan Poe.jpg: changed=0.0%, mean_delta=0.0
+[06:50:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Works of Edgar Allan Poe — Volume 1 — Edgar Allan Poe.jpg: changed=0.0%, mean_delta=0.0
+[06:50:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Mansfield Park — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:50:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Mansfield Park — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:50:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Mansfield Park — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:50:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Mansfield Park — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:50:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Mansfield Park — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:50:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Return of Sherlock Holmes — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Return of Sherlock Holmes — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:50:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Return of Sherlock Holmes — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:51:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Return of Sherlock Holmes — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:51:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Return of Sherlock Holmes — Arthur Conan Doyle.jpg: changed=0.0%, mean_delta=0.0
+[06:51:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Railway Children — E. Nesbit.jpg: changed=0.0%, mean_delta=0.0
+[06:51:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Railway Children — E. Nesbit.jpg: changed=0.0%, mean_delta=0.0
+[06:51:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Railway Children — E. Nesbit.jpg: changed=0.0%, mean_delta=0.0
+[06:51:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Railway Children — E. Nesbit.jpg: changed=0.0%, mean_delta=0.0
+[06:51:07] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Railway Children — E. Nesbit.jpg: changed=0.0%, mean_delta=0.0
+[06:51:09] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Connecticut Yankee in King Arthur_s Court — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:51:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Connecticut Yankee in King Arthur_s Court — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:51:12] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Connecticut Yankee in King Arthur_s Court — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:51:13] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Connecticut Yankee in King Arthur_s Court — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:51:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Connecticut Yankee in King Arthur_s Court — Mark Twain.jpg: changed=0.0%, mean_delta=0.0
+[06:51:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Hamlet, Prince of Denmark - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:51:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Hamlet, Prince of Denmark - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:51:19] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Hamlet, Prince of Denmark - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:51:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Hamlet, Prince of Denmark - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:51:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Hamlet, Prince of Denmark - William Shakespeare.jpg: changed=0.0%, mean_delta=0.0
+[06:51:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Turn of the Screw - Henry James.jpg: changed=0.0%, mean_delta=0.0
+[06:51:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Turn of the Screw - Henry James.jpg: changed=0.0%, mean_delta=0.0
+[06:51:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Turn of the Screw - Henry James.jpg: changed=0.0%, mean_delta=0.0
+[06:51:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Turn of the Screw - Henry James.jpg: changed=0.0%, mean_delta=0.0
+[06:51:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Turn of the Screw - Henry James.jpg: changed=0.0%, mean_delta=0.0
+[06:51:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sorrows of Young Werther - Johann Wolfgang von Goethe.jpg: changed=0.0%, mean_delta=0.0
+[06:51:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sorrows of Young Werther - Johann Wolfgang von Goethe.jpg: changed=0.0%, mean_delta=0.0
+[06:51:31] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sorrows of Young Werther - Johann Wolfgang von Goethe.jpg: changed=0.0%, mean_delta=0.0
+[06:51:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sorrows of Young Werther - Johann Wolfgang von Goethe.jpg: changed=0.0%, mean_delta=0.0
+[06:51:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Sorrows of Young Werther - Johann Wolfgang von Goethe.jpg: changed=0.0%, mean_delta=0.0
+[06:51:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Swann_s Way - Marcel Proust.jpg: changed=0.0%, mean_delta=0.0
+[06:51:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Swann_s Way - Marcel Proust.jpg: changed=0.0%, mean_delta=0.0
+[06:51:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Swann_s Way - Marcel Proust.jpg: changed=0.0%, mean_delta=0.0
+[06:51:39] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Swann_s Way - Marcel Proust.jpg: changed=0.0%, mean_delta=0.0
+[06:51:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Swann_s Way - Marcel Proust.jpg: changed=0.0%, mean_delta=0.0
+[06:51:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Rip Van Winkle — Washington Irving.jpg: changed=0.0%, mean_delta=0.0
+[06:51:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Rip Van Winkle — Washington Irving.jpg: changed=0.0%, mean_delta=0.0
+[06:51:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Rip Van Winkle — Washington Irving.jpg: changed=0.0%, mean_delta=0.0
+[06:51:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Rip Van Winkle — Washington Irving.jpg: changed=0.0%, mean_delta=0.0
+[06:51:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Rip Van Winkle — Washington Irving.jpg: changed=0.0%, mean_delta=0.0
+[06:51:48] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Plays — Susan Glaspell.jpg: changed=0.0%, mean_delta=0.0
+[06:51:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Plays — Susan Glaspell.jpg: changed=0.0%, mean_delta=0.0
+[06:51:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Plays — Susan Glaspell.jpg: changed=0.0%, mean_delta=0.0
+[06:51:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Plays — Susan Glaspell.jpg: changed=0.0%, mean_delta=0.0
+[06:51:53] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Plays — Susan Glaspell.jpg: changed=0.0%, mean_delta=0.0
+[06:51:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Northanger Abbey — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:51:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Northanger Abbey — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:51:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Northanger Abbey — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:51:58] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Northanger Abbey — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:51:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Northanger Abbey — Jane Austen.jpg: changed=0.0%, mean_delta=0.0
+[06:52:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lysistrata — Aristophanes.jpg: changed=0.0%, mean_delta=0.0
+[06:52:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lysistrata — Aristophanes.jpg: changed=0.0%, mean_delta=0.0
+[06:52:03] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lysistrata — Aristophanes.jpg: changed=0.0%, mean_delta=0.0
+[06:52:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lysistrata — Aristophanes.jpg: changed=0.0%, mean_delta=0.0
+[06:52:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Lysistrata — Aristophanes.jpg: changed=0.0%, mean_delta=0.0
+[06:52:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anne of Avonlea — L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:52:08] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anne of Avonlea — L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:52:10] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anne of Avonlea — L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:52:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anne of Avonlea — L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:52:12] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Anne of Avonlea — L. M. Montgomery.jpg: changed=0.0%, mean_delta=0.0
+[06:52:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pygmalion — Bernard Shaw.jpg: changed=0.0%, mean_delta=0.0
+[06:52:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pygmalion — Bernard Shaw.jpg: changed=0.0%, mean_delta=0.0
+[06:52:16] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pygmalion — Bernard Shaw.jpg: changed=0.0%, mean_delta=0.0
+[06:52:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pygmalion — Bernard Shaw.jpg: changed=0.0%, mean_delta=0.0
+[06:52:19] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Pygmalion — Bernard Shaw.jpg: changed=0.0%, mean_delta=0.0
+[06:52:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for We — Evgenii Ivanovich Zamiatin.jpg: changed=0.0%, mean_delta=0.0
+[06:52:21] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for We — Evgenii Ivanovich Zamiatin.jpg: changed=0.0%, mean_delta=0.0
+[06:52:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for We — Evgenii Ivanovich Zamiatin.jpg: changed=0.0%, mean_delta=0.0
+[06:52:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for We — Evgenii Ivanovich Zamiatin.jpg: changed=0.0%, mean_delta=0.0
+[06:52:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for We — Evgenii Ivanovich Zamiatin.jpg: changed=0.0%, mean_delta=0.0
+[06:52:26] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Best American Humorous Short Stories — Alexander Jessup et al..jpg: changed=0.0%, mean_delta=0.0
+[06:52:27] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Best American Humorous Short Stories — Alexander Jessup et al..jpg: changed=0.0%, mean_delta=0.0
+[06:52:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Best American Humorous Short Stories — Alexander Jessup et al..jpg: changed=0.0%, mean_delta=0.0
+[06:52:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Best American Humorous Short Stories — Alexander Jessup et al..jpg: changed=0.0%, mean_delta=0.0
+[06:52:31] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Best American Humorous Short Stories — Alexander Jessup et al..jpg: changed=0.0%, mean_delta=0.0
+[06:52:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Christmas Carol — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:52:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Christmas Carol — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:52:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Christmas Carol — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:52:36] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Christmas Carol — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:52:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Christmas Carol — Charles Dickens.jpg: changed=0.0%, mean_delta=0.0
+[06:52:39] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Happy Prince, and Other Tales — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:52:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Happy Prince, and Other Tales — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:52:41] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Happy Prince, and Other Tales — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:52:43] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Happy Prince, and Other Tales — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:52:44] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Happy Prince, and Other Tales — Oscar Wilde.jpg: changed=0.0%, mean_delta=0.0
+[06:52:45] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Ivanhoe A Romance — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:52:46] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Ivanhoe A Romance — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:52:47] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Ivanhoe A Romance — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:52:49] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Ivanhoe A Romance — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:52:50] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Ivanhoe A Romance — Walter Scott.jpg: changed=0.0%, mean_delta=0.0
+[06:52:51] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Princess of Mars — Edgar Rice Burroughs.jpg: changed=0.0%, mean_delta=0.0
+[06:52:52] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Princess of Mars — Edgar Rice Burroughs.jpg: changed=0.0%, mean_delta=0.0
+[06:52:54] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Princess of Mars — Edgar Rice Burroughs.jpg: changed=0.0%, mean_delta=0.0
+[06:52:55] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Princess of Mars — Edgar Rice Burroughs.jpg: changed=0.0%, mean_delta=0.0
+[06:52:56] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for A Princess of Mars — Edgar Rice Burroughs.jpg: changed=0.0%, mean_delta=0.0
+[06:52:57] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Invisible Man A Grotesque Romance — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:52:59] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Invisible Man A Grotesque Romance — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:53:00] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Invisible Man A Grotesque Romance — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:53:01] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Invisible Man A Grotesque Romance — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:53:02] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Invisible Man A Grotesque Romance — H. G. Wells.jpg: changed=0.0%, mean_delta=0.0
+[06:53:04] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Awakening, and Selected Short Stories — Kate Chopin.jpg: changed=0.0%, mean_delta=0.0
+[06:53:05] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Awakening, and Selected Short Stories — Kate Chopin.jpg: changed=0.0%, mean_delta=0.0
+[06:53:06] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Awakening, and Selected Short Stories — Kate Chopin.jpg: changed=0.0%, mean_delta=0.0
+[06:53:07] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Awakening, and Selected Short Stories — Kate Chopin.jpg: changed=0.0%, mean_delta=0.0
+[06:53:09] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Awakening, and Selected Short Stories — Kate Chopin.jpg: changed=0.0%, mean_delta=0.0
+[06:53:10] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Alchemist — Ben Jonson.jpg: changed=0.0%, mean_delta=0.0
+[06:53:11] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Alchemist — Ben Jonson.jpg: changed=0.0%, mean_delta=0.0
+[06:53:13] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Alchemist — Ben Jonson.jpg: changed=0.0%, mean_delta=0.0
+[06:53:14] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Alchemist — Ben Jonson.jpg: changed=0.0%, mean_delta=0.0
+[06:53:15] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Alchemist — Ben Jonson.jpg: changed=0.0%, mean_delta=0.0
+[06:53:17] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Opinions of Tristram Shandy, Gentleman — Laurence Sterne.jpg: changed=0.0%, mean_delta=0.0
+[06:53:18] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Opinions of Tristram Shandy, Gentleman — Laurence Sterne.jpg: changed=0.0%, mean_delta=0.0
+[06:53:19] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Opinions of Tristram Shandy, Gentleman — Laurence Sterne.jpg: changed=0.0%, mean_delta=0.0
+[06:53:20] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Opinions of Tristram Shandy, Gentleman — Laurence Sterne.jpg: changed=0.0%, mean_delta=0.0
+[06:53:22] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Life and Opinions of Tristram Shandy, Gentleman — Laurence Sterne.jpg: changed=0.0%, mean_delta=0.0
+[06:53:23] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Gargantua and Pantagruel — François Rabelais.jpg: changed=0.0%, mean_delta=0.0
+[06:53:24] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Gargantua and Pantagruel — François Rabelais.jpg: changed=0.0%, mean_delta=0.0
+[06:53:25] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Gargantua and Pantagruel — François Rabelais.jpg: changed=0.0%, mean_delta=0.0
+[06:53:27] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Gargantua and Pantagruel — François Rabelais.jpg: changed=0.0%, mean_delta=0.0
+[06:53:28] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Gargantua and Pantagruel — François Rabelais.jpg: changed=0.0%, mean_delta=0.0
+[06:53:29] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Space Station 1 — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:53:30] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Space Station 1 — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:53:32] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Space Station 1 — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:53:33] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Space Station 1 — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:53:34] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Space Station 1 — Frank Belknap Long.jpg: changed=0.0%, mean_delta=0.0
+[06:53:35] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 3.jpg: changed=0.0%, mean_delta=0.0
+[06:53:37] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 3.jpg: changed=0.0%, mean_delta=0.0
+[06:53:38] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 3.jpg: changed=0.0%, mean_delta=0.0
+[06:53:39] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 3.jpg: changed=0.0%, mean_delta=0.0
+[06:53:40] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 3.jpg: changed=0.0%, mean_delta=0.0
+[06:53:42] [[32mINFO[0m] src.cover_compositor: Frame integrity OK for The Extraordinary Adventures of Arsène Lupin, Gentleman-Burglar — Maurice Leblanc.jpg: changed=0.0%, mean_delta=0.0
+[1/99] Processing book 1: A Room with a View
+[10/99] Processing book 10: The Enchanted April
+[20/99] Processing book 21: The Lady with the Dog and Other Stories
+[30/99] Processing book 31: The Picture of Dorian Gray
+[40/99] Processing book 41: Lady Chatterley's Lover
+[50/99] Processing book 51: The Vibration Wasps
+[60/99] Processing book 61: Oedipus King of Thebes
+[70/99] Processing book 71: The Sign of the Four
+[80/99] Processing book 81: Rip Van Winkle
+[90/99] Processing book 91: Ivanhoe' A Romance
+[99/99] Processing book 100: The Extraordinary Adventures of Arsène Lupin, Gentleman-Burglar
+Summary report: qa_output/classics/recomposite_summary.json
+
+Batch recomposite summary
+=========================
+Catalog books: 99
+Books with illustrations: 99
+Re-composited: 99 books
+Passed frame check: 99
+Failed frame check: 0
+Skipped (no illustration): 0
+Variant success: 482
+Variant failures: 0

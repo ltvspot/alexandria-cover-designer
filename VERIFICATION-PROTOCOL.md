@@ -72,7 +72,7 @@ python scripts/verify_composite.py <composited.jpg> <source_cover.jpg> --strict
 ## When to Run
 
 ### For Codex:
-1. After ANY change to `src/pdf_swap_compositor.py`, `src/pdf_compositor.py`, or `src/cover_compositor.py`
+1. After ANY change to `src/pdf_compositor.py` or `src/cover_compositor.py`
 2. After ANY change to SMask handling, frame masking, or compositing logic
 3. Before EVERY `git commit` that touches compositor code
 4. Always use `--strict` mode
@@ -178,20 +178,13 @@ bash scripts/test_compositor_integration.sh 25
 
 ---
 
-## Current Approach — PROMPT-20: Im0 Layer Swap (supersedes PROMPT-09 series and all prior)
+## PDF-Based Approach (Current — PROMPT-09 Series)
 
-The Im0 Layer Swap compositor (`src/pdf_swap_compositor.py`) works at the PDF object level:
-1. Opens the source PDF with `pikepdf`
-2. Extracts `/Im0` (2480×2470, CMYK — contains both art AND frame combined)
-3. Within Im0: replaces CENTER art area with new AI art (geometric circle, radius ~950 from Im0 center)
-4. Keeps OUTER frame ring pixels from original Im0 untouched
-5. Writes modified Im0 back into PDF, keeping original SMask completely unchanged
-6. Renders modified PDF at 300 DPI using `pdftoppm` → final composite JPG
+The PDF compositor (PROMPT-09A) works at the PDF object level:
+1. Opens the source PDF with pikepdf
+2. Extracts Im0 (CMYK raster) and SMask (grayscale transparency)
+3. Composites: AI art fills everything, then frame ring pixels (SMask 5–250) are restored from original
+4. Writes composited data back into Im0, keeping SMask unchanged
+5. Renders PDF to JPG via PyMuPDF at 300 DPI
 
-This preserves the frame **by construction** — the outer ring of Im0 is never touched. The new art sits BEHIND the frame within the same image. The SMask from the original designer handles all scrollwork clipping automatically.
-
-**Key difference from PROMPT-09:** PROMPT-09 tried to use SMask values (5–250) to restore frame pixels after full replacement. PROMPT-20 never replaces the frame pixels in the first place — it only replaces the center art area using a geometric circle mask at radius ~950.
-
-**What this eliminates:** frame_mask.png, frame_overlays/, extract_frame_overlays.py, color-based metal detection, hole punching, all pixel-level heuristics from PROMPTs 07–19.
-
-**Implementation:** `Codex Prompts/PROMPT-20-IM0-LAYER-SWAP-COMPOSITOR.md`
+This makes frame corruption **structurally impossible** — there is no edge detection, approximation, or reconstruction. The SMask from the original designer is the frame boundary, period.

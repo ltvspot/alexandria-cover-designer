@@ -1,29 +1,27 @@
 {
   "book_number": 34,
   "book_title": "The Adventures of Ferdinand Count Fathom — Complete",
-  "passed": false,
-  "failed_checks": [
-    "frame_ring_integrity"
-  ],
+  "passed": true,
+  "failed_checks": [],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": false,
-      "value": "15.46% changed, delta 10.76",
+      "passed": true,
+      "value": "0.00% changed, delta 0.20",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.14% outer pixels changed",
+      "value": "0.00% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "96.75% inner pixels changed",
+      "value": "98.88% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -37,7 +35,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=959x959, ratio=1.000",
+      "value": "bbox=912x912, ratio=1.000",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -50,15 +48,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 15.4595,
-    "frame_mean_delta": 10.7557,
-    "outer_changed_pct": 0.138,
-    "inner_changed_pct": 96.7529,
-    "changed_bbox_width": 959,
-    "changed_bbox_height": 959,
+    "frame_changed_pct": 0.0,
+    "frame_mean_delta": 0.1973,
+    "outer_changed_pct": 0.0,
+    "inner_changed_pct": 98.8753,
+    "changed_bbox_width": 912,
+    "changed_bbox_height": 912,
     "changed_bbox_aspect_ratio": 1.0
   },
-  "generated_at": "2026-03-05T09:03:08.021301+00:00",
+  "generated_at": "2026-03-05T06:54:46.302325+00:00",
   "original_path": "Input Covers/34. The Adventures of Ferdinand Count Fathom — Complete — T. Smollett copy/The Adventures of Ferdinand Count Fathom - Complete - T. Smollett.jpg",
   "composite_path": "tmp/composited/34/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

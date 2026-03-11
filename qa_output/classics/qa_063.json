@@ -1,29 +1,27 @@
 {
   "book_number": 63,
   "book_title": "The Time Machine",
-  "passed": false,
-  "failed_checks": [
-    "frame_ring_integrity"
-  ],
+  "passed": true,
+  "failed_checks": [],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": false,
-      "value": "4.96% changed, delta 2.63",
+      "passed": true,
+      "value": "0.00% changed, delta 0.22",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.23% outer pixels changed",
+      "value": "0.00% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "97.48% inner pixels changed",
+      "value": "99.61% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -37,7 +35,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=959x956, ratio=1.003",
+      "value": "bbox=911x912, ratio=0.999",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -50,15 +48,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 4.9561,
-    "frame_mean_delta": 2.6313,
-    "outer_changed_pct": 0.2296,
-    "inner_changed_pct": 97.4767,
-    "changed_bbox_width": 959,
-    "changed_bbox_height": 956,
-    "changed_bbox_aspect_ratio": 1.0031
+    "frame_changed_pct": 0.0,
+    "frame_mean_delta": 0.2175,
+    "outer_changed_pct": 0.0,
+    "inner_changed_pct": 99.6072,
+    "changed_bbox_width": 911,
+    "changed_bbox_height": 912,
+    "changed_bbox_aspect_ratio": 0.9989
   },
-  "generated_at": "2026-03-05T09:03:23.531445+00:00",
+  "generated_at": "2026-03-05T06:54:58.986939+00:00",
   "original_path": "Input Covers/63. The Time Machine — H. G. Wells copy/The Time Machine — H. G. Wells.jpg",
   "composite_path": "tmp/composited/63/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

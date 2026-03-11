@@ -1,29 +1,27 @@
 {
   "book_number": 25,
   "book_title": "The Eyes Have It",
-  "passed": false,
-  "failed_checks": [
-    "frame_ring_integrity"
-  ],
+  "passed": true,
+  "failed_checks": [],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": false,
-      "value": "5.86% changed, delta 4.90",
+      "passed": true,
+      "value": "0.00% changed, delta 0.22",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.23% outer pixels changed",
+      "value": "0.00% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "96.53% inner pixels changed",
+      "value": "98.64% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -37,7 +35,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=959x959, ratio=1.000",
+      "value": "bbox=912x912, ratio=1.000",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -50,15 +48,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 5.8551,
-    "frame_mean_delta": 4.8966,
-    "outer_changed_pct": 0.2324,
-    "inner_changed_pct": 96.5263,
-    "changed_bbox_width": 959,
-    "changed_bbox_height": 959,
+    "frame_changed_pct": 0.0,
+    "frame_mean_delta": 0.2185,
+    "outer_changed_pct": 0.0,
+    "inner_changed_pct": 98.6415,
+    "changed_bbox_width": 912,
+    "changed_bbox_height": 912,
     "changed_bbox_aspect_ratio": 1.0
   },
-  "generated_at": "2026-03-05T09:03:03.618186+00:00",
+  "generated_at": "2026-03-05T06:54:42.385689+00:00",
   "original_path": "Input Covers/25. The Eyes Have It — Philip K. Dick copy/The Eyes Have It — Philip K. Dick.jpg",
   "composite_path": "tmp/composited/25/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

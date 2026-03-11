@@ -1070,21 +1070,6 @@ def _frame_integrity_metrics(
     return float(np.max(deltas)), float(np.mean(deltas))
 
 
-def _scaled_circle_validation_radii(*, width: int, height: int, region_radius: float) -> tuple[float, float]:
-    """Return the allowed change radius and edge-probe radius for circle validation.
-
-    The live compositor intentionally lets the illustration extend underneath the
-    medallion frame before the opaque overlay is painted on top. Validation must
-    account for that larger footprint or it will misclassify valid composites as
-    border bleed.
-    """
-    scale = min(float(width) / float(FALLBACK_COVER_WIDTH), float(height) / float(FALLBACK_COVER_HEIGHT))
-    frame_hole_radius = float(FRAME_HOLE_RADIUS) * scale
-    allowed_change_radius = max(float(region_radius), frame_hole_radius) + max(10.0, float(INNER_FEATHER_PX) + 2.0)
-    edge_probe_radius = allowed_change_radius + max(4.0, float(INNER_FEATHER_PX))
-    return allowed_change_radius, edge_probe_radius
-
-
 def _validate_pdf_swap_output(
     *,
     output_path: Path,
@@ -1217,12 +1202,7 @@ def validate_composite_output(
         tolerance = max(25.0, float(region.radius) * 0.45)
         yy, xx = np.ogrid[:h, :w]
         dist = np.sqrt((xx - target_x) ** 2 + (yy - target_y) ** 2)
-        allowed_change_radius, edge_probe_radius = _scaled_circle_validation_radii(
-            width=w,
-            height=h,
-            region_radius=float(region.radius),
-        )
-        expected_mask = dist <= allowed_change_radius
+        expected_mask = dist <= max(10.0, float(region.radius) + 10.0)
 
     alignment_distance = float(np.sqrt((centroid_x - target_x) ** 2 + (centroid_y - target_y) ** 2))
     alignment_ok = alignment_distance <= tolerance
@@ -1239,8 +1219,7 @@ def validate_composite_output(
     if region.region_type != "rectangle":
         yy, xx = np.ogrid[:h, :w]
         dist = np.sqrt((xx - target_x) ** 2 + (yy - target_y) ** 2)
-        ring_center = edge_probe_radius
-        ring = (dist >= max(0.0, ring_center - 6.0)) & (dist <= ring_center + 6.0)
+        ring = (dist >= max(0.0, float(region.radius) - 6.0)) & (dist <= float(region.radius) + 6.0)
         if ring.any():
             ring_strength = float(np.percentile(diff[ring], 95))
     edge_artifacts_ok = ring_strength <= 130.0

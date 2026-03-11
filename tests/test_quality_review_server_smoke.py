@@ -516,18 +516,6 @@ def test_quality_review_server_cover_preview_and_visual_qa_missing_errors_are_js
         _stop_server(process)
 
 
-def test_quality_review_server_enrichment_health_returns_json():
-    process, base_url = _start_server(wait_path="/api/healthz", timeout_seconds=10.0)
-    try:
-        status, payload = _request_json(base_url, "/api/enrichment-health?catalog=classics")
-        assert status == 200
-        assert payload.get("ok") is True
-        assert payload.get("catalog") == "classics"
-        assert "health" in payload
-    finally:
-        _stop_server(process)
-
-
 def test_quality_review_server_iterate_data_returns_22_priced_models():
     process, base_url = _start_server(wait_path="/api/healthz", timeout_seconds=10.0)
     try:

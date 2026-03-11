@@ -90,32 +90,3 @@ def test_run_checks_uses_dynamic_catalog_count_and_catalog_scoped_regions(tmp_pa
     region_row = by_name["cover_regions has regions for all covers"]
     assert region_row["status"] == "PASS"
     assert "cover_regions_demo.json" in region_row["detail"]
-
-
-def test_run_checks_rebuilds_prompt_library_when_missing(tmp_path: Path, monkeypatch):
-    runtime = _runtime(tmp_path)
-    runtime.prompt_library_path.unlink()
-    monkeypatch.setattr(vc.config, "get_config", lambda: runtime)
-    monkeypatch.setattr(
-        vc.config,
-        "resolve_catalog",
-        lambda _catalog_id: config.CatalogConfig(
-            id="demo",
-            name="Demo",
-            book_count=3,
-            catalog_file=runtime.book_catalog_path,
-            prompts_file=runtime.prompts_path,
-            input_covers_dir=runtime.input_dir,
-            output_covers_dir=runtime.output_dir,
-        ),
-    )
-    monkeypatch.setattr(
-        vc.pipeline,
-        "test_api_keys",
-        lambda **_kwargs: {"providers": [{"provider": "openrouter", "status": "KEY_VALID"}]},
-    )
-
-    checks = vc.run_checks()
-    by_name = {row["check"]: row for row in checks}
-    assert by_name["prompt_library is valid JSON"]["status"] == "PASS"
-    assert runtime.prompt_library_path.exists()
