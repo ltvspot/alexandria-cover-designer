@@ -294,6 +294,33 @@ def test_iterate_default_selected_model_keeps_nano_even_when_google_is_down():
     assert result == ["openrouter/google/gemini-3-pro-image-preview"]
 
 
+def test_iterate_recommended_models_keep_default_nano_visible_even_when_degraded():
+    result = _run_iterate_hook(
+        function_name="getRecommendedModelIds",
+        payload={
+            "models": [
+                {"id": "openrouter/google/gemini-3-pro-image-preview", "status": "active"},
+                {"id": "openai/gpt-image-1-mini", "status": "active"},
+                {"id": "openai/gpt-image-1", "status": "active"},
+                {"id": "fal/fal-ai/flux-2/klein/4b", "status": "active"},
+            ],
+            "providerConnectivity": {
+                "openrouter": {"status": "connected", "error": None},
+                "openai": {"status": "connected", "error": None},
+                "google": {"status": "error", "error": "Google key leaked"},
+                "fal": {"status": "connected", "error": None},
+            },
+            "providerRuntime": {
+                "openrouter": {"last_error": "OpenRouter error 402: This request requires more credits"},
+                "google": {"last_error": "Google error 403: leaked"},
+            },
+        },
+    )
+
+    assert result[0] == "openrouter/google/gemini-3-pro-image-preview"
+    assert "openai/gpt-image-1-mini" in result
+
+
 def test_iterate_model_availability_disables_direct_google_model_when_connectivity_fails():
     result = _run_iterate_hook(
         function_name="modelAvailability",

@@ -1234,27 +1234,6 @@ window.__ITERATE_TEST_HOOKS__.buildGenreAwareRotation = ({ book, variantCount, r
     referenceDate: referenceDate ? new Date(referenceDate) : new Date(),
   })
 );
-window.__ITERATE_TEST_HOOKS__.modelAvailability = ({ model, providerConnectivity, providerRuntime }) => (
-  modelAvailability(model, { providerConnectivity, providerRuntime })
-);
-window.__ITERATE_TEST_HOOKS__.defaultSelectedModelIds = ({ models, providerConnectivity, providerRuntime }) => (
-  defaultSelectedModelIds(models || [], { providerConnectivity, providerRuntime })
-);
-window.__ITERATE_TEST_HOOKS__.fallbackModelsForSelection = (modelId) => fallbackModelsForSelection(modelId);
-window.__ITERATE_TEST_HOOKS__.buildVariantJobs = ({
-  book,
-  bookId,
-  modelId,
-  variantCount,
-  variantPromptPlan,
-}) => buildVariantJobs({
-  book,
-  bookId,
-  modelId,
-  variantCount,
-  variantPromptPlan,
-});
-
 function backendJobIdForJob(job) {
   const direct = String(job?.backend_job_id || '').trim();
   if (direct) return direct;
@@ -1415,13 +1394,14 @@ function modelAvailability(model, {
   return { selectable: true, degraded: false, reason: '' };
 }
 
-function getRecommendedModelIds(models) {
-  const healthy = models.filter((model) => {
-    const availability = modelAvailability(model);
+function getRecommendedModelIds(models, availabilityOptions = {}) {
+  const selectable = models.filter((model) => modelAvailability(model, availabilityOptions).selectable);
+  const healthy = selectable.filter((model) => {
+    const availability = modelAvailability(model, availabilityOptions);
     return availability.selectable && !availability.degraded;
   });
-  const selectable = healthy.length ? healthy : models.filter((model) => modelAvailability(model).selectable);
-  const top = selectable.slice(0, Math.min(15, selectable.length)).map((model) => normalizedModelId(model));
+  const ranked = healthy.length ? healthy : selectable;
+  const top = ranked.slice(0, Math.min(15, ranked.length)).map((model) => normalizedModelId(model));
   const pinned = RECOMMENDED_PINNED_MODEL_IDS.filter((id) => selectable.some((model) => normalizedModelId(model) === id));
   return Array.from(new Set(pinned.concat(top)));
 }
@@ -1451,6 +1431,30 @@ function fallbackModelsForSelection(selectedModelId) {
     GENERATION_FALLBACK_MODEL_IDS.filter((modelId) => normalizedModelId(modelId) && normalizedModelId(modelId) !== selected)
   ));
 }
+
+window.__ITERATE_TEST_HOOKS__.modelAvailability = ({ model, providerConnectivity, providerRuntime }) => (
+  modelAvailability(model, { providerConnectivity, providerRuntime })
+);
+window.__ITERATE_TEST_HOOKS__.defaultSelectedModelIds = ({ models, providerConnectivity, providerRuntime }) => (
+  defaultSelectedModelIds(models || [], { providerConnectivity, providerRuntime })
+);
+window.__ITERATE_TEST_HOOKS__.getRecommendedModelIds = ({ models, providerConnectivity, providerRuntime }) => (
+  getRecommendedModelIds(models || [], { providerConnectivity, providerRuntime })
+);
+window.__ITERATE_TEST_HOOKS__.fallbackModelsForSelection = (modelId) => fallbackModelsForSelection(modelId);
+window.__ITERATE_TEST_HOOKS__.buildVariantJobs = ({
+  book,
+  bookId,
+  modelId,
+  variantCount,
+  variantPromptPlan,
+}) => buildVariantJobs({
+  book,
+  bookId,
+  modelId,
+  variantCount,
+  variantPromptPlan,
+});
 
 function renderModelCards({ models, selectedIds, activeFilter, searchText }) {
   const search = String(searchText || '').trim().toLowerCase();
