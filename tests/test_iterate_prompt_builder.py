@@ -246,3 +246,44 @@ def test_iterate_science_genre_maps_to_scientific_wildcards():
 def test_iterate_short_real_name_is_not_generic():
     result = _run_iterate_hook(function_name="isGenericContent", payload="Eve")
     assert result is False
+
+
+def test_iterate_default_selected_model_skips_degraded_nano_and_uses_openai_fallback():
+    result = _run_iterate_hook(
+        function_name="defaultSelectedModelIds",
+        payload={
+            "models": [
+                {"id": "openrouter/google/gemini-3-pro-image-preview", "status": "active"},
+                {"id": "openai/gpt-image-1-mini", "status": "active"},
+                {"id": "google/gemini-3-pro-image-preview", "status": "active"},
+            ],
+            "providerConnectivity": {
+                "openrouter": {"status": "connected", "error": None},
+                "openai": {"status": "connected", "error": None},
+                "google": {"status": "error", "error": "Google key leaked"},
+            },
+            "providerRuntime": {
+                "openrouter": {"last_error": "OpenRouter error 402: This request requires more credits"},
+                "google": {"last_error": "Google error 403: leaked"},
+            },
+        },
+    )
+
+    assert result == ["openai/gpt-image-1-mini"]
+
+
+def test_iterate_model_availability_disables_direct_google_model_when_connectivity_fails():
+    result = _run_iterate_hook(
+        function_name="modelAvailability",
+        payload={
+            "model": {"id": "google/gemini-3-pro-image-preview", "status": "active"},
+            "providerConnectivity": {
+                "google": {"status": "error", "error": "Google error 403: leaked"},
+            },
+            "providerRuntime": {},
+        },
+    )
+
+    assert result["selectable"] is False
+    assert result["degraded"] is False
+    assert "leaked" in result["reason"].lower()

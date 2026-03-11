@@ -531,6 +531,16 @@ main.content {
   background: #fff;
 }
 
+.model-card.disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+  background: #f7f8fb;
+}
+
+.model-card.degraded {
+  border-color: rgba(196, 163, 82, 0.5);
+}
+
 .model-card-head {
   display: flex;
   align-items: flex-start;
@@ -570,6 +580,20 @@ main.content {
   line-height: 1.45;
   color: #556a8d;
   min-height: 38px;
+}
+
+.model-card-note {
+  margin-top: -2px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.model-card-note.is-warning {
+  color: #8a6421;
+}
+
+.model-card-note.is-error {
+  color: #9b2e2e;
 }
 
 .model-card-tags {

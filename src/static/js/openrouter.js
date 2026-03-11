@@ -66,6 +66,7 @@ window.OpenRouter = {
             id,
             label,
             status,
+            statusReason: String(m.status_reason || m.reason || '').trim(),
             sortOrder,
             cost: Number(m.cost_per_image ?? m.cost ?? m.avg_cost_usd ?? DEFAULT_MODEL_COST),
             modality: String(m.modality || 'image'),
@@ -85,6 +86,7 @@ window.OpenRouter = {
     } catch (err) {
       console.warn('Unable to load models from backend:', err.message);
       this.MODELS = [
+        { id: 'openai/gpt-image-1-mini', label: 'GPT Image 1 Mini', cost: 0.01, modality: 'both', status: 'active', statusReason: '' },
         { id: 'openrouter/openai/gpt-5-image', label: 'GPT-5 Image', cost: 0.04, modality: 'both' },
         { id: 'openrouter/google/gemini-3-pro-image-preview', label: 'Nano Banana Pro', cost: 0.02, modality: 'both' },
         { id: 'openrouter/google/gemini-2.5-flash-image', label: 'Nano Banana (Gemini 2.5 Flash)', cost: 0.003, modality: 'both' },

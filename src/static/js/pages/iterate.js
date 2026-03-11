@@ -8,10 +8,17 @@ let _lastVisibleModelIds = [];
 let _defaultSelectedModelIds = [];
 let _variantPromptPlan = [];
 let _activeVariantPrompt = 1;
+let _providerConnectivity = {};
+let _providerRuntime = {};
 const PREFERRED_DEFAULT_MODELS = [
   'openrouter/google/gemini-3-pro-image-preview',
   'nano-banana-pro',
   'google/gemini-3-pro-image-preview',
+  'openai/gpt-image-1-mini',
+  'openai/gpt-image-1',
+  'openrouter/openai/gpt-5-image-mini',
+  'openrouter/openai/gpt-5-image',
+  'fal/fal-ai/flux-2/klein/4b',
 ];
 const RECOMMENDED_PINNED_MODEL_IDS = [
   'openrouter/google/gemini-3-pro-image-preview',
@@ -1051,6 +1058,12 @@ window.__ITERATE_TEST_HOOKS__.buildVariantPromptAssignments = ({ book, variantCo
     referenceDate: referenceDate ? new Date(referenceDate) : new Date(),
   })
 );
+window.__ITERATE_TEST_HOOKS__.modelAvailability = ({ model, providerConnectivity, providerRuntime }) => (
+  modelAvailability(model, { providerConnectivity, providerRuntime })
+);
+window.__ITERATE_TEST_HOOKS__.defaultSelectedModelIds = ({ models, providerConnectivity, providerRuntime }) => (
+  defaultSelectedModelIds(models || [], { providerConnectivity, providerRuntime })
+);
 
 function backendJobIdForJob(job) {
   const direct = String(job?.backend_job_id || '').trim();
@@ -1160,16 +1173,75 @@ function modelDescription(model) {
   return 'Balanced quality and cost for iterative cover generation.';
 }
 
+function looksLikeCreditExhaustion(value) {
+  const text = String(value || '').trim().toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes('402')
+    || text.includes('credit')
+    || text.includes('can only afford')
+    || text.includes('max_tokens')
+  );
+}
+
+function modelAvailability(model, {
+  providerConnectivity = _providerConnectivity,
+  providerRuntime = _providerRuntime,
+} = {}) {
+  const modelId = normalizedModelId(model);
+  const token = modelId.toLowerCase();
+  const provider = providerFromModel(modelId);
+  const status = String(model?.status || 'active').trim().toLowerCase();
+  const statusReason = String(model?.statusReason || model?.status_reason || '').trim();
+  if (!modelId) return { selectable: false, degraded: false, reason: 'Missing model id.' };
+  if (status === 'disabled') {
+    return { selectable: false, degraded: false, reason: statusReason || 'Model disabled.' };
+  }
+  const connectivityRow = provider && providerConnectivity && typeof providerConnectivity === 'object'
+    ? providerConnectivity[provider]
+    : null;
+  const connectivityStatus = String(connectivityRow?.status || '').trim().toLowerCase();
+  const connectivityError = String(connectivityRow?.error || '').trim();
+  if (connectivityStatus === 'error') {
+    return { selectable: false, degraded: false, reason: connectivityError || `${provider} provider unavailable.` };
+  }
+  if (token.startsWith('openrouter/google/')) {
+    const openrouterError = String(providerRuntime?.openrouter?.last_error || '').trim();
+    const googleConnectivity = providerConnectivity && typeof providerConnectivity === 'object'
+      ? (providerConnectivity.google || null)
+      : null;
+    const googleConnected = String(googleConnectivity?.status || '').trim().toLowerCase() === 'connected';
+    const googleError = String(googleConnectivity?.error || providerRuntime?.google?.last_error || '').trim();
+    if (looksLikeCreditExhaustion(openrouterError) && !googleConnected) {
+      const suffix = googleError ? ` ${googleError}` : '';
+      return {
+        selectable: true,
+        degraded: true,
+        reason: `OpenRouter recently reported credit exhaustion and the Google fallback is unavailable.${suffix}`.trim(),
+      };
+    }
+  }
+  return { selectable: true, degraded: false, reason: '' };
+}
+
 function getRecommendedModelIds(models) {
-  const top = models.slice(0, Math.min(15, models.length)).map((model) => normalizedModelId(model));
-  const pinned = RECOMMENDED_PINNED_MODEL_IDS.filter((id) => models.some((model) => normalizedModelId(model) === id));
+  const healthy = models.filter((model) => {
+    const availability = modelAvailability(model);
+    return availability.selectable && !availability.degraded;
+  });
+  const selectable = healthy.length ? healthy : models.filter((model) => modelAvailability(model).selectable);
+  const top = selectable.slice(0, Math.min(15, selectable.length)).map((model) => normalizedModelId(model));
+  const pinned = RECOMMENDED_PINNED_MODEL_IDS.filter((id) => selectable.some((model) => normalizedModelId(model) === id));
   return Array.from(new Set(pinned.concat(top)));
 }
 
-function defaultSelectedModelIds(models) {
-  const preferred = PREFERRED_DEFAULT_MODELS.find((id) => models.some((model) => normalizedModelId(model) === id));
+function defaultSelectedModelIds(models, availabilityOptions = {}) {
+  const selectable = models.filter((model) => modelAvailability(model, availabilityOptions).selectable);
+  const healthy = selectable.filter((model) => !modelAvailability(model, availabilityOptions).degraded);
+  const pool = healthy.length ? healthy : selectable;
+  const preferred = PREFERRED_DEFAULT_MODELS.find((id) => pool.some((model) => normalizedModelId(model) === id));
   if (preferred) return [preferred];
-  const first = normalizedModelId(models[0] || null);
+  const first = normalizedModelId(pool[0] || null);
   return first ? [first] : [];
 }
 
@@ -1195,31 +1267,42 @@ function renderModelCards({ models, selectedIds, activeFilter, searchText }) {
     return id.includes(search) || label.includes(search) || provider.includes(search);
   });
   const orderedVisible = visible.slice().sort((left, right) => {
+    const leftAvailability = modelAvailability(left);
+    const rightAvailability = modelAvailability(right);
     const leftSelected = selectedIds.has(normalizedModelId(left));
     const rightSelected = selectedIds.has(normalizedModelId(right));
-    if (leftSelected === rightSelected) return 0;
-    return leftSelected ? -1 : 1;
+    if (leftSelected !== rightSelected) return leftSelected ? -1 : 1;
+    if (leftAvailability.selectable !== rightAvailability.selectable) return leftAvailability.selectable ? -1 : 1;
+    if (leftAvailability.degraded !== rightAvailability.degraded) return leftAvailability.degraded ? 1 : -1;
+    return Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0);
   });
   const visibleIds = orderedVisible.map((model) => normalizedModelId(model));
   const html = orderedVisible.map((model) => {
     const modelId = normalizedModelId(model);
-    const checked = selectedIds.has(modelId);
+    const availability = modelAvailability(model);
+    const checked = availability.selectable && selectedIds.has(modelId);
     const provider = providerFromModel(modelId);
     const capability = modelCapabilities(model);
+    const note = availability.reason
+      ? `<div class="model-card-note ${availability.selectable ? 'is-warning' : 'is-error'}">${escapeHtml(availability.reason)}</div>`
+      : '';
     return `
-      <label class="model-card ${checked ? 'selected' : ''}">
+      <label class="model-card ${checked ? 'selected' : ''} ${availability.selectable ? '' : 'disabled'} ${availability.degraded ? 'degraded' : ''}" title="${escapeHtml(availability.reason || '')}">
         <div class="model-card-head">
           <div class="model-card-titlewrap">
-            <input type="checkbox" class="iter-model-check" value="${escapeHtml(modelId)}" ${checked ? 'checked' : ''} />
+            <input type="checkbox" class="iter-model-check" value="${escapeHtml(modelId)}" ${checked ? 'checked' : ''} ${availability.selectable ? '' : 'disabled'} />
             <span class="model-card-title">${escapeHtml(model.label || modelId)}</span>
           </div>
           <span class="tag tag-gold">$${Number(model.cost || 0).toFixed(3)}</span>
         </div>
         <div class="model-card-id">${escapeHtml(modelId)}</div>
         <div class="model-card-desc">${escapeHtml(modelDescription(model))}</div>
+        ${note}
         <div class="model-card-tags">
           <span class="tag tag-provider">${escapeHtml(provider)}</span>
           <span class="tag tag-style">${escapeHtml(capability)}</span>
+          ${availability.selectable ? '' : '<span class="tag tag-failed">Unavailable</span>'}
+          ${availability.selectable && availability.degraded ? '<span class="tag tag-pending">Fallback risk</span>' : ''}
         </div>
       </label>
     `;
@@ -1642,8 +1725,37 @@ window.Pages.iterate = {
       updateWildcardSuggestion(book);
     };
 
+    const fetchProviderAvailability = async ({ silent = false } = {}) => {
+      try {
+        const [healthResponse, connectivityResponse] = await Promise.all([
+          fetch(`/api/health?catalog=${encodeURIComponent(catalogId)}`, { cache: 'no-store' }),
+          fetch(`/api/providers/connectivity?catalog=${encodeURIComponent(catalogId)}`, { cache: 'no-store' }),
+        ]);
+        if (!healthResponse.ok) throw new Error(`Health HTTP ${healthResponse.status}`);
+        if (!connectivityResponse.ok) throw new Error(`Connectivity HTTP ${connectivityResponse.status}`);
+        const healthPayload = await healthResponse.json();
+        const connectivityPayload = await connectivityResponse.json();
+        _providerRuntime = healthPayload?.providers && typeof healthPayload.providers === 'object'
+          ? healthPayload.providers
+          : {};
+        _providerConnectivity = connectivityPayload?.providers && typeof connectivityPayload.providers === 'object'
+          ? connectivityPayload.providers
+          : {};
+        return { healthPayload, connectivityPayload };
+      } catch (err) {
+        _providerRuntime = {};
+        _providerConnectivity = {};
+        if (!silent) Toast.error(`Provider availability failed: ${err.message || err}`);
+        return null;
+      }
+    };
+
+    await fetchProviderAvailability({ silent: true });
     _defaultSelectedModelIds = defaultSelectedModelIds(OpenRouter.MODELS);
-    _defaultModelId = _defaultSelectedModelIds[0] || normalizedModelId(OpenRouter.MODELS[0] || null) || null;
+    _defaultModelId = _defaultSelectedModelIds[0]
+      || normalizedModelId(OpenRouter.MODELS.find((model) => modelAvailability(model).selectable) || null)
+      || normalizedModelId(OpenRouter.MODELS[0] || null)
+      || null;
     _selectedModelIds = new Set(_defaultSelectedModelIds);
     _lastVisibleModelIds = [];
     let activeModelFilter = 'recommended';
@@ -1755,6 +1867,15 @@ window.Pages.iterate = {
 
     const renderModels = () => {
       if (!modelGridEl || !modelSummaryEl) return;
+      const selectableIds = new Set(
+        OpenRouter.MODELS
+          .filter((model) => modelAvailability(model).selectable)
+          .map((model) => normalizedModelId(model))
+      );
+      _selectedModelIds = new Set(Array.from(_selectedModelIds).filter((id) => selectableIds.has(id)));
+      if (!_selectedModelIds.size && _defaultSelectedModelIds.length) {
+        _selectedModelIds = new Set(_defaultSelectedModelIds.filter((id) => selectableIds.has(id)));
+      }
       const rendered = renderModelCards({
         models: OpenRouter.MODELS,
         selectedIds: _selectedModelIds,
@@ -1769,8 +1890,14 @@ window.Pages.iterate = {
         .join(', ');
       const remaining = Math.max(0, _selectedModelIds.size - 4);
       const selectedSuffix = remaining > 0 ? ` +${remaining} more` : '';
-      const defaultLabels = _defaultSelectedModelIds.map((id) => modelIdToLabel(id)).join(', ') || 'first model';
-      modelSummaryEl.textContent = `${_selectedModelIds.size} model selected · showing ${rendered.visibleCount}/${OpenRouter.MODELS.length}. Default selection: ${defaultLabels}. Selected: ${selectedLabels || 'none'}${selectedSuffix}.`;
+      const defaultLabels = _defaultSelectedModelIds.map((id) => modelIdToLabel(id)).join(', ') || 'first available model';
+      const unavailableCount = OpenRouter.MODELS.filter((model) => !modelAvailability(model).selectable).length;
+      const degradedCount = OpenRouter.MODELS.filter((model) => modelAvailability(model).degraded).length;
+      const statusBits = [];
+      if (unavailableCount > 0) statusBits.push(`${unavailableCount} unavailable`);
+      if (degradedCount > 0) statusBits.push(`${degradedCount} with fallback risk`);
+      const statusSuffix = statusBits.length ? ` Status: ${statusBits.join(', ')}.` : '';
+      modelSummaryEl.textContent = `${_selectedModelIds.size} model selected · showing ${rendered.visibleCount}/${OpenRouter.MODELS.length}. Default selection: ${defaultLabels}. Selected: ${selectedLabels || 'none'}${selectedSuffix}.${statusSuffix}`;
       updateCost();
     };
 
@@ -1791,7 +1918,10 @@ window.Pages.iterate = {
       btn.addEventListener('click', () => {
         const action = String(btn.dataset.modelAction || '');
         if (action === 'select-visible') {
-          _lastVisibleModelIds.forEach((id) => _selectedModelIds.add(id));
+          _lastVisibleModelIds.forEach((id) => {
+            const model = OpenRouter.MODELS.find((row) => normalizedModelId(row) === id);
+            if (model && modelAvailability(model).selectable) _selectedModelIds.add(id);
+          });
         } else if (action === 'clear') {
           _selectedModelIds.clear();
         }
@@ -1805,6 +1935,11 @@ window.Pages.iterate = {
       if (!target.classList.contains('iter-model-check')) return;
       const modelId = String(target.value || '').trim();
       if (!modelId) return;
+      const model = OpenRouter.MODELS.find((row) => normalizedModelId(row) === modelId);
+      if (model && !modelAvailability(model).selectable) {
+        target.checked = false;
+        return;
+      }
       if (target.checked) _selectedModelIds.add(modelId);
       else _selectedModelIds.delete(modelId);
       renderModels();
