@@ -2411,6 +2411,75 @@ def test_run_startup_checks_reports_missing_prompts_as_issue(tmp_path: Path):
     assert any("prompts" in issue for issue in report["issues"])
 
 
+def test_enrichment_health_payload_counts_real_generic_missing_and_running(tmp_path: Path):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps(
+            [
+                {"number": 1, "title": "Book One", "author": "Author A"},
+                {"number": 2, "title": "Book Two", "author": "Author B"},
+                {"number": 3, "title": "Book Three", "author": "Author C"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    enriched_path = config.enriched_catalog_path(catalog_id=cfg.catalog_id, config_dir=cfg.config_dir)
+    enriched_path.write_text(
+        json.dumps(
+            [
+                {
+                    "number": 1,
+                    "enrichment": {
+                        "protagonist": "Victor Frankenstein",
+                        "iconic_scenes": ["scene one", "scene two", "scene three"],
+                    },
+                },
+                {
+                    "number": 2,
+                    "enrichment": {
+                        "protagonist": "central protagonist",
+                        "iconic_scenes": ["scene one", "scene two", "scene three"],
+                    },
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    class _AliveThread:
+        def is_alive(self) -> bool:
+            return True
+
+    with qr._CATALOG_ENRICHMENT_THREADS_LOCK:
+        previous = dict(qr._CATALOG_ENRICHMENT_RUN_STATUS)
+        previous_threads = dict(qr._CATALOG_ENRICHMENT_THREADS)
+        qr._CATALOG_ENRICHMENT_RUN_STATUS[cfg.catalog_id] = {
+            "catalog": cfg.catalog_id,
+            "status": "running",
+            "running": True,
+            "books": [2, 3],
+        }
+        qr._CATALOG_ENRICHMENT_THREADS[cfg.catalog_id] = _AliveThread()  # type: ignore[assignment]
+
+    try:
+        payload = qr._enrichment_health_payload(runtime=cfg)
+    finally:
+        with qr._CATALOG_ENRICHMENT_THREADS_LOCK:
+            qr._CATALOG_ENRICHMENT_RUN_STATUS.clear()
+            qr._CATALOG_ENRICHMENT_RUN_STATUS.update(previous)
+            qr._CATALOG_ENRICHMENT_THREADS.clear()
+            qr._CATALOG_ENRICHMENT_THREADS.update(previous_threads)
+
+    assert payload["ok"] is True
+    assert payload["health"] == "critical"
+    assert payload["total_books"] == 3
+    assert payload["enriched_real"] == 1
+    assert payload["enriched_generic"] == 1
+    assert payload["no_enrichment"] == 1
+    assert payload["books_needing_reenrichment"] == [2, 3]
+    assert payload["run_status"]["running"] is True
+
+
 def test_health_payload_includes_startup_checks(tmp_path: Path):
     cfg = _build_runtime_for_startup_checks(tmp_path)
     original_startup = dict(qr.STARTUP_HEALTH)

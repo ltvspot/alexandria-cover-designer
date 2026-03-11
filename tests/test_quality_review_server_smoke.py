@@ -663,6 +663,18 @@ def test_quality_review_server_external_worker_mode_starts():
         _stop_server(process)
 
 
+def test_quality_review_server_exposes_enrichment_health():
+    process, base_url = _start_server()
+    try:
+        status, body = _request_json(base_url, "/api/enrichment-health")
+        assert status == 200
+        assert body.get("ok") is True
+        assert "health" in body
+        assert "run_status" in body
+    finally:
+        _stop_server(process)
+
+
 def test_quality_review_server_sets_security_headers():
     process, base_url = _start_server()
     try:

@@ -224,6 +224,7 @@ _VISUAL_QA_RUNNING: set[str] = set()
 _VISUAL_QA_RUNNING_LOCK = threading.Lock()
 _CATALOG_ENRICHMENT_THREADS: dict[str, threading.Thread] = {}
 _CATALOG_ENRICHMENT_THREADS_LOCK = threading.Lock()
+_CATALOG_ENRICHMENT_RUN_STATUS: dict[str, dict[str, Any]] = {}
 _JSON_LIST_ROWS_CACHE_LOCK = threading.Lock()
 _JSON_LIST_ROWS_CACHE: dict[str, dict[str, Any]] = {}
 
@@ -4917,12 +4918,33 @@ def _queue_catalog_enrichment(*, runtime: config.Config, books: list[int], reaso
     with _CATALOG_ENRICHMENT_THREADS_LOCK:
         active = _CATALOG_ENRICHMENT_THREADS.get(catalog_id)
         if active is not None and active.is_alive():
+            existing_status = dict(_CATALOG_ENRICHMENT_RUN_STATUS.get(catalog_id, {}))
+            if not existing_status:
+                existing_status = {"catalog": catalog_id, "status": "running", "running": True}
             return {
                 "queued": False,
                 "reason": "already_running",
                 "books": target_books,
                 "count": len(target_books),
+                "run_status": existing_status,
             }
+
+        job_id = str(uuid.uuid4())
+        started_at = datetime.now(timezone.utc).isoformat()
+        _CATALOG_ENRICHMENT_RUN_STATUS[catalog_id] = {
+            "job_id": job_id,
+            "catalog": catalog_id,
+            "status": "running",
+            "running": True,
+            "reason": str(reason or "manual"),
+            "books": list(target_books),
+            "count": len(target_books),
+            "started_at": started_at,
+            "updated_at": started_at,
+            "finished_at": "",
+            "error": "",
+            "summary": {},
+        }
 
         def _worker() -> None:
             try:
@@ -4940,7 +4962,7 @@ def _queue_catalog_enrichment(*, runtime: config.Config, books: list[int], reaso
                     descriptions_path=descriptions_path,
                 )
                 write_iterate_data(runtime=worker_runtime)
-                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/dashboard-data", "/api/analytics/")
+                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/dashboard-data", "/api/analytics/", "/api/enrichment-health")
                 logger.info(
                     "Background enrichment completed",
                     extra={
@@ -4950,7 +4972,12 @@ def _queue_catalog_enrichment(*, runtime: config.Config, books: list[int], reaso
                         "validation": summary.get("validation", {}),
                     },
                 )
+                status = "completed"
+                error_text = ""
             except Exception as exc:  # pragma: no cover - background guard
+                summary = {}
+                status = "failed"
+                error_text = str(exc)
                 logger.warning(
                     "Background enrichment failed for catalog %s (%s): %s",
                     catalog_id,
@@ -4959,6 +4986,20 @@ def _queue_catalog_enrichment(*, runtime: config.Config, books: list[int], reaso
                 )
             finally:
                 with _CATALOG_ENRICHMENT_THREADS_LOCK:
+                    current = _CATALOG_ENRICHMENT_RUN_STATUS.get(catalog_id, {})
+                    if str(current.get("job_id", "")) == job_id:
+                        finished_at = datetime.now(timezone.utc).isoformat()
+                        current.update(
+                            {
+                                "status": status,
+                                "running": False,
+                                "updated_at": finished_at,
+                                "finished_at": finished_at,
+                                "error": error_text,
+                                "summary": summary if isinstance(summary, dict) else {},
+                            }
+                        )
+                        _CATALOG_ENRICHMENT_RUN_STATUS[catalog_id] = current
                     if _CATALOG_ENRICHMENT_THREADS.get(catalog_id) is thread:
                         _CATALOG_ENRICHMENT_THREADS.pop(catalog_id, None)
 
@@ -4975,6 +5016,100 @@ def _queue_catalog_enrichment(*, runtime: config.Config, books: list[int], reaso
         "reason": reason,
         "books": target_books,
         "count": len(target_books),
+        "run_status": _catalog_enrichment_run_status_snapshot(catalog_id=catalog_id),
+    }
+
+
+def _catalog_enrichment_run_status_snapshot(*, catalog_id: str) -> dict[str, Any]:
+    token = str(catalog_id or "").strip()
+    with _CATALOG_ENRICHMENT_THREADS_LOCK:
+        active = _CATALOG_ENRICHMENT_THREADS.get(token)
+        snapshot = dict(_CATALOG_ENRICHMENT_RUN_STATUS.get(token, {}))
+    if not snapshot:
+        return {
+            "catalog": token,
+            "status": "running" if active is not None and active.is_alive() else "idle",
+            "running": bool(active is not None and active.is_alive()),
+        }
+    if active is not None and active.is_alive():
+        snapshot["status"] = "running"
+        snapshot["running"] = True
+    else:
+        snapshot["running"] = bool(snapshot.get("running", False))
+        if str(snapshot.get("status", "")).strip().lower() == "running":
+            snapshot["status"] = "idle"
+            snapshot["running"] = False
+    return snapshot
+
+
+def _books_needing_enrichment(*, runtime: config.Config) -> dict[str, Any]:
+    source_rows = _catalog_books_payload(runtime.book_catalog_path)
+    enriched_path = config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir)
+    enriched_rows = _json_list_rows_cache_entry(enriched_path).get("by_number", {})
+    missing: list[int] = []
+    generic: list[int] = []
+    valid: list[int] = []
+    for row in source_rows:
+        if not isinstance(row, dict):
+            continue
+        number = _safe_int(row.get("number"), 0)
+        if number <= 0:
+            continue
+        candidate = enriched_rows.get(number, {}) if isinstance(enriched_rows, dict) else {}
+        enrichment = candidate.get("enrichment", {}) if isinstance(candidate, dict) else {}
+        if not isinstance(enrichment, dict) or not enrichment:
+            missing.append(number)
+            continue
+        if book_enricher._has_generic_content(enrichment):  # type: ignore[attr-defined]
+            generic.append(number)
+            continue
+        valid.append(number)
+    books = sorted({*missing, *generic})
+    return {
+        "total_books": len([row for row in source_rows if isinstance(row, dict) and _safe_int(row.get("number"), 0) > 0]),
+        "books": books,
+        "generic_books": generic,
+        "missing_books": missing,
+        "valid_books": valid,
+        "enriched_path": str(enriched_path),
+    }
+
+
+def _enrichment_health_payload(*, runtime: config.Config) -> dict[str, Any]:
+    needed = _books_needing_enrichment(runtime=runtime)
+    total_books = int(needed.get("total_books", 0) or 0)
+    generic_count = len(needed.get("generic_books", []))
+    missing_count = len(needed.get("missing_books", []))
+    real_count = len(needed.get("valid_books", []))
+    issue_count = generic_count + missing_count
+    if total_books <= 0 or issue_count == 0:
+        health = "healthy"
+    elif real_count <= 0 or issue_count >= max(1, math.ceil(total_books * 0.5)):
+        health = "critical"
+    else:
+        health = "warning"
+    enriched_path = Path(str(needed.get("enriched_path", "") or ""))
+    updated_at = ""
+    try:
+        if enriched_path.exists():
+            updated_at = datetime.fromtimestamp(enriched_path.stat().st_mtime, timezone.utc).isoformat()
+    except OSError:
+        updated_at = ""
+    return {
+        "ok": True,
+        "catalog": runtime.catalog_id,
+        "health": health,
+        "total_books": total_books,
+        "enriched_real": real_count,
+        "enriched_generic": generic_count,
+        "no_enrichment": missing_count,
+        "coverage_ratio": float(real_count) / float(total_books) if total_books > 0 else 1.0,
+        "books_needing_reenrichment": needed.get("books", []),
+        "generic_books": needed.get("generic_books", []),
+        "missing_books": needed.get("missing_books", []),
+        "run_status": _catalog_enrichment_run_status_snapshot(catalog_id=runtime.catalog_id),
+        "enriched_path": str(enriched_path),
+        "updated_at": updated_at,
     }
 
 
@@ -8843,6 +8978,8 @@ def serve_review_webapp(
                 payload = _health_payload(runtime=runtime_req)
                 payload["default_reviewer"] = configured_reviewer
                 return _cache_and_send(payload)
+            if path == "/api/enrichment-health":
+                return self._send_json(_enrichment_health_payload(runtime=runtime_req))
             if path == "/api/history":
                 book = int(query.get("book", ["0"])[0])
                 history_payload = _load_json(_history_path_for_runtime(runtime_req), {"items": []})
@@ -10603,7 +10740,7 @@ def serve_review_webapp(
                         None,
                 )
                 write_iterate_data(runtime=runtime_req)
-                _invalidate_cache("/api/iterate-data", "/api/prompt-performance")
+                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/enrichment-health")
                 usage_last = summary.get("usage", {}).get("last_run", {}) if isinstance(summary.get("usage"), dict) else {}
                 _record_cost_entry(
                     runtime=runtime_req,
@@ -10637,7 +10774,7 @@ def serve_review_webapp(
                     descriptions_path=runtime_req.config_dir / "book_descriptions.json",
                 )
                 write_iterate_data(runtime=runtime_req)
-                _invalidate_cache("/api/iterate-data", "/api/prompt-performance")
+                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/enrichment-health")
                 usage_last = summary.get("usage", {}).get("last_run", {}) if isinstance(summary.get("usage"), dict) else {}
                 _record_cost_entry(
                     runtime=runtime_req,
@@ -10654,6 +10791,23 @@ def serve_review_webapp(
                 )
                 _invalidate_cache("/api/analytics/", "/api/dashboard-data")
                 return self._send_json({"ok": True, "summary": summary})
+
+            if path == "/api/enrich-generic":
+                queued = _queue_catalog_enrichment(
+                    runtime=runtime_req,
+                    books=_books_needing_enrichment(runtime=runtime_req).get("books", []),
+                    reason="replace_generic",
+                )
+                payload = _enrichment_health_payload(runtime=runtime_req)
+                payload.update(
+                    {
+                        "ok": True,
+                        "started": bool(queued.get("queued")),
+                        "queued": queued,
+                        "run_status": queued.get("run_status", payload.get("run_status", {})),
+                    }
+                )
+                return self._send_json(payload)
 
             if path == "/api/generate-smart-prompts":
                 book_number = _safe_int(body.get("book"), 0)
