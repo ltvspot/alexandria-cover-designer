@@ -1,19 +1,80 @@
 {
-  "generated_at": "2026-03-05T07:02:47.638835+00:00",
-  "results": [],
-  "missing": [
+  "generated_at": "2026-03-11T03:08:46.303697+00:00",
+  "results": [
     {
-      "book_number": 1,
-      "book_title": "Book",
-      "missing_original": true,
-      "missing_composite": false
+      "book_number": 99,
+      "book_title": "Frankenstein' Or, The Modern Prometheus",
+      "passed": false,
+      "failed_checks": [
+        "frame_ring_integrity",
+        "art_containment"
+      ],
+      "checks": [
+        {
+          "name": "frame_ring_integrity",
+          "passed": false,
+          "value": "99.90% changed, delta 88.45",
+          "threshold": "<1.0% changed and delta <3.0",
+          "detail": "Ornamental frame ring must remain intact."
+        },
+        {
+          "name": "art_containment",
+          "passed": false,
+          "value": "17.70% outer pixels changed",
+          "threshold": "<0.5% outer pixels changed",
+          "detail": "Generated art should not bleed into outer cover/frame area."
+        },
+        {
+          "name": "art_presence",
+          "passed": true,
+          "value": "99.20% inner pixels changed",
+          "threshold": ">20.0% inner pixels changed",
+          "detail": "Medallion center must contain newly generated art."
+        },
+        {
+          "name": "dimensions_match",
+          "passed": true,
+          "value": "original=(3784, 2777), composite=(3784, 2777)",
+          "threshold": "dimensions must match exactly",
+          "detail": "Composite dimensions must match template dimensions."
+        },
+        {
+          "name": "aspect_ratio_sanity",
+          "passed": true,
+          "value": "bbox=959x959, ratio=1.000",
+          "threshold": "changed-art bbox ratio in [0.55, 1.80]",
+          "detail": "Changed medallion art footprint should not be heavily stretched."
+        },
+        {
+          "name": "golden_reference",
+          "passed": true,
+          "value": "no golden reference available",
+          "threshold": "N/A",
+          "detail": "Human review required until a golden reference is stored."
+        }
+      ],
+      "metrics": {
+        "frame_changed_pct": 99.8983,
+        "frame_mean_delta": 88.4519,
+        "outer_changed_pct": 17.7023,
+        "inner_changed_pct": 99.1954,
+        "changed_bbox_width": 959,
+        "changed_bbox_height": 959,
+        "changed_bbox_aspect_ratio": 1.0
+      },
+      "generated_at": "2026-03-11T03:08:46.764312+00:00",
+      "original_path": "Input Covers/99. Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley copy/Frankenstein_ Or, The Modern Prometheus — Mary Wollstonecraft Shelley 3.jpg",
+      "composite_path": "tmp/composited/99/google__gemini-3-pro-image-preview/variant_1.jpg",
+      "golden_path": "",
+      "report_path": "qa_output/classics/qa_099.json"
     }
   ],
+  "missing": [],
   "summary": {
     "total": 1,
-    "verified": 0,
+    "verified": 1,
     "passed": 0,
-    "failed": 0,
-    "not_compared": 1
+    "failed": 1,
+    "not_compared": 0
   }
 }

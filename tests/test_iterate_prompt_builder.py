@@ -142,10 +142,10 @@ def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto(
     assert result["libraryPromptId"] == ""
 
 
-def test_iterate_ui_defaults_use_four_variants_and_auto_rotate_label():
+def test_iterate_ui_defaults_use_ten_variants_and_auto_rotate_label():
     result = _run_iterate_ui_defaults()
 
-    assert result["defaultVariantCount"] == 4
+    assert result["defaultVariantCount"] == 10
     assert result["autoRotateLabel"] == "Auto-Rotate (Recommended)"
 
 
@@ -186,6 +186,33 @@ def test_iterate_scene_pool_filters_generic_enrichment_and_uses_prompt_context()
 
     assert "Iconic turning point from Emma" not in result
     assert result[0].startswith("Emma Woodhouse standing in Hartfield")
+
+
+def test_iterate_expanded_scene_pool_reaches_ten_unique_scenes_for_sparse_books():
+    result = _run_iterate_hook(
+        function_name="buildExpandedScenePool",
+        payload={
+            "book": {
+                "title": "The Island Voyage",
+                "author": "Anon",
+                "prompt_context": {
+                    "setting": "a wind-beaten island observatory",
+                },
+                "enrichment": {
+                    "iconic_scenes": [
+                        "The navigator enters the wind-beaten island observatory",
+                    ],
+                    "setting_primary": "a wind-beaten island observatory",
+                    "emotional_tone": "storm-charged wonder",
+                },
+            },
+            "minimumCount": 10,
+        },
+    )
+
+    assert len(result) == 10
+    assert len(set(result)) == 10
+    assert all("wind-beaten island observatory" in scene.lower() for scene in result[1:])
 
 
 def test_iterate_wildcard_rotation_changes_across_days():
@@ -256,6 +283,48 @@ def test_iterate_variant_prompt_plan_falls_back_to_literature_defaults_for_unkno
         "alexandria-wildcard-art-nouveau-poster",
         "alexandria-wildcard-pre-raphaelite-dream",
     }
+
+
+def test_iterate_variant_prompt_plan_uses_all_five_bases_and_five_wildcards_for_ten_variants():
+    prompts = [
+        {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-classical-devotion", "name": "BASE 1 — Classical Devotion", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-gothic-atmosphere", "name": "BASE 2 — Gothic Atmosphere", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-esoteric-mysticism", "name": "BASE 5 — Esoteric Mysticism", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-philosophical-gravitas", "name": "BASE 3 — Philosophical Gravitas", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-antique-map", "name": "WILDCARD 7 — Antique Map", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-maritime-chart", "name": "WILDCARD 9 — Maritime Chart", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-vintage-pulp-cover", "name": "WILDCARD 14 — Vintage Pulp Cover", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-edo-meets-alexandria", "name": "WILDCARD 18 — Edo Meets Alexandria", "tags": ["alexandria", "wildcard"]},
+    ]
+    assignments = _run_iterate_hook(
+        function_name="buildVariantPromptAssignments",
+        payload={
+            "book": {"title": "Gulliver's Travels", "author": "Jonathan Swift", "genre": "adventure"},
+            "variantCount": 10,
+            "referenceDate": "2026-03-11T00:00:00.000Z",
+        },
+        prompts=prompts,
+    )
+
+    prompt_ids = [row["promptId"] for row in assignments]
+    assert len(prompt_ids) == 10
+    assert len(set(prompt_ids)) == 10
+    assert {
+        "alexandria-base-romantic-realism",
+        "alexandria-base-classical-devotion",
+        "alexandria-base-gothic-atmosphere",
+        "alexandria-base-esoteric-mysticism",
+        "alexandria-base-philosophical-gravitas",
+    }.issubset(set(prompt_ids))
+    assert {
+        "alexandria-wildcard-pre-raphaelite-garden",
+        "alexandria-wildcard-antique-map",
+        "alexandria-wildcard-maritime-chart",
+        "alexandria-wildcard-vintage-pulp-cover",
+        "alexandria-wildcard-edo-meets-alexandria",
+    }.issubset(set(prompt_ids))
 
 
 def test_iterate_variant_payloads_auto_rotate_assign_distinct_scenes():

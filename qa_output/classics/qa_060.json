@@ -1,27 +1,29 @@
 {
   "book_number": 60,
   "book_title": "The Jungle Book",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "5.21% changed, delta 3.04",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.23% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "98.56% inner pixels changed",
+      "value": "96.47% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=911x912, ratio=0.999",
+      "value": "bbox=958x956, ratio=1.002",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2175,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 98.5585,
-    "changed_bbox_width": 911,
-    "changed_bbox_height": 912,
-    "changed_bbox_aspect_ratio": 0.9989
+    "frame_changed_pct": 5.2134,
+    "frame_mean_delta": 3.0406,
+    "outer_changed_pct": 0.2341,
+    "inner_changed_pct": 96.4736,
+    "changed_bbox_width": 958,
+    "changed_bbox_height": 956,
+    "changed_bbox_aspect_ratio": 1.0021
   },
-  "generated_at": "2026-03-05T06:54:57.747068+00:00",
+  "generated_at": "2026-03-05T09:03:22.159483+00:00",
   "original_path": "Input Covers/60. The Jungle Book — Rudyard Kipling copy/The Jungle Book — Rudyard Kipling.jpg",
   "composite_path": "tmp/composited/60/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

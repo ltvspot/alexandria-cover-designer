@@ -34,8 +34,11 @@ COPY --from=builder /opt/venv /opt/venv
 COPY src/ src/
 RUN mkdir -p config scripts
 COPY scripts/quality_review.py scripts/quality_review.py
+COPY scripts/enrich_catalog.py scripts/enrich_catalog.py
+COPY scripts/validate_enrichment.py scripts/validate_enrichment.py
 COPY config/catalogs.json config/catalogs.json
 COPY config/book_catalog.json config/book_catalog.json
+COPY config/book_catalog_enriched.json config/book_catalog_enriched.json
 COPY config/book_prompts.json config/book_prompts.json
 COPY config/book_catalog_test-catalog.json config/book_catalog_test-catalog.json
 COPY config/book_prompts_test-catalog.json config/book_prompts_test-catalog.json
@@ -45,7 +48,6 @@ COPY config/frame_mask.png config/frame_mask.png
 COPY scripts/extract_frame_overlays.py scripts/extract_frame_overlays.py
 COPY scripts/verify_composite.py scripts/verify_composite.py
 COPY config/prompt_templates.json config/prompt_templates.json
-COPY config/prompt_library.json config/prompt_library.json
 COPY config/cover_templates.json config/cover_templates.json
 COPY config/model_prompt_overrides.json config/model_prompt_overrides.json
 COPY config/genre_presets.json config/genre_presets.json

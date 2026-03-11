@@ -65,3 +65,38 @@ You have implementation prompts to execute in strict sequence. Each builds on th
 5. **All outputs: 3784×2777, 300 DPI**
 6. **Handle Unicode in filenames** (accents, em-dashes, curly quotes)
 7. **Quality over speed** — illustrations must look like real oil paintings
+
+### ⛔ MANDATORY DEPLOYMENT + HUMAN-LIKE TESTING (Apply to ALL Prompts)
+
+**This overrides everything above. No prompt is complete without deployment verification.**
+
+After EVERY implementation, you MUST:
+
+1. **`git add` + `git commit` + `git push`** to main/master branch
+2. **Wait for Railway deployment** to complete
+3. **Open the LIVE production webapp** at `https://web-production-900a7.up.railway.app`
+4. **Use the webapp like a human would:**
+   - Navigate to `/iterate`
+   - Select a book, select a model, click Generate
+   - WAIT for generation to complete or fail
+   - If it FAILS → diagnose, fix, push again, re-test on production
+   - If it SUCCEEDS → verify the cover is relevant to the book
+5. **Test at least 3 different books** on the LIVE webapp
+6. **Provide the direct deployed webapp link** in your response
+7. **Include screenshots** of the actual live webapp showing successful generations
+
+**What is NOT acceptable:**
+- ❌ "Tests pass locally" without deploying
+- ❌ Running a local server and calling that "verification"
+- ❌ Claiming generation works without showing actual covers from PRODUCTION
+- ❌ Skipping deployment because "the code looks correct"
+
+**Read VISUAL-REQUIREMENTS.md before ANY code change — it contains ALL 6 non-negotiable rules.**
+
+### Style ≠ Scene (Critical — Apply to ALL Prompts)
+
+- **Style** = art technique, palette, rendering (UNIVERSAL — same for every book)
+- **Scene** = characters, settings, narrative moments (BOOK-SPECIFIC — from enrichment data via `{SCENE}`)
+- NEVER mix them. If a style says "sunflower fields", every book gets sunflower fields. WRONG.
+- The 5 base prompt `style_name`/`style_description` values are LOCKED. See VISUAL-REQUIREMENTS.md.
+- The catalog has **2,000+ books** (continuously growing), NOT 99.

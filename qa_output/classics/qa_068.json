@@ -1,27 +1,29 @@
 {
   "book_number": 68,
   "book_title": "Second Variety",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "8.66% changed, delta 11.52",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.24% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "97.84% inner pixels changed",
+      "value": "95.70% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=912x912, ratio=1.000",
+      "value": "bbox=955x957, ratio=0.998",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2162,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 97.8361,
-    "changed_bbox_width": 912,
-    "changed_bbox_height": 912,
-    "changed_bbox_aspect_ratio": 1.0
+    "frame_changed_pct": 8.6642,
+    "frame_mean_delta": 11.5164,
+    "outer_changed_pct": 0.2387,
+    "inner_changed_pct": 95.7044,
+    "changed_bbox_width": 955,
+    "changed_bbox_height": 957,
+    "changed_bbox_aspect_ratio": 0.9979
   },
-  "generated_at": "2026-03-05T06:55:01.097362+00:00",
+  "generated_at": "2026-03-05T09:03:25.925343+00:00",
   "original_path": "Input Covers/68. Second Variety — Philip K. Dick copy/Second Variety — Philip K. Dick.jpg",
   "composite_path": "tmp/composited/68/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

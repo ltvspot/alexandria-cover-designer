@@ -1,27 +1,29 @@
 {
   "book_number": 19,
   "book_title": "Crime and Punishment",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "4.65% changed, delta 4.18",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.21% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "97.70% inner pixels changed",
+      "value": "95.61% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=912x912, ratio=1.000",
+      "value": "bbox=958x958, ratio=1.000",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2181,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 97.7,
-    "changed_bbox_width": 912,
-    "changed_bbox_height": 912,
+    "frame_changed_pct": 4.6537,
+    "frame_mean_delta": 4.1765,
+    "outer_changed_pct": 0.2104,
+    "inner_changed_pct": 95.6123,
+    "changed_bbox_width": 958,
+    "changed_bbox_height": 958,
     "changed_bbox_aspect_ratio": 1.0
   },
-  "generated_at": "2026-03-05T06:54:39.685580+00:00",
+  "generated_at": "2026-03-05T09:03:00.785822+00:00",
   "original_path": "Input Covers/19. Crime and Punishment — Fyodor Dostoyevsky copy/Crime and Punishment - Fyodor Dostoyevsky.jpg",
   "composite_path": "tmp/composited/19/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

@@ -416,6 +416,8 @@ main.content {
 
 .iterate-primary-actions {
   margin-top: 4px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .iterate-variant-summary {
@@ -437,6 +439,10 @@ main.content {
 
 .iterate-variant-line + .iterate-variant-line {
   margin-top: 6px;
+}
+
+.result-card-actions {
+  flex-wrap: wrap;
 }
 
 .iterate-model-summary-card {
@@ -1456,6 +1462,11 @@ tr:hover td {
   .pipeline-row {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .iterate-primary-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .iterate-model-summary-card {

@@ -1,1 +1,0 @@
-Structural QA summary: total=99 verified=99 passed=99 failed=0 not_compared=0

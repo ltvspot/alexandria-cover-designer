@@ -1,27 +1,29 @@
 {
   "book_number": 20,
   "book_title": "Middlemarch",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.21",
+      "passed": false,
+      "value": "10.41% changed, delta 10.62",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.09% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "98.85% inner pixels changed",
+      "value": "96.75% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=912x911, ratio=1.001",
+      "value": "bbox=959x959, ratio=1.000",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2128,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 98.8518,
-    "changed_bbox_width": 912,
-    "changed_bbox_height": 911,
-    "changed_bbox_aspect_ratio": 1.0011
+    "frame_changed_pct": 10.4115,
+    "frame_mean_delta": 10.6157,
+    "outer_changed_pct": 0.0885,
+    "inner_changed_pct": 96.7471,
+    "changed_bbox_width": 959,
+    "changed_bbox_height": 959,
+    "changed_bbox_aspect_ratio": 1.0
   },
-  "generated_at": "2026-03-05T06:54:40.150635+00:00",
+  "generated_at": "2026-03-05T09:03:01.257125+00:00",
   "original_path": "Input Covers/20. Middlemarch — George Eliot copy/Middlemarch — George Eliot.jpg",
   "composite_path": "tmp/composited/20/openrouter__openai__gpt-5-image-mini/variant_3.jpg",
   "golden_path": ""

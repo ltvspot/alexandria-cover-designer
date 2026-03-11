@@ -1,27 +1,29 @@
 {
   "book_number": 71,
   "book_title": "The Sign of the Four",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "5.34% changed, delta 3.35",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.24% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "98.80% inner pixels changed",
+      "value": "96.70% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=911x911, ratio=1.000",
+      "value": "bbox=959x957, ratio=1.002",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2173,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 98.7961,
-    "changed_bbox_width": 911,
-    "changed_bbox_height": 911,
-    "changed_bbox_aspect_ratio": 1.0
+    "frame_changed_pct": 5.3372,
+    "frame_mean_delta": 3.348,
+    "outer_changed_pct": 0.2393,
+    "inner_changed_pct": 96.6994,
+    "changed_bbox_width": 959,
+    "changed_bbox_height": 957,
+    "changed_bbox_aspect_ratio": 1.0021
   },
-  "generated_at": "2026-03-05T06:55:02.447632+00:00",
+  "generated_at": "2026-03-05T09:03:27.320215+00:00",
   "original_path": "Input Covers/71. The Sign of the Four — Arthur Conan Doyle copy/The Sign of the Four — Arthur Conan Doyle.jpg",
   "composite_path": "tmp/composited/71/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

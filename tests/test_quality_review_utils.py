@@ -1517,6 +1517,77 @@ def test_save_raw_payload_uses_nested_drive_folder_parts_per_result(
     assert captured["folder_parts"][1].startswith("save-raw__job-emma__variant-3__")
 
 
+def test_save_result_payload_for_job_uses_prompt45_drive_folder_and_png_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 4, "title": "Emma", "author": "Jane Austen"}]),
+        encoding="utf-8",
+    )
+    comp_path = cfg.output_dir / "saved_composites" / "4" / "job-emma_variant_3_openrouter_google_gemini-3-pro-image-preview.jpg"
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (43, 53, 63)).save(comp_path, format="JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-emma",
+        idempotency_key="idem-job-emma",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=4,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 3,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "saved_composited_path": qr._to_project_relative(comp_path),
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    captured: dict[str, Any] = {}
+
+    def _fake_upload_saved_result_to_drive(**kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return {
+            "ok": True,
+            "drive_file_id": "drive-file-1",
+            "drive_url": "https://drive.google.com/file/d/drive-file-1/view",
+            "warning": None,
+        }
+
+    monkeypatch.setattr(qr, "_upload_saved_result_to_drive", _fake_upload_saved_result_to_drive)
+
+    payload = qr._save_result_payload_for_job(
+        runtime=cfg,
+        job=job,
+        style_label="Romantic Realism",
+    )
+
+    assert payload["status"] == "saved"
+    assert payload["drive_url"] == "https://drive.google.com/file/d/drive-file-1/view"
+    assert payload["file_name"].startswith("Emma_V3_Romantic_Realism_")
+    assert payload["file_name"].endswith(".png")
+    assert captured["parent_folder_id"] == qr.SAVE_RESULT_DRIVE_FOLDER_ID
+    assert Path(payload["local_path"]).exists()
+    assert Path(payload["local_path"]).suffix.lower() == ".png"
+
+
 def test_save_raw_drive_status_payload_reports_parent_folder_access(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

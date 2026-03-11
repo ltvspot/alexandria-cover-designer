@@ -1,27 +1,29 @@
 {
   "book_number": 97,
   "book_title": "Gargantua and Pantagruel",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "5.27% changed, delta 4.85",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.12% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "96.78% inner pixels changed",
+      "value": "94.68% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=911x912, ratio=0.999",
+      "value": "bbox=958x954, ratio=1.004",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2182,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 96.777,
-    "changed_bbox_width": 911,
-    "changed_bbox_height": 912,
-    "changed_bbox_aspect_ratio": 0.9989
+    "frame_changed_pct": 5.2663,
+    "frame_mean_delta": 4.8475,
+    "outer_changed_pct": 0.1157,
+    "inner_changed_pct": 94.6797,
+    "changed_bbox_width": 958,
+    "changed_bbox_height": 954,
+    "changed_bbox_aspect_ratio": 1.0042
   },
-  "generated_at": "2026-03-05T06:55:14.297142+00:00",
+  "generated_at": "2026-03-05T09:03:40.166696+00:00",
   "original_path": "Input Covers/97. Gargantua and Pantagruel — François Rabelais copy/Gargantua and Pantagruel — François Rabelais.jpg",
   "composite_path": "tmp/composited/97/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

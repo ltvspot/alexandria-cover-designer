@@ -1,27 +1,29 @@
 {
   "book_number": 41,
   "book_title": "Lady Chatterley's Lover",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "5.53% changed, delta 3.22",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
       "passed": true,
-      "value": "0.00% outer pixels changed",
+      "value": "0.12% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "99.40% inner pixels changed",
+      "value": "97.28% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +37,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=911x912, ratio=0.999",
+      "value": "bbox=959x958, ratio=1.001",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,15 +50,15 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2179,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 99.4001,
-    "changed_bbox_width": 911,
-    "changed_bbox_height": 912,
-    "changed_bbox_aspect_ratio": 0.9989
+    "frame_changed_pct": 5.5304,
+    "frame_mean_delta": 3.217,
+    "outer_changed_pct": 0.1219,
+    "inner_changed_pct": 97.2762,
+    "changed_bbox_width": 959,
+    "changed_bbox_height": 958,
+    "changed_bbox_aspect_ratio": 1.001
   },
-  "generated_at": "2026-03-05T06:54:49.443180+00:00",
+  "generated_at": "2026-03-05T09:03:11.809574+00:00",
   "original_path": "Input Covers/41. Lady Chatterley_s Lover — D. H. Lawrence copy/Lady Chatterley_s Lover — D. H. Lawrence.jpg",
   "composite_path": "tmp/composited/41/openai__gpt-image-1/variant_5.jpg",
   "golden_path": ""

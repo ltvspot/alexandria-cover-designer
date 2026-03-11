@@ -1,27 +1,30 @@
 {
   "book_number": 2,
   "book_title": "Moby Dick' Or, The Whale",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+    "frame_ring_integrity",
+    "art_containment"
+  ],
   "checks": [
     {
       "name": "frame_ring_integrity",
-      "passed": true,
-      "value": "0.00% changed, delta 0.22",
+      "passed": false,
+      "value": "99.90% changed, delta 83.45",
       "threshold": "<1.0% changed and delta <3.0",
       "detail": "Ornamental frame ring must remain intact."
     },
     {
       "name": "art_containment",
-      "passed": true,
-      "value": "0.00% outer pixels changed",
+      "passed": false,
+      "value": "16.93% outer pixels changed",
       "threshold": "<0.5% outer pixels changed",
       "detail": "Generated art should not bleed into outer cover/frame area."
     },
     {
       "name": "art_presence",
       "passed": true,
-      "value": "99.47% inner pixels changed",
+      "value": "99.11% inner pixels changed",
       "threshold": ">20.0% inner pixels changed",
       "detail": "Medallion center must contain newly generated art."
     },
@@ -35,7 +38,7 @@
     {
       "name": "aspect_ratio_sanity",
       "passed": true,
-      "value": "bbox=911x911, ratio=1.000",
+      "value": "bbox=959x959, ratio=1.000",
       "threshold": "changed-art bbox ratio in [0.55, 1.80]",
       "detail": "Changed medallion art footprint should not be heavily stretched."
     },
@@ -48,16 +51,16 @@
     }
   ],
   "metrics": {
-    "frame_changed_pct": 0.0,
-    "frame_mean_delta": 0.2176,
-    "outer_changed_pct": 0.0,
-    "inner_changed_pct": 99.469,
-    "changed_bbox_width": 911,
-    "changed_bbox_height": 911,
+    "frame_changed_pct": 99.9006,
+    "frame_mean_delta": 83.4495,
+    "outer_changed_pct": 16.9334,
+    "inner_changed_pct": 99.1098,
+    "changed_bbox_width": 959,
+    "changed_bbox_height": 959,
     "changed_bbox_aspect_ratio": 1.0
   },
-  "generated_at": "2026-03-05T06:54:32.246047+00:00",
+  "generated_at": "2026-03-11T03:08:05.063153+00:00",
   "original_path": "Input Covers/2. Moby Dick_ Or, The Whale - Herman Melville copy/Moby Dick_ Or, The Whale - Herman Melville.jpg",
-  "composite_path": "tmp/composited/2/openrouter__openai__gpt-5-image/variant_1.jpg",
+  "composite_path": "tmp/composited/2/google__gemini-3-pro-image-preview/variant_1.jpg",
   "golden_path": ""
 }

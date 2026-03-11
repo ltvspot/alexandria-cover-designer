@@ -153,6 +153,7 @@ SETTINGS_STORE_PATH = PROJECT_ROOT / "settings_store.json"
 CGI_CATALOG_CACHE_PATH = PROJECT_ROOT / "catalog_cache.json"
 CGI_CATALOG_MAX_AGE_SECONDS = 3600
 SAVE_RAW_DRIVE_FOLDER_ID = "0ABLZWLOVzq-qUk9PVA"
+SAVE_RESULT_DRIVE_FOLDER_ID = "1SHzAaDU1pN0ECC61KCRtYijv4dp4IR59"
 SAVE_RAW_LOCAL_DIRNAME = "Chosen Winner Generated Covers"
 SAVE_RAW_DRIVE_RETRY_ATTEMPTS = max(1, int(os.getenv("SAVE_RAW_DRIVE_RETRY_ATTEMPTS", "2")))
 SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS = max(0.0, float(os.getenv("SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS", "0.5")))
@@ -3318,7 +3319,15 @@ def _assert_composite_validation_within_limits(*, runtime: config.Config, book_n
         return
     max_invalid = max(0, _safe_int(getattr(runtime, "composite_max_invalid_variants", 0), 0))
     if invalid > max_invalid:
-        rebuilt = _rebuild_composite_validation_report(runtime=runtime, book_number=book_number)
+        try:
+            rebuilt = _rebuild_composite_validation_report(runtime=runtime, book_number=book_number)
+        except Exception as exc:
+            logger.warning(
+                "Composite validation recheck failed for book %s; using existing report: %s",
+                book_number,
+                exc,
+            )
+            rebuilt = {}
         if isinstance(rebuilt, dict) and rebuilt:
             report = rebuilt
             total = _safe_int(report.get("total"), 0)
@@ -11743,6 +11752,59 @@ def serve_review_webapp(
                     )
                 return self._send_json(payload)
 
+            if path == "/api/save-result":
+                job_id = str(body.get("job_id", "") or body.get("backend_job_id", "")).strip()
+                if not job_id:
+                    return self._send_error(
+                        code="JOB_ID_REQUIRED",
+                        message="job_id is required",
+                        status=HTTPStatus.BAD_REQUEST,
+                        endpoint=path,
+                    )
+                job = job_db_store.get_job(job_id)
+                if job is None:
+                    return self._send_error(
+                        code="JOB_NOT_FOUND",
+                        message="job not found",
+                        details={"job_id": job_id},
+                        status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                expected_selection = _save_raw_expectation_from_payload(body)
+                style_label = str(body.get("style_label", "") or "").strip()
+                try:
+                    payload = _save_result_payload_for_job(
+                        runtime=runtime_req,
+                        job=job,
+                        expected=expected_selection,
+                        style_label=style_label,
+                    )
+                except LookupError:
+                    return self._send_error(
+                        code="BOOK_NOT_FOUND",
+                        message="book not found for job",
+                        details={"job_id": job_id, "book_number": int(job.book_number or 0)},
+                        status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                except FileNotFoundError:
+                    return self._send_error(
+                        code="JOB_OUTPUTS_NOT_FOUND",
+                        message="No composite image found for job",
+                        details={"job_id": job_id},
+                        status=HTTPStatus.NOT_FOUND,
+                        endpoint=path,
+                    )
+                except SaveRawIntegrityError as exc:
+                    return self._send_error(
+                        code=exc.code,
+                        message=str(exc),
+                        details=exc.details,
+                        status=HTTPStatus.CONFLICT,
+                        endpoint=path,
+                    )
+                return self._send_json(payload)
+
             if path == "/api/retry-drive-upload":
                 job_id = str(body.get("job_id", "") or body.get("backend_job_id", "")).strip()
                 if not job_id:
@@ -15147,8 +15209,14 @@ def _row_matches_save_raw_expectation(row: dict[str, Any], expected: dict[str, A
     if raw_art_path and str(row.get("raw_art_path", "") or "").strip() != raw_art_path:
         return False
     saved_composited_path = str(expected.get("saved_composited_path", "") or "").strip()
-    if saved_composited_path and str(row.get("saved_composited_path", "") or "").strip() != saved_composited_path:
-        return False
+    if saved_composited_path:
+        row_composite_paths = {
+            str(row.get("saved_composited_path", "") or "").strip(),
+            str(row.get("composited_path", "") or "").strip(),
+        }
+        row_composite_paths.discard("")
+        if saved_composited_path not in row_composite_paths:
+            return False
     return True
 
 
@@ -15463,6 +15531,7 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
                     "name": file_path.name,
                     "path": str(file_path),
                     "file_id": file_id,
+                    "drive_url": f"https://drive.google.com/file/d/{file_id}/view",
                     "action": "updated",
                     "attempts": attempt,
                 }
@@ -15480,6 +15549,7 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
                 "name": file_path.name,
                 "path": str(file_path),
                 "file_id": file_id,
+                "drive_url": f"https://drive.google.com/file/d/{file_id}/view",
                 "action": "created",
                 "attempts": attempt,
             }
@@ -15493,6 +15563,7 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
                 "name": file_path.name,
                 "path": str(file_path),
                 "file_id": "",
+                "drive_url": "",
                 "action": "failed",
                 "attempts": attempt,
                 "error": details["message"],
@@ -15782,6 +15853,199 @@ def _save_raw_payload_for_job(
         "drive_folder_id": str(drive_payload.get("folder_id", "") or ""),
         "drive_uploaded": drive_payload.get("uploaded", []),
         "drive_failed": drive_payload.get("failed", []),
+        "drive_warning": drive_payload.get("warning"),
+        "retry_available": not bool(drive_payload.get("ok", False)),
+        "warning": " ".join(warnings).strip() or None,
+        "drive": drive_payload,
+    }
+
+
+def _local_save_result_root(*, runtime: config.Config) -> Path:
+    return _local_save_raw_root(runtime=runtime) / "_iterate_results"
+
+
+def _safe_filename_component(text: str) -> str:
+    token = _display_filename_token(text, allow_en_dash=False)
+    token = re.sub(r"[^A-Za-z0-9._-]+", "_", token).strip("._")
+    return token or "Untitled"
+
+
+def _save_result_filename(*, title: str, variant: int, style_label: str, stamp: datetime | None = None) -> str:
+    current = stamp or datetime.now(timezone.utc)
+    date_token = current.strftime("%Y%m%d-%H%M%S")
+    title_token = _safe_filename_component(title)
+    style_token = _safe_filename_component(style_label or "Saved Cover")
+    return f"{title_token}_V{max(1, int(variant))}_{style_token}_{date_token}.png"
+
+
+def _save_result_context_for_job(
+    *,
+    runtime: config.Config,
+    job: job_store.JobRecord,
+    expected: dict[str, Any] | None = None,
+    style_label: str = "",
+) -> dict[str, Any]:
+    book = _book_row_for_number(runtime=runtime, book_number=int(job.book_number or 0))
+    if not isinstance(book, dict):
+        raise LookupError("book not found for job")
+
+    selected_row = _row_for_save_raw(job=job, expected=expected)
+    composite_source = _resolve_durable_composite_image_path(runtime=runtime, row=selected_row)
+    if composite_source is None or not composite_source.exists():
+        raise FileNotFoundError("No composite image found for job")
+
+    variant = _row_variant_number(selected_row)
+    title_display = _display_filename_token(str(book.get("title", f"Book {int(job.book_number or 0)}")))
+    author_display = _display_filename_token(str(book.get("author", "Unknown")))
+    catalog_number = str(
+        book.get("catalog_number")
+        or book.get("number")
+        or job.book_number
+        or "0"
+    ).strip()
+    book_folder_name = f"{catalog_number}. {title_display} - {author_display}"
+    resolved_style_label = str(
+        style_label
+        or (job.payload.get("style_label") if isinstance(job.payload, dict) else "")
+        or selected_row.get("style_label")
+        or selected_row.get("prompt_name")
+        or "Saved Cover"
+    ).strip()
+    file_name = _save_result_filename(
+        title=str(book.get("title", f"Book {int(job.book_number or 0)}")),
+        variant=variant,
+        style_label=resolved_style_label,
+    )
+    local_folder = _local_save_result_root(runtime=runtime) / book_folder_name
+    return {
+        "job_id": str(job.id or "").strip(),
+        "book_number": int(job.book_number or 0),
+        "book_folder_name": book_folder_name,
+        "local_folder": local_folder,
+        "local_path": local_folder / file_name,
+        "file_name": file_name,
+        "variant": variant,
+        "model": str(selected_row.get("model", "") or "").strip(),
+        "style_label": resolved_style_label,
+        "composite_source": composite_source,
+    }
+
+
+def _materialize_saved_result_file(
+    *,
+    runtime: config.Config,
+    job: job_store.JobRecord,
+    expected: dict[str, Any] | None = None,
+    style_label: str = "",
+) -> dict[str, Any]:
+    context = _save_result_context_for_job(
+        runtime=runtime,
+        job=job,
+        expected=expected,
+        style_label=style_label,
+    )
+    local_folder = Path(context["local_folder"])
+    local_path = Path(context["local_path"])
+    local_folder.mkdir(parents=True, exist_ok=True)
+    _copy_image_with_format(
+        Path(context["composite_source"]),
+        local_path,
+        format_name="PNG",
+    )
+    return {
+        "job_id": context["job_id"],
+        "book_number": context["book_number"],
+        "book_folder_name": context["book_folder_name"],
+        "local_folder": str(local_folder),
+        "local_path": str(local_path),
+        "file_name": context["file_name"],
+        "variant": context["variant"],
+        "model": context["model"],
+        "style_label": context["style_label"],
+    }
+
+
+def _upload_saved_result_to_drive(
+    *,
+    runtime: config.Config,
+    local_path: Path,
+    parent_folder_id: str,
+) -> dict[str, Any]:
+    service, credentials_path, mode, credentials_meta, connection_error = _drive_service_for_runtime(runtime)
+    payload: dict[str, Any] = {
+        "ok": False,
+        "mode": mode,
+        "parent_folder_id": str(parent_folder_id),
+        "drive_url": None,
+        "drive_file_id": "",
+        "upload": None,
+        "warning": None,
+        "error": connection_error,
+        "credentials_path": str(credentials_path),
+        "credentials": credentials_meta,
+    }
+    if service is None:
+        payload["warning"] = connection_error or "Google Drive is unavailable."
+        return payload
+
+    upload_row = _upload_single_file_to_drive(
+        service=service,
+        parent_folder_id=parent_folder_id,
+        file_path=local_path,
+    )
+    payload["upload"] = upload_row
+    payload["ok"] = bool(upload_row.get("ok", False))
+    payload["drive_file_id"] = str(upload_row.get("file_id", "") or "").strip()
+    payload["drive_url"] = str(upload_row.get("drive_url", "") or "").strip() or None
+    if not payload["ok"]:
+        payload["error"] = str(upload_row.get("error", "") or connection_error or "Drive upload failed.")
+        payload["warning"] = (
+            "The cover was saved locally but could not be uploaded to Google Drive. "
+            f"Error: {payload['error']}"
+        )
+    return payload
+
+
+def _save_result_payload_for_job(
+    *,
+    runtime: config.Config,
+    job: job_store.JobRecord,
+    expected: dict[str, Any] | None = None,
+    style_label: str = "",
+) -> dict[str, Any]:
+    local_payload = _materialize_saved_result_file(
+        runtime=runtime,
+        job=job,
+        expected=expected,
+        style_label=style_label,
+    )
+    drive_payload = _upload_saved_result_to_drive(
+        runtime=runtime,
+        local_path=Path(local_payload["local_path"]),
+        parent_folder_id=SAVE_RESULT_DRIVE_FOLDER_ID,
+    )
+    warnings = [
+        token
+        for token in [
+            str(drive_payload.get("warning", "") or "").strip(),
+        ]
+        if token
+    ]
+    return {
+        "ok": True,
+        "job_id": local_payload["job_id"],
+        "book_number": local_payload["book_number"],
+        "book_folder_name": local_payload["book_folder_name"],
+        "local_folder": local_payload["local_folder"],
+        "local_path": local_payload["local_path"],
+        "file_name": local_payload["file_name"],
+        "variant": local_payload["variant"],
+        "model": local_payload["model"],
+        "style_label": local_payload["style_label"],
+        "status": "saved" if bool(drive_payload.get("ok", False)) else "partial",
+        "drive_ok": bool(drive_payload.get("ok", False)),
+        "drive_url": drive_payload.get("drive_url"),
+        "drive_file_id": str(drive_payload.get("drive_file_id", "") or ""),
         "drive_warning": drive_payload.get("warning"),
         "retry_available": not bool(drive_payload.get("ok", False)),
         "warning": " ".join(warnings).strip() or None,
