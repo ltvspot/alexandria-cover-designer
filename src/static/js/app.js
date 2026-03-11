@@ -355,6 +355,8 @@ window.JobQueue = {
               compose_prompt: job.compose_prompt !== false,
               preserve_prompt_text: job.preserve_prompt_text === true,
               library_prompt_id: String(job.library_prompt_id || '').trim() || undefined,
+              scene_description: String(job.scene_description || '').trim() || undefined,
+              prompt_template_id: String(job.prompt_template_id || '').trim() || undefined,
               cover_source: 'drive',
               selected_cover_id: resolvedSelectedCoverId,
               selected_cover_book_number: resolvedBookNumber,
@@ -407,15 +409,17 @@ window.JobQueue = {
             await new Promise((resolve) => setTimeout(resolve, Math.min((attempts + 1) * 5000, 30000)));
             continue;
           }
+          const exhausted = /(?:^|[\s:])402(?:\b|:)|requires more credits|can only afford|max_tokens|insufficient credits/i.test(message);
           const transient = /timed out|timeout|missing image payload|polling failed: http 5\d\d|temporarily unavailable/i.test(message);
-          if (transient && attempts < this.MAX_RETRIES + 1) {
+          if ((transient || exhausted) && attempts < this.MAX_RETRIES + 1) {
             const nextModel = this._nextRetryModel(job);
             if (nextModel) {
               job.model = nextModel;
               job._attempted_models.push(nextModel);
-              setStatus('retrying', `Transient error; switching to ${this._modelLabel(nextModel)} (${attempts}/${this.MAX_RETRIES})`);
+              const reasonLabel = exhausted ? 'Provider limit hit' : 'Transient error';
+              setStatus('retrying', `${reasonLabel}; switching to ${this._modelLabel(nextModel)} (${attempts}/${this.MAX_RETRIES})`);
             } else {
-              setStatus('retrying', `Transient error, retry ${attempts}/${this.MAX_RETRIES}`);
+              setStatus('retrying', `${exhausted ? 'Provider limit hit' : 'Transient error'}, retry ${attempts}/${this.MAX_RETRIES}`);
             }
             await new Promise((resolve) => setTimeout(resolve, Math.min((attempts + 1) * 4000, 30000)));
             continue;

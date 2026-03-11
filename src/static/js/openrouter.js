@@ -86,10 +86,10 @@ window.OpenRouter = {
     } catch (err) {
       console.warn('Unable to load models from backend:', err.message);
       this.MODELS = [
+        { id: 'openrouter/google/gemini-3-pro-image-preview', label: 'Nano Banana Pro', cost: 0.02, modality: 'both', status: 'active', statusReason: '' },
+        { id: 'openrouter/google/gemini-2.5-flash-image', label: 'Nano Banana (Gemini 2.5 Flash)', cost: 0.003, modality: 'both' },
         { id: 'openai/gpt-image-1-mini', label: 'GPT Image 1 Mini', cost: 0.01, modality: 'both', status: 'active', statusReason: '' },
         { id: 'openrouter/openai/gpt-5-image', label: 'GPT-5 Image', cost: 0.04, modality: 'both' },
-        { id: 'openrouter/google/gemini-3-pro-image-preview', label: 'Nano Banana Pro', cost: 0.02, modality: 'both' },
-        { id: 'openrouter/google/gemini-2.5-flash-image', label: 'Nano Banana (Gemini 2.5 Flash)', cost: 0.003, modality: 'both' },
       ];
       this.MODELS.forEach((m) => {
         this.MODEL_COSTS[m.id] = m.cost;
@@ -137,6 +137,9 @@ window.OpenRouter = {
     if (typeof options.compose_prompt === 'boolean') payload.compose_prompt = options.compose_prompt;
     if (options.preserve_prompt_text === true) payload.preserve_prompt_text = true;
     if (options.library_prompt_id) payload.library_prompt_id = String(options.library_prompt_id).trim();
+    if (options.prompt_template_id) payload.prompt_template_id = String(options.prompt_template_id).trim();
+    if (options.template_id) payload.template_id = String(options.template_id).trim();
+    if (options.scene_description) payload.scene_description = String(options.scene_description).trim();
 
     const generateResp = await fetch('/api/generate', {
       method: 'POST',

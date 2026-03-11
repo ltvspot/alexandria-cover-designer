@@ -602,6 +602,81 @@ main.content {
   flex-wrap: wrap;
 }
 
+.variant-plan-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(10, 22, 40, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.variant-plan-card:hover {
+  border-color: #c7a95d;
+  transform: translateY(-1px);
+}
+
+.variant-plan-card.is-active {
+  border-width: 2px;
+  border-color: #d4af37;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.22);
+}
+
+.variant-customizer {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fbfcfe;
+  margin-bottom: 16px;
+}
+
+.variant-customizer summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--navy);
+  list-style: none;
+}
+
+.variant-customizer summary::-webkit-details-marker {
+  display: none;
+}
+
+.variant-customizer-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.variant-customizer-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(240px, 1fr) minmax(260px, 1.3fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #d9e3ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.variant-customizer-row.is-active {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.18);
+}
+
+.variant-customizer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.variant-customizer-title {
+  font-weight: 700;
+  color: var(--navy);
+}
+
 .tag-provider {
   background: #e7ecf3;
   color: #5a6f93;
@@ -1331,6 +1406,8 @@ tr:hover td {
 @media (max-width: 1024px) {
   .settings-grid { grid-template-columns: 1fr; }
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .variant-customizer-row { grid-template-columns: 1fr; }
+  .variant-customizer-meta { align-items: flex-start; }
 }
 
 @media (max-width: 768px) {
@@ -1378,5 +1455,9 @@ tr:hover td {
 
   .model-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .variant-customizer {
+    padding: 12px;
   }
 }

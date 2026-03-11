@@ -24,6 +24,7 @@ def _run_iterate_hook(*, function_name: str, payload: dict, prompts: list[dict] 
 
         global.window = {{ Pages: {{}}, __ITERATE_TEST_HOOKS__: {{}} }};
         global.document = {{}};
+        global.console = {{ log: () => {{}}, warn: () => {{}}, error: () => {{}} }};
         const promptRows = {json.dumps(prompts or [])};
         global.DB = {{
           dbGetAll: (table) => table === 'prompts' ? promptRows : [],
@@ -178,9 +179,13 @@ def test_iterate_wildcard_rotation_changes_across_days():
     assert first["id"] != second["id"]
 
 
-def test_iterate_variant_prompt_plan_uses_base_then_rotating_wildcards():
+def test_iterate_variant_prompt_plan_interleaves_base_rotation_and_wildcards():
     prompts = [
+        {"id": "alexandria-base-classical-devotion", "name": "BASE 1 — Classical Devotion", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-philosophical-gravitas", "name": "BASE 2 — Philosophical Gravitas", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-gothic-atmosphere", "name": "BASE 3 — Gothic Atmosphere", "tags": ["alexandria", "base"]},
         {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-base-esoteric-mysticism", "name": "BASE 5 — Esoteric Mysticism", "tags": ["alexandria", "base"]},
         {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-impressionist-plein-air", "name": "WILDCARD 8 — Impressionist Plein Air", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-romantic-landscape", "name": "WILDCARD 10 — Romantic Landscape", "tags": ["alexandria", "wildcard"]},
@@ -190,17 +195,33 @@ def test_iterate_variant_prompt_plan_uses_base_then_rotating_wildcards():
     assignments = _run_iterate_hook(
         function_name="buildVariantPromptAssignments",
         payload={
-            "book": {"title": "Emma", "author": "Jane Austen", "genre": "literature"},
-            "variantCount": 4,
+            "book": {
+                "title": "Emma",
+                "author": "Jane Austen",
+                "genre": "literature",
+                "enrichment": {
+                    "iconic_scenes": [
+                        "Emma Woodhouse scolding Harriet in the Hartfield drawing room",
+                        "The Box Hill picnic where Emma insults Miss Bates",
+                        "Mr. Knightley confronting Emma on the walk back from Box Hill",
+                    ],
+                },
+            },
+            "variantCount": 6,
             "referenceDate": "2026-03-11T00:00:00.000Z",
         },
         prompts=prompts,
     )
 
-    assert assignments[0]["promptId"] == "alexandria-base-romantic-realism"
-    assert [row["variant"] for row in assignments] == [1, 2, 3, 4]
-    assert all(row["promptId"] != "alexandria-base-romantic-realism" for row in assignments[1:])
-    assert len({row["promptId"] for row in assignments[1:]}) == 3
+    assert [row["variant"] for row in assignments] == [1, 2, 3, 4, 5, 6]
+    assert [assignments[0]["promptId"], assignments[2]["promptId"], assignments[4]["promptId"]] == [
+        "alexandria-base-romantic-realism",
+        "alexandria-base-classical-devotion",
+        "alexandria-base-philosophical-gravitas",
+    ]
+    assert all(row["promptType"] == "wildcard" for row in [assignments[1], assignments[3], assignments[5]])
+    assert len({row["promptId"] for row in [assignments[1], assignments[3], assignments[5]]}) == 3
+    assert len({row["scene"] for row in assignments[:3]}) == 3
 
 
 def test_iterate_variant_prompt_plan_falls_back_to_literature_defaults_for_unknown_genre():
@@ -222,6 +243,7 @@ def test_iterate_variant_prompt_plan_falls_back_to_literature_defaults_for_unkno
         "alexandria-wildcard-art-nouveau-poster",
         "alexandria-wildcard-pre-raphaelite-dream",
     }
+    assert assignments[2]["promptId"] == "alexandria-base-classical-devotion"
 
 
 def test_iterate_science_genre_maps_to_scientific_wildcards():
@@ -248,7 +270,7 @@ def test_iterate_short_real_name_is_not_generic():
     assert result is False
 
 
-def test_iterate_default_selected_model_skips_degraded_nano_and_uses_openai_fallback():
+def test_iterate_default_selected_model_keeps_nano_even_when_google_is_down():
     result = _run_iterate_hook(
         function_name="defaultSelectedModelIds",
         payload={
@@ -269,7 +291,7 @@ def test_iterate_default_selected_model_skips_degraded_nano_and_uses_openai_fall
         },
     )
 
-    assert result == ["openai/gpt-image-1-mini"]
+    assert result == ["openrouter/google/gemini-3-pro-image-preview"]
 
 
 def test_iterate_model_availability_disables_direct_google_model_when_connectivity_fails():
@@ -289,7 +311,7 @@ def test_iterate_model_availability_disables_direct_google_model_when_connectivi
     assert "leaked" in result["reason"].lower()
 
 
-def test_iterate_default_selected_model_prefers_openai_when_google_is_down_even_before_runtime_failures():
+def test_iterate_default_selected_model_still_prefers_nano_before_runtime_failures():
     result = _run_iterate_hook(
         function_name="defaultSelectedModelIds",
         payload={
@@ -307,4 +329,93 @@ def test_iterate_default_selected_model_prefers_openai_when_google_is_down_even_
         },
     )
 
-    assert result == ["openai/gpt-image-1-mini"]
+    assert result == ["openrouter/google/gemini-3-pro-image-preview"]
+
+
+def test_iterate_variant_jobs_create_exactly_one_job_per_variant_with_rotating_metadata():
+    result = _run_iterate_hook(
+        function_name="buildVariantJobs",
+        payload={
+            "book": {
+                "title": "Gulliver's Travels",
+                "author": "Jonathan Swift",
+                "genre": "adventure",
+                "enrichment": {
+                    "iconic_scenes": [
+                        "Lemuel Gulliver bound by the Lilliputians on the shore",
+                        "Gulliver towering over the tiny palace in Lilliput",
+                        "Gulliver standing among the giants of Brobdingnag",
+                        "Gulliver facing the Houyhnhnms across a windswept plain",
+                    ],
+                    "emotional_tone": "satirical, adventurous, absurd",
+                    "era": "Georgian era",
+                },
+            },
+            "bookId": 3,
+            "modelId": "openrouter/google/gemini-3-pro-image-preview",
+            "variantCount": 4,
+            "variantPromptPlan": [
+                {
+                    "variant": 1,
+                    "autoPromptId": "alexandria-base-romantic-realism",
+                    "autoScene": "Lemuel Gulliver bound by the Lilliputians on the shore",
+                    "usesAutoAssignment": True,
+                    "usesAutoScene": True,
+                    "promptId": "alexandria-base-romantic-realism",
+                    "customPrompt": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text.",
+                    "sceneVal": "Lemuel Gulliver bound by the Lilliputians on the shore",
+                    "moodVal": "satirical, adventurous, absurd",
+                    "eraVal": "Georgian era",
+                },
+                {
+                    "variant": 2,
+                    "autoPromptId": "alexandria-wildcard-antique-map-illustration",
+                    "autoScene": "Gulliver towering over the tiny palace in Lilliput",
+                    "usesAutoAssignment": True,
+                    "usesAutoScene": True,
+                    "promptId": "alexandria-wildcard-antique-map-illustration",
+                    "customPrompt": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text.",
+                    "sceneVal": "Gulliver towering over the tiny palace in Lilliput",
+                    "moodVal": "satirical, adventurous, absurd",
+                    "eraVal": "Georgian era",
+                },
+                {
+                    "variant": 3,
+                    "autoPromptId": "alexandria-base-classical-devotion",
+                    "autoScene": "Gulliver standing among the giants of Brobdingnag",
+                    "usesAutoAssignment": True,
+                    "usesAutoScene": True,
+                    "promptId": "alexandria-base-classical-devotion",
+                    "customPrompt": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text.",
+                    "sceneVal": "Gulliver standing among the giants of Brobdingnag",
+                    "moodVal": "satirical, adventurous, absurd",
+                    "eraVal": "Georgian era",
+                },
+                {
+                    "variant": 4,
+                    "autoPromptId": "alexandria-wildcard-maritime-chart",
+                    "autoScene": "Gulliver facing the Houyhnhnms across a windswept plain",
+                    "usesAutoAssignment": True,
+                    "usesAutoScene": True,
+                    "promptId": "alexandria-wildcard-maritime-chart",
+                    "customPrompt": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text.",
+                    "sceneVal": "Gulliver facing the Houyhnhnms across a windswept plain",
+                    "moodVal": "satirical, adventurous, absurd",
+                    "eraVal": "Georgian era",
+                },
+            ],
+        },
+        prompts=[
+            {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "prompt_template": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text."},
+            {"id": "alexandria-base-classical-devotion", "name": "BASE 1 — Classical Devotion", "prompt_template": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text."},
+            {"id": "alexandria-wildcard-antique-map-illustration", "name": "WILDCARD 27 — Antique Map Illustration", "prompt_template": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text."},
+            {"id": "alexandria-wildcard-maritime-chart", "name": "WILDCARD 29 — Maritime Chart", "prompt_template": "Book cover illustration only. {SCENE}. Mood: {MOOD}. Era: {ERA}. No text."},
+        ],
+    )
+
+    assert result["validationError"] == ""
+    assert len(result["jobs"]) == 4
+    assert {job["model"] for job in result["jobs"]} == {"openrouter/google/gemini-3-pro-image-preview"}
+    assert {job["variant"] for job in result["jobs"]} == {1, 2, 3, 4}
+    assert len({job["prompt_template_id"] for job in result["jobs"]}) == 4
+    assert len({job["scene_description"] for job in result["jobs"]}) == 4

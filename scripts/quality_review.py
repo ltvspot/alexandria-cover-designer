@@ -10018,7 +10018,7 @@ def serve_review_webapp(
                 models = body.get("models", [])
                 active_models = [str(item).strip() for item in models if str(item).strip()] if isinstance(models, list) else []
                 if not active_models:
-                    active_models = runtime_req.all_models[:]
+                    active_models = [config.DEFAULT_MODEL]
                 max_variants = _max_generation_variants(runtime_req)
                 variants = _safe_int(body.get("variants"), runtime_req.variants_per_cover)
                 requested_variant = max(1, _safe_int(body.get("variant"), 1))
@@ -11911,13 +11911,7 @@ def serve_review_webapp(
                     _validate_prompt_before_generation(prompt, book_row)
                 active_models = [str(item).strip() for item in models if str(item).strip()]
                 if not active_models:
-                    return self._send_error(
-                        code="MODELS_REQUIRED",
-                        message="Select at least one model before generating.",
-                        details={"models": models},
-                        status=HTTPStatus.BAD_REQUEST,
-                        endpoint=path,
-                    )
+                    active_models = [config.DEFAULT_MODEL]
                 valid_catalog_source, catalog_source_error = _validate_catalog_cover_request(
                     runtime=runtime_req,
                     book=book,

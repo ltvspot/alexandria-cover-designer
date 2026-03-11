@@ -40,8 +40,10 @@ MODEL_PROMPT_OVERRIDES_PATH = CONFIG_DIR / os.getenv("MODEL_PROMPT_OVERRIDES_FIL
 DEFAULT_CATALOG_ID = os.getenv("CATALOG_ID", "classics").strip() or "classics"
 
 # Provider defaults
+DEFAULT_MODEL = "openrouter/google/gemini-3-pro-image-preview"
+DEFAULT_MODEL_DISPLAY_NAME = "Nano Banana Pro"
 AI_PROVIDER = os.getenv("AI_PROVIDER", "openrouter").strip().lower()
-AI_MODEL = os.getenv("AI_MODEL", "openrouter/google/gemini-3-pro-image-preview").strip()
+AI_MODEL = os.getenv("AI_MODEL", DEFAULT_MODEL).strip()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 FAL_API_KEY = os.getenv("FAL_API_KEY", "")
