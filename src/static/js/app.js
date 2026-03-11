@@ -410,16 +410,22 @@ window.JobQueue = {
             continue;
           }
           const exhausted = /(?:^|[\s:])402(?:\b|:)|requires more credits|can only afford|max_tokens|insufficient credits/i.test(message);
+          const providerBlocked = /(?:^|[\s:])403(?:\b|:)|reported as leaked|permission denied|provider unavailable|api key/i.test(message);
           const transient = /timed out|timeout|missing image payload|polling failed: http 5\d\d|temporarily unavailable/i.test(message);
-          if ((transient || exhausted) && attempts < this.MAX_RETRIES + 1) {
+          if ((transient || exhausted || providerBlocked) && attempts < this.MAX_RETRIES + 1) {
             const nextModel = this._nextRetryModel(job);
             if (nextModel) {
               job.model = nextModel;
               job._attempted_models.push(nextModel);
-              const reasonLabel = exhausted ? 'Provider limit hit' : 'Transient error';
+              const reasonLabel = exhausted
+                ? 'Provider limit hit'
+                : (providerBlocked ? 'Provider blocked' : 'Transient error');
               setStatus('retrying', `${reasonLabel}; switching to ${this._modelLabel(nextModel)} (${attempts}/${this.MAX_RETRIES})`);
             } else {
-              setStatus('retrying', `${exhausted ? 'Provider limit hit' : 'Transient error'}, retry ${attempts}/${this.MAX_RETRIES}`);
+              const reasonLabel = exhausted
+                ? 'Provider limit hit'
+                : (providerBlocked ? 'Provider blocked' : 'Transient error');
+              setStatus('retrying', `${reasonLabel}, retry ${attempts}/${this.MAX_RETRIES}`);
             }
             await new Promise((resolve) => setTimeout(resolve, Math.min((attempts + 1) * 4000, 30000)));
             continue;
