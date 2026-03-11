@@ -287,3 +287,24 @@ def test_iterate_model_availability_disables_direct_google_model_when_connectivi
     assert result["selectable"] is False
     assert result["degraded"] is False
     assert "leaked" in result["reason"].lower()
+
+
+def test_iterate_default_selected_model_prefers_openai_when_google_is_down_even_before_runtime_failures():
+    result = _run_iterate_hook(
+        function_name="defaultSelectedModelIds",
+        payload={
+            "models": [
+                {"id": "openrouter/google/gemini-3-pro-image-preview", "status": "active"},
+                {"id": "openai/gpt-image-1-mini", "status": "active"},
+                {"id": "openrouter/openai/gpt-5-image", "status": "active"},
+            ],
+            "providerConnectivity": {
+                "openrouter": {"status": "connected", "error": None},
+                "openai": {"status": "connected", "error": None},
+                "google": {"status": "error", "error": "Google error 403: leaked"},
+            },
+            "providerRuntime": {},
+        },
+    )
+
+    assert result == ["openai/gpt-image-1-mini"]

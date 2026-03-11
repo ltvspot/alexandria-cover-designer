@@ -20,6 +20,13 @@ const PREFERRED_DEFAULT_MODELS = [
   'openrouter/openai/gpt-5-image',
   'fal/fal-ai/flux-2/klein/4b',
 ];
+const GOOGLE_DOWN_DEFAULT_MODELS = [
+  'openai/gpt-image-1-mini',
+  'openai/gpt-image-1',
+  'openrouter/openai/gpt-5-image-mini',
+  'openrouter/openai/gpt-5-image',
+  'fal/fal-ai/flux-2/klein/4b',
+];
 const RECOMMENDED_PINNED_MODEL_IDS = [
   'openrouter/google/gemini-3-pro-image-preview',
   'google/gemini-3-pro-image-preview',
@@ -1236,10 +1243,15 @@ function getRecommendedModelIds(models) {
 }
 
 function defaultSelectedModelIds(models, availabilityOptions = {}) {
+  const providerConnectivity = availabilityOptions?.providerConnectivity || _providerConnectivity;
   const selectable = models.filter((model) => modelAvailability(model, availabilityOptions).selectable);
   const healthy = selectable.filter((model) => !modelAvailability(model, availabilityOptions).degraded);
   const pool = healthy.length ? healthy : selectable;
-  const preferred = PREFERRED_DEFAULT_MODELS.find((id) => pool.some((model) => normalizedModelId(model) === id));
+  const googleStatus = String(providerConnectivity?.google?.status || '').trim().toLowerCase();
+  const preferenceOrder = googleStatus === 'error'
+    ? Array.from(new Set([...GOOGLE_DOWN_DEFAULT_MODELS, ...PREFERRED_DEFAULT_MODELS]))
+    : PREFERRED_DEFAULT_MODELS;
+  const preferred = preferenceOrder.find((id) => pool.some((model) => normalizedModelId(model) === id));
   if (preferred) return [preferred];
   const first = normalizedModelId(pool[0] || null);
   return first ? [first] : [];
