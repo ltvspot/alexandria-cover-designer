@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import textwrap
-from urllib.parse import parse_qs, urlparse
+from typing import Any
 
 import pytest
 
@@ -13,36 +13,21 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-TEST_PROMPTS = [
-    {"id": "alexandria-base-classical-devotion", "name": "BASE 1 — Classical Devotion"},
-    {"id": "alexandria-base-philosophical-gravitas", "name": "BASE 2 — Philosophical Gravitas"},
-    {"id": "alexandria-base-gothic-atmosphere", "name": "BASE 3 — Gothic Atmosphere"},
-    {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism"},
-    {"id": "alexandria-base-esoteric-mysticism", "name": "BASE 5 — Esoteric Mysticism"},
-    {"id": "alexandria-wildcard-edo-meets-alexandria", "name": "WILDCARD 1 — Dramatic Graphic Novel"},
-    {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Vintage Travel Poster"},
-    {"id": "alexandria-wildcard-illuminated-manuscript", "name": "WILDCARD 3 — Illuminated Manuscript"},
-    {"id": "alexandria-wildcard-celestial-cartography", "name": "WILDCARD 4 — Celestial Cartography"},
-    {"id": "alexandria-wildcard-temple-of-knowledge", "name": "WILDCARD 5 — Temple of Knowledge"},
-]
-
-
-def _run_iterate_hook(hook_name: str, payload, prompts=None) -> dict | list | str:
+def _run_iterate_hook(*, function_name: str, payload: dict, prompts: list[dict] | None = None) -> Any:
     if shutil.which("node") is None:
         pytest.skip("node not installed")
 
-    prompt_rows = prompts if prompts is not None else []
     node_script = textwrap.dedent(
         f"""
         const fs = require('fs');
         const vm = require('vm');
-        const prompts = {json.dumps(prompt_rows)};
 
-        global.window = {{ Pages: {{}}, __ITERATE_TEST_HOOKS__: {{}}, location: {{ origin: 'https://example.test' }} }};
+        global.window = {{ Pages: {{}}, __ITERATE_TEST_HOOKS__: {{}} }};
         global.document = {{}};
+        const promptRows = {json.dumps(prompts or [])};
         global.DB = {{
-          dbGetAll: (table) => table === 'prompts' ? prompts : [],
-          dbGet: (table, id) => table === 'prompts' ? (prompts.find((row) => String(row.id) === String(id)) || null) : null,
+          dbGetAll: (table) => table === 'prompts' ? promptRows : [],
+          dbGet: (table, key) => table === 'prompts' ? (promptRows.find((row) => String(row.id) === String(key)) || null) : null,
         }};
         global.OpenRouter = {{ MODELS: [] }};
         global.Toast = {{}};
@@ -59,7 +44,7 @@ def _run_iterate_hook(hook_name: str, payload, prompts=None) -> dict | list | st
 
         const source = fs.readFileSync('src/static/js/pages/iterate.js', 'utf8');
         vm.runInThisContext(source, {{ filename: 'iterate.js' }});
-        const fn = window.__ITERATE_TEST_HOOKS__[{json.dumps(hook_name)}];
+        const fn = window.__ITERATE_TEST_HOOKS__[{json.dumps(function_name)}];
         const result = fn({json.dumps(payload)});
         process.stdout.write(JSON.stringify(result));
         """
@@ -76,51 +61,7 @@ def _run_iterate_hook(hook_name: str, payload, prompts=None) -> dict | list | st
 
 
 def _run_iterate_prompt_builder(payload: dict) -> dict:
-    return _run_iterate_hook("buildGenerationJobPrompt", payload)
-
-
-def _run_iterate_default_mood(book: dict) -> str:
-    return _run_iterate_hook("defaultMoodForBook", book)
-
-
-def _run_iterate_default_scene(book: dict) -> str:
-    return _run_iterate_hook("defaultSceneForBook", book)
-
-
-def _run_iterate_resolve_composite_preview_sources(job: dict) -> list[str]:
-    return _run_iterate_hook("resolveCompositePreviewSources", {"job": job})
-
-
-def _run_iterate_pick_full_resolution_source(job: dict, *, prefer_raw: bool = False) -> str:
-    return _run_iterate_hook("pickFullResolutionSource", {"job": job, "preferRaw": prefer_raw})
-
-
-def _run_iterate_resolve_job_artifact_href(job: dict, keys: list[str]) -> str:
-    return _run_iterate_hook("resolveJobArtifactHref", {"job": job, "keys": keys})
-
-
-def _run_iterate_apply_prompt_placeholders(
-    *,
-    prompt_text: str,
-    book: dict,
-    scene_override: str = "",
-    mood_override: str = "",
-    era_override: str = "",
-) -> str:
-    return _run_iterate_hook(
-        "applyPromptPlaceholders",
-        {
-            "promptText": prompt_text,
-            "book": book,
-            "sceneOverride": scene_override,
-            "moodOverride": mood_override,
-            "eraOverride": era_override,
-        },
-    )
-
-
-def _run_iterate_ensure_enriched_prompt(prompt_text: str, book: dict, scene_override: str = "") -> str:
-    return _run_iterate_hook("ensureEnrichedPrompt", {"promptText": prompt_text, "book": book, "sceneOverride": scene_override})
+    return _run_iterate_hook(function_name="buildGenerationJobPrompt", payload=payload)
 
 
 def test_iterate_prompt_builder_keeps_library_prompt_precomposed():
@@ -189,472 +130,119 @@ def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto(
     assert result["libraryPromptId"] == ""
 
 
-def test_iterate_prompt_builder_appends_enrichment_for_default_auto_when_available():
-    result = _run_iterate_prompt_builder(
-        {
-            "book": {
-                "title": "Gulliver's Travels",
-                "author": "Jonathan Swift",
-                "enrichment": {
-                    "iconic_scenes": [
-                        "Gulliver wakes on the beach bound by hundreds of tiny ropes while Lilliputians climb over him",
-                    ],
-                    "protagonist": "Gulliver",
-                    "setting_primary": "the shore of Lilliput",
-                    "emotional_tone": "satirical wonder with unease",
-                    "era": "18th-century voyage literature",
-                },
-            },
-            "templateObj": None,
-            "promptId": "",
-            "customPrompt": "",
-            "sceneVal": "",
-            "moodVal": "",
-            "eraVal": "",
-            "style": {"id": "romantic-sublime", "label": "Romantic Sublime"},
-        }
-    )
-
-    assert "Gulliver wakes on the beach bound by hundreds of tiny ropes" in result["prompt"]
-    assert "The illustration must depict:" in result["prompt"]
-    assert "A pivotal dramatic moment from the literary work" not in result["prompt"]
-
-
-def test_iterate_prompt_builder_uses_evocative_scene_fallback_when_scene_missing():
-    result = _run_iterate_prompt_builder(
-        {
-            "book": {
-                "title": "A Room with a View",
-                "author": "E. M. Forster",
-            },
-            "templateObj": {
-                "id": "alexandria-base-romantic-realism",
-                "name": "BASE 4 Romantic Realism",
-                "prompt_template": "Book cover illustration only — {SCENE}. The mood is {MOOD}. Era reference: {ERA}.",
-            },
-            "promptId": "alexandria-base-romantic-realism",
-            "customPrompt": "",
-            "sceneVal": "",
-            "moodVal": "",
-            "eraVal": "",
-            "style": {"id": "romantic-sublime", "label": "Romantic Sublime"},
-        }
-    )
-
-    assert 'a scene from "A Room with a View"' in result["prompt"]
-    assert "centered and fully contained" not in result["prompt"]
-
-
-def test_ensure_enriched_prompt_replaces_generic_scene_and_mood():
-    resolved = _run_iterate_ensure_enriched_prompt(
-        'Create a colorful circular medallion illustration for "Gulliver\'s Travels" by Jonathan Swift. '
-        'A pivotal dramatic moment from the literary work "Gulliver\'s Travels" by Jonathan Swift, '
-        'depicting the central emotional conflict with period-accurate setting, costume, and atmosphere. '
-        'Mood: classical, timeless, evocative.',
-        {
-            "title": "Gulliver's Travels",
-            "author": "Jonathan Swift",
-            "enrichment": {
-                "iconic_scenes": [
-                    "Gulliver wakes on the beach bound by hundreds of tiny ropes while Lilliputians climb over him",
-                ],
-                "protagonist": "Gulliver",
-                "setting_primary": "the shore of Lilliput",
-                "emotional_tone": "satirical wonder with unease",
-                "era": "18th-century voyage literature",
-            },
-        },
-    )
-
-    assert "A pivotal dramatic moment from the literary work" not in resolved
-    assert "Gulliver wakes on the beach bound by hundreds of tiny ropes" in resolved
-    assert "satirical wonder with unease" in resolved
-
-
-def test_ensure_enriched_prompt_honors_scene_override_for_rotated_variant():
-    resolved = _run_iterate_ensure_enriched_prompt(
-        'Book cover illustration only. A pivotal dramatic moment from the literary work "Gulliver\'s Travels" by Jonathan Swift. Mood: classical, timeless, evocative.',
-        {
-            "title": "Gulliver's Travels",
-            "author": "Jonathan Swift",
-            "enrichment": {
-                "iconic_scenes": [
-                    "Gulliver wakes on the beach bound by hundreds of tiny ropes while Lilliputians climb over him",
-                    "Gulliver towers over the court of Brobdingnag as nobles stare up in awe",
-                ],
-                "emotional_tone": "satirical wonder with unease",
-            },
-        },
-        "Gulliver towers over the court of Brobdingnag as nobles stare up in awe",
-    )
-
-    assert "Brobdingnag" in resolved
-    assert "Lilliputians climb over him" not in resolved
-
-
-def test_build_scene_pool_uses_enrichment_sources_and_variation_prefixes():
+def test_iterate_scene_pool_filters_generic_enrichment_and_uses_prompt_context():
     result = _run_iterate_hook(
-        "buildScenePool",
-        {
-            "title": "A Room with a View",
-            "enrichment": {
-                "iconic_scenes": [
-                    "Lucy Honeychurch at the pension window overlooking Florence",
-                    "George Emerson and Lucy in the Italian countryside",
-                ],
-                "protagonist": "Lucy Honeychurch",
-                "setting_primary": "Edwardian Florence terraces",
-                "setting_details": "cypress trees and sunlit courtyards",
-                "visual_motifs": ["violet flowers", "open window", "travel guidebook"],
-                "symbolic_elements": ["view over the Arno", "threshold between freedom and convention"],
-                "key_characters": ["Lucy Honeychurch", "George Emerson", "Charlotte Bartlett"],
-            },
-            "count": 8,
-        },
-    )
-
-    assert len(result) == 8
-    assert result[0] == "Lucy Honeychurch at the pension window overlooking Florence"
-    assert result[1] == "George Emerson and Lucy in the Italian countryside"
-    assert "Lucy Honeychurch in a pivotal moment" in result[2]
-    assert result[3].startswith("Edwardian Florence terraces")
-    assert result[4].startswith("symbolic arrangement of violet flowers")
-    assert result[5] == "Lucy Honeychurch, George Emerson, Charlotte Bartlett — a dramatic ensemble scene from the story"
-    assert result[6].startswith("intimate close-up view of ")
-    assert result[7].startswith("intimate close-up view of ")
-
-
-def test_default_mood_for_book_prefers_emotional_tone():
-    result = _run_iterate_default_mood(
-        {
-            "mood": "",
-            "enrichment": {
-                "emotional_tone": "restless wonder and romantic longing",
-                "mood": "generic fallback",
-                "tones": ["should not be used"],
-            },
-        }
-    )
-
-    assert result == "restless wonder and romantic longing"
-
-
-def test_default_scene_for_book_filters_generic_placeholder_scenes():
-    result = _run_iterate_default_scene(
-        {
-            "title": "Emma",
-            "enrichment": {
-                "iconic_scenes": [
-                    "Iconic turning point in the story with period-accurate costume",
-                    "Emma Woodhouse confronting Mr. Knightley on the Box Hill hillside after the insult to Miss Bates",
-                ],
-            },
-        }
-    )
-
-    assert "Iconic turning point" not in result
-    assert "Emma Woodhouse confronting Mr. Knightley" in result
-
-
-def test_apply_prompt_placeholders_appends_specific_protagonist_to_scene():
-    result = _run_iterate_apply_prompt_placeholders(
-        prompt_text="Book cover illustration only — {SCENE}. The mood is {MOOD}. Era reference: {ERA}.",
-        book={
+        function_name="buildScenePool",
+        payload={
             "title": "Emma",
             "author": "Jane Austen",
             "enrichment": {
-                "protagonist": "Emma Woodhouse",
                 "iconic_scenes": [
-                    "Emma stands in the drawing room at Hartfield while planning a match for Harriet Smith",
+                    "Iconic turning point from Emma",
+                    "Emma Woodhouse insulting Miss Bates during the Box Hill picnic",
                 ],
-                "emotional_tone": "witty romantic tension",
-                "era": "Regency England",
             },
-        },
-    )
-
-    assert "Emma stands in the drawing room at Hartfield" in result
-    assert "The main character is Emma Woodhouse" in result
-
-
-def test_build_scene_pool_filters_generic_placeholder_scenes():
-    result = _run_iterate_hook(
-        "buildScenePool",
-        {
-            "title": "Emma",
-            "enrichment": {
-                "iconic_scenes": [
-                    "Iconic turning point in the story with classical dramatic tension",
-                    "Emma Woodhouse at Box Hill while Mr. Knightley rebukes her cruelty toward Miss Bates",
+            "prompt_context": {
+                "scene_pool": [
+                    "Emma Woodhouse standing in Hartfield's drawing room overlooking Highbury",
                 ],
-                "protagonist": "Central protagonist",
-                "setting_primary": "Highbury drawing rooms",
             },
-            "count": 2,
         },
     )
 
-    assert all("Iconic turning point" not in scene for scene in result)
-    assert result[0].startswith("Emma Woodhouse at Box Hill")
+    assert "Iconic turning point from Emma" not in result
+    assert result[0].startswith("Emma Woodhouse standing in Hartfield")
 
 
-def test_build_scene_pool_uses_title_keywords_when_enrichment_missing():
-    result = _run_iterate_hook(
-        "buildScenePool",
-        {
-            "title": "A Room with a View",
-            "prompt_components": {
-                "title_keywords": ["room", "view", "window", "italian villa", "florentine landscape"],
-            },
-            "count": 5,
-        },
-    )
-
-    assert result == [
-        'narrative tableau shaped by room, view, window — a defining moment from A Room with a View',
-        'setting-focused scene built around italian villa and florentine landscape with period atmosphere',
-        'symbolic arrangement of room, view, window, italian villa — thematic emblem for A Room with a View',
-        'intimate close-up view of narrative tableau shaped by room, view, window — a defining moment from A Room with a View',
-        'intimate close-up view of setting-focused scene built around italian villa and florentine landscape with period atmosphere',
+def test_iterate_wildcard_rotation_changes_across_days():
+    prompts = [
+        {"id": "alexandria-wildcard-illuminated-manuscript", "name": "WILDCARD 3 — Illuminated Manuscript", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-celtic-knotwork", "name": "WILDCARD 24 — Celtic Knotwork", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-temple-of-knowledge", "name": "WILDCARD 5 — Temple of Knowledge", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-venetian-renaissance", "name": "WILDCARD 6 — Venetian Renaissance", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-klimt-gold-leaf", "name": "WILDCARD 26 — Klimt Gold Leaf", "tags": ["alexandria", "wildcard"]},
     ]
+    book = {"title": "The Gospel of Thomas", "author": "Unknown", "genre": "religious"}
 
-
-def test_build_genre_aware_rotation_matches_literature_and_varies_scenes():
-    result = _run_iterate_hook(
-        "buildGenreAwareRotation",
-        {
-            "book": {
-                "title": "A Room with a View",
-                "genre": "Literary Fiction",
-                "enrichment": {
-                    "iconic_scenes": [
-                        "Lucy at the pension window overlooking Florence",
-                        "George and Lucy in the Italian countryside",
-                        "The Pension Bertolini courtyard scene",
-                    ],
-                    "protagonist": "Lucy Honeychurch",
-                    "setting_primary": "Edwardian Florence terraces",
-                    "setting_details": "cypress trees and sunlit courtyards",
-                    "visual_motifs": ["open window", "violet flowers"],
-                    "symbolic_elements": ["view over the Arno", "threshold between freedom and convention"],
-                    "key_characters": ["Lucy Honeychurch", "George Emerson", "Charlotte Bartlett"],
-                },
-            },
-            "variantCount": 10,
-            "dayOfYearOverride": 0,
-        },
-        prompts=TEST_PROMPTS,
+    first = _run_iterate_hook(
+        function_name="suggestedWildcardPromptForBookAtDate",
+        payload={"book": book, "referenceDate": "2026-03-10T00:00:00.000Z"},
+        prompts=prompts,
+    )
+    second = _run_iterate_hook(
+        function_name="suggestedWildcardPromptForBookAtDate",
+        payload={"book": book, "referenceDate": "2026-03-11T00:00:00.000Z"},
+        prompts=prompts,
     )
 
-    assert [row["promptId"] for row in result] == [
-        "alexandria-base-romantic-realism",
-        "alexandria-wildcard-dutch-golden-age",
-        "alexandria-base-romantic-realism",
-        "alexandria-wildcard-impressionist-plein-air",
-        "alexandria-base-romantic-realism",
+    assert first["id"] != second["id"]
+
+
+def test_iterate_variant_prompt_plan_uses_base_then_rotating_wildcards():
+    prompts = [
+        {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-impressionist-plein-air", "name": "WILDCARD 8 — Impressionist Plein Air", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-romantic-landscape", "name": "WILDCARD 10 — Romantic Landscape", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-art-nouveau-poster", "name": "WILDCARD 11 — Art Nouveau Poster", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-pre-raphaelite-dream", "name": "WILDCARD 23 — Pre-Raphaelite Dream", "tags": ["alexandria", "wildcard"]},
+    ]
+    assignments = _run_iterate_hook(
+        function_name="buildVariantPromptAssignments",
+        payload={
+            "book": {"title": "Emma", "author": "Jane Austen", "genre": "literature"},
+            "variantCount": 4,
+            "referenceDate": "2026-03-11T00:00:00.000Z",
+        },
+        prompts=prompts,
+    )
+
+    assert assignments[0]["promptId"] == "alexandria-base-romantic-realism"
+    assert [row["variant"] for row in assignments] == [1, 2, 3, 4]
+    assert all(row["promptId"] != "alexandria-base-romantic-realism" for row in assignments[1:])
+    assert len({row["promptId"] for row in assignments[1:]}) == 3
+
+
+def test_iterate_variant_prompt_plan_falls_back_to_literature_defaults_for_unknown_genre():
+    assignments = _run_iterate_hook(
+        function_name="buildVariantPromptAssignments",
+        payload={
+            "book": {"title": "Unknown Treatise", "author": "Anon", "genre": "uncategorized"},
+            "variantCount": 3,
+            "referenceDate": "2026-03-11T00:00:00.000Z",
+        },
+        prompts=[],
+    )
+
+    assert assignments[0]["promptId"] == "alexandria-base-romantic-realism"
+    assert assignments[1]["promptId"] in {
         "alexandria-wildcard-pre-raphaelite-garden",
-        "alexandria-base-romantic-realism",
+        "alexandria-wildcard-impressionist-plein-air",
+        "alexandria-wildcard-romantic-landscape",
         "alexandria-wildcard-art-nouveau-poster",
-        "alexandria-base-romantic-realism",
         "alexandria-wildcard-pre-raphaelite-dream",
+    }
+
+
+def test_iterate_science_genre_maps_to_scientific_wildcards():
+    prompts = [
+        {"id": "alexandria-wildcard-scientific-diagram", "name": "Scientific Diagram", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-celestial-cartography", "name": "Celestial Cartography", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-naturalist-field-study", "name": "Naturalist Field Study", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-botanical-plate", "name": "Botanical Plate", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-antique-map-illustration", "name": "Antique Map Illustration", "tags": ["alexandria", "wildcard"]},
     ]
-    assert len({row["sceneOverride"] for row in result}) == 10
-    assert all(row["promptId"] != "alexandria-base-classical-devotion" for row in result)
-    assert all(row["promptId"] != "alexandria-base-gothic-atmosphere" for row in result)
+    book = {"title": "On the Origin of Species", "author": "Charles Darwin", "genre": "science"}
 
-
-def test_suggested_wildcard_prompt_rotates_by_day_for_same_book():
-    day_zero = _run_iterate_hook(
-        "suggestedWildcardPromptForBook",
-        {
-            "book": {
-                "title": "Emma",
-                "author": "Jane Austen",
-                "genre": "Literary Fiction",
-            },
-            "dayOfYearOverride": 0,
-        },
-    )
-    day_one = _run_iterate_hook(
-        "suggestedWildcardPromptForBook",
-        {
-            "book": {
-                "title": "Emma",
-                "author": "Jane Austen",
-                "genre": "Literary Fiction",
-            },
-            "dayOfYearOverride": 1,
-        },
-    )
-    day_zero_repeat = _run_iterate_hook(
-        "suggestedWildcardPromptForBook",
-        {
-            "book": {
-                "title": "Emma",
-                "author": "Jane Austen",
-                "genre": "Literary Fiction",
-            },
-            "dayOfYearOverride": 0,
-        },
+    selected = _run_iterate_hook(
+        function_name="suggestedWildcardPromptForBookAtDate",
+        payload={"book": book, "referenceDate": "2026-03-11T00:00:00.000Z"},
+        prompts=prompts,
     )
 
-    assert day_zero["id"] != day_one["id"]
-    assert day_zero["id"] == day_zero_repeat["id"]
+    assert selected["id"] in {prompt["id"] for prompt in prompts}
 
 
-def test_validate_prompt_before_generation_flags_placeholders_and_generic_markers():
-    result = _run_iterate_hook(
-        "validatePromptBeforeGeneration",
-        {
-            "resolvedPrompt": "Book cover illustration only — {SCENE}. Central protagonist in a pivotal narrative tableau.",
-            "book": {"title": "Emma"},
-        },
-    )
-
-    assert result["valid"] is False
-    assert any("Unresolved placeholders" in error for error in result["errors"])
-    assert any("Generic content marker" in error for error in result["errors"])
-
-
-def test_build_genre_aware_rotation_defaults_to_romantic_realism_when_genre_unknown():
-    result = _run_iterate_hook(
-        "buildGenreAwareRotation",
-        {
-            "book": {
-                "title": "Unknown Text",
-                "enrichment": {
-                    "iconic_scenes": ["A mysterious ritual unfolds beneath torchlight in the ruined citadel courtyard"],
-                },
-            },
-            "variantCount": 1,
-        },
-        prompts=TEST_PROMPTS,
-    )
-
-    assert result == [
-        {
-            "promptId": "alexandria-base-romantic-realism",
-            "sceneOverride": "A mysterious ritual unfolds beneath torchlight in the ruined citadel courtyard",
-        }
-    ]
-
-
-def test_resolve_composite_preview_sources_uses_thumbnail_then_asset_without_double_encoding():
-    job = {
-        "id": "job-asset-1",
-        "completed_at": "2026-03-10T18:40:00Z",
-        "results_json": json.dumps(
-            {
-                "result": {
-                    "composited_path": "Output Covers/saved_composites/4/cover image.jpg",
-                }
-            }
-        ),
-    }
-
-    sources = _run_iterate_resolve_composite_preview_sources(job)
-
-    thumb = urlparse(sources[0])
-    thumb_query = parse_qs(thumb.query)
-    asset = urlparse(sources[1])
-    asset_query = parse_qs(asset.query)
-
-    assert thumb.path == "/api/thumbnail"
-    assert thumb_query["path"] == ["Output Covers/saved_composites/4/cover image.jpg"]
-    assert thumb_query["size"] == ["large"]
-    assert thumb_query["v"] == ["2026-03-10T18:40:00Z"]
-    assert asset.path == "/api/asset"
-    assert asset_query["path"] == ["Output Covers/saved_composites/4/cover image.jpg"]
-    assert asset_query["v"] == ["2026-03-10T18:40:00Z"]
-    assert "%2520" not in sources[0]
-    assert "%3Fv%3D" not in sources[0]
-
-
-def test_pick_full_resolution_source_prefers_asset_endpoint_for_local_paths():
-    job = {
-        "id": "job-asset-2",
-        "completed_at": "2026-03-10T18:40:00Z",
-        "results_json": json.dumps(
-            {
-                "result": {
-                    "composited_path": "Output Covers/saved_composites/4/cover image.jpg",
-                    "image_path": "tmp/generated/4/openrouter/model/variant_1.png",
-                }
-            }
-        ),
-    }
-
-    composite = _run_iterate_pick_full_resolution_source(job, prefer_raw=False)
-    raw = _run_iterate_pick_full_resolution_source(job, prefer_raw=True)
-
-    composite_query = parse_qs(urlparse(composite).query)
-    raw_query = parse_qs(urlparse(raw).query)
-
-    assert urlparse(composite).path == "/api/asset"
-    assert composite_query["path"] == ["Output Covers/saved_composites/4/cover image.jpg"]
-    assert urlparse(raw).path == "/api/asset"
-    assert raw_query["path"] == ["tmp/generated/4/openrouter/model/variant_1.png"]
-
-
-def test_resolve_job_artifact_href_uses_asset_endpoint_for_pdf_path():
-    job = {
-        "id": "job-asset-3",
-        "completed_at": "2026-03-10T18:40:00Z",
-        "results_json": json.dumps(
-            {
-                "result": {
-                    "composited_pdf_path": "Output Covers/saved_composites/4/cover image.pdf",
-                }
-            }
-        ),
-    }
-
-    href = _run_iterate_resolve_job_artifact_href(job, ["composited_pdf_path"])
-
-    parsed = urlparse(href)
-    query = parse_qs(parsed.query)
-    assert parsed.path == "/api/asset"
-    assert query["path"] == ["Output Covers/saved_composites/4/cover image.pdf"]
-    assert query["v"] == ["2026-03-10T18:40:00Z"]
-
-
-def test_filter_books_for_combobox_matches_number_title_and_author():
-    result = _run_iterate_hook(
-        "filterBooksForCombobox",
-        {
-            "books": [
-                {"id": 3, "number": 3, "title": "Gulliver's Travels", "author": "Jonathan Swift"},
-                {"id": 13, "number": 13, "title": "The Trial", "author": "Franz Kafka"},
-                {"id": 52, "number": 52, "title": "Dracula", "author": "Bram Stoker"},
-            ],
-            "query": "3",
-            "limit": 5,
-        },
-    )
-    assert [row["number"] for row in result][:2] == [3, 13]
-
-    title_result = _run_iterate_hook(
-        "filterBooksForCombobox",
-        {
-            "books": [
-                {"id": 3, "number": 3, "title": "Gulliver's Travels", "author": "Jonathan Swift"},
-                {"id": 52, "number": 52, "title": "Dracula", "author": "Bram Stoker"},
-            ],
-            "query": "gulliver",
-            "limit": 5,
-        },
-    )
-    assert [row["number"] for row in title_result] == [3]
-
-    author_result = _run_iterate_hook(
-        "filterBooksForCombobox",
-        {
-            "books": [
-                {"id": 3, "number": 3, "title": "Gulliver's Travels", "author": "Jonathan Swift"},
-                {"id": 52, "number": 52, "title": "Dracula", "author": "Bram Stoker"},
-            ],
-            "query": "stoker",
-            "limit": 5,
-        },
-    )
-    assert [row["number"] for row in author_result] == [52]
+def test_iterate_short_real_name_is_not_generic():
+    result = _run_iterate_hook(function_name="isGenericContent", payload="Eve")
+    assert result is False

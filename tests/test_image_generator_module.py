@@ -44,7 +44,14 @@ class _Runtime:
         self.batch_concurrency = 3
         self.variants_per_cover = 2
         self.ai_model = "openai/gpt-image-1"
-        self.all_models = ["openai/gpt-image-1", "openrouter/flux-2-pro"]
+        self.all_models = [
+            "openai/gpt-image-1",
+            "openrouter/flux-2-pro",
+            "openrouter/google/gemini-3-pro-image-preview",
+            "google/gemini-3-pro-image-preview",
+            "openrouter/google/gemini-2.5-flash-image",
+            "google/gemini-2.5-flash-image",
+        ]
         self.provider_request_delay = {key: 0.0 for key in ["openai", "openrouter", "google", "replicate", "fal"]}
         self.provider_rate_limit_per_second = {key: 0 for key in ["openai", "openrouter", "google", "replicate", "fal"]}
         self.provider_rate_limit_per_minute = {key: 0 for key in ["openai", "openrouter", "google", "replicate", "fal"]}
@@ -476,6 +483,37 @@ def test_generate_image_prefixed_model_ignores_mismatched_provider(tmp_path: Pat
     )
     assert output
     assert captured["provider"] == "fal"
+
+
+def test_generate_image_prefixed_model_respects_equivalent_provider_override(tmp_path: Path, monkeypatch):
+    runtime = _Runtime(tmp_path)
+    monkeypatch.setattr(ig.config, "get_config", lambda: runtime)
+    monkeypatch.setattr(ig._RATE_LIMITER, "wait", lambda *args, **kwargs: None)
+
+    captured: dict[str, str] = {}
+
+    class _Provider:
+        def __init__(self, image):
+            self._image = image
+
+        def generate(self, **_kwargs):  # type: ignore[no-untyped-def]
+            return self._image
+
+    def _fake_create_provider_instance(**kwargs):  # type: ignore[no-untyped-def]
+        captured["provider"] = kwargs["provider"]
+        captured["model"] = kwargs["model"]
+        return _Provider(Image.open(io.BytesIO(_image_bytes((64, 64), gradient=True))))
+
+    monkeypatch.setattr(ig, "_create_provider_instance", _fake_create_provider_instance)
+    output = ig.generate_image(
+        "prompt",
+        "negative",
+        "openrouter/google/gemini-3-pro-image-preview",
+        {"provider": "google", "width": 64, "height": 64},
+    )
+    assert output
+    assert captured["provider"] == "google"
+    assert captured["model"] == "gemini-3-pro-image-preview"
 
 
 def test_generate_image_skips_hard_content_reject_for_synthetic_fallback(tmp_path: Path, monkeypatch):
@@ -1130,6 +1168,45 @@ def test_generate_one_success_failover_and_failure(tmp_path: Path, monkeypatch):
     )
     assert result3.success is False
     assert "fatal" in (result3.error or "")
+
+
+def test_generate_one_openrouter_credit_exhaustion_falls_back_to_google(tmp_path: Path, monkeypatch):
+    runtime = _Runtime(tmp_path)
+    runtime.provider_keys = {"openrouter": "k", "google": "k"}
+    runtime.max_retries = 1
+    monkeypatch.setattr(ig.config, "get_config", lambda: runtime)
+    monkeypatch.setattr(ig.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(ig.similarity_detector, "check_prompt_similarity_against_winners", lambda **_kwargs: {"alert": False})
+    monkeypatch.setattr(
+        ig.similarity_detector,
+        "check_generated_image_against_winners",
+        lambda **_kwargs: {"alert": False, "similarity": 1.0},
+    )
+
+    attempted_providers: list[str] = []
+
+    def _credit_then_google(**kwargs):  # type: ignore[no-untyped-def]
+        provider = str(kwargs.get("params", {}).get("provider", ""))
+        attempted_providers.append(provider)
+        if provider == "openrouter":
+            raise ig.GenerationError("OpenRouter error 402: This request requires more credits.", status_code=402)
+        return _image_bytes((64, 64), gradient=True)
+
+    monkeypatch.setattr(ig, "generate_image", _credit_then_google)
+    result = ig._generate_one(
+        book_number=1,
+        variant=6,
+        prompt="prompt",
+        negative_prompt="neg",
+        model="openrouter/google/gemini-3-pro-image-preview",
+        provider="openrouter",
+        output_path=tmp_path / "generated" / "1" / "variant_6.png",
+        resume=False,
+    )
+    assert result.success is True
+    assert result.provider == "google"
+    assert result.attempts == 2
+    assert attempted_providers == ["openrouter", "google"]
 
 
 def test_generate_one_artifact_error_retries_with_hardened_prompt(tmp_path: Path, monkeypatch):

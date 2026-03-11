@@ -31,6 +31,7 @@ except Exception:  # pragma: no cover
 
 try:
     from src import config
+    from src import content_relevance
     from src import safe_json
     from src import similarity_detector
     from src import prompt_generator
@@ -38,6 +39,7 @@ try:
     from src.prompt_library import PromptLibrary
 except ModuleNotFoundError:  # pragma: no cover
     import config  # type: ignore
+    import content_relevance  # type: ignore
     import safe_json  # type: ignore
     import similarity_detector  # type: ignore
     import prompt_generator  # type: ignore
@@ -124,30 +126,6 @@ VIVID_COLOR_GUARDRAIL = (
     "Color direction: vivid, high-saturation painterly palette with rich contrast and luminous highlights."
 )
 GENERATION_GUARDRAIL = f"{STRICT_SCENE_GUARDRAIL} {NO_ORNAMENT_GUARDRAIL} {VIVID_COLOR_GUARDRAIL}"
-GENERIC_SCENE_PATTERN = re.compile(
-    r'A pivotal dramatic moment from the literary work\s+"[^"]*"'
-    r'(?:\s+by\s+[^,."]+)?'
-    r'(?:,\s*depicting the central emotional conflict[^.]*\.?)?',
-    re.IGNORECASE,
-)
-GENERIC_MOOD_PATTERN = re.compile(r"classical,\s+timeless,\s+evocative", re.IGNORECASE)
-GENERIC_ENRICHMENT_MARKERS: tuple[str, ...] = (
-    "iconic turning point",
-    "central protagonist",
-    "atmospheric setting moment",
-    "defining confrontation involving",
-    "historically grounded era",
-    "classical dramatic tension",
-    "period costume and historically grounded",
-    "symbolic object tied to the story",
-    "circular medallion-ready composition",
-    "dramatic emotional conflict",
-)
-GENERIC_ENRICHMENT_PATTERN = re.compile(
-    "|".join(re.escape(marker) for marker in GENERIC_ENRICHMENT_MARKERS),
-    re.IGNORECASE,
-)
-GENERIC_SCENE_FALLBACK_PATTERN = GENERIC_ENRICHMENT_PATTERN
 MAX_CONTENT_VIOLATION_SCORE = 0.24
 TEXT_ARTIFACT_HARD_SCORE_FLOOR = 0.20
 TEXT_ARTIFACT_HARD_TEXT_PENALTY = 0.62
@@ -163,21 +141,16 @@ ARTIFACT_RETRY_APPEND = (
     "banners, plaques, medallion rings, circular frames, ornamental borders, decorative edges, "
     "filigree, scrollwork, arabesques, ornamental curls, black ornamental silhouettes, or lace-like cutout motifs."
 )
-_ENRICHED_BOOK_LOOKUP_CACHE: dict[str, Any] = {"path": "", "mtime": -1.0, "lookup": {}}
-_ENRICHED_BOOK_LOOKUP_LOCK = threading.Lock()
 ALEXANDRIA_NEGATIVE_PROMPT = (
     "No text, no letters, no words, no numbers, no titles, no author names, no typography, no captions, "
     "no labels, no watermarks, no signatures, no inscriptions of any kind. No modern elements, no photography, "
     "no 3D rendering, no digital art aesthetic, no gradients on background, no neon colours, no sans-serif fonts, "
     "no minimalist design, no stock photo look, no cartoonish style, no anime influence, no spelling mistakes, "
-    "no blurry illustration, no off-centre composition, no white or light backgrounds. "
-    "No ornamental borders, no frames, no scrollwork, no filigree, no decorative edges, "
-    "no corner ornaments, no dividers."
+    "no blurry medallion illustration, no off-centre composition, no white or light backgrounds."
 )
 _PROMPT_REMOVAL_PATTERNS: tuple[str, ...] = (
-    r"(?<!no )\bcircular\s+medallion(?:\s+illustration)?\b",
-    r"(?<!no )\bcircular\s+(?:frame|border|ring)\b",
-    r"(?<!no )\bgold\s+circular\s+border\b",
+    r"\bcircular vignette composition\b",
+    r"(?<!no )\bcircular(?:\s+medallion)?(?:\s+frame)?\b",
     r"\btypography(?:[- ]led)?\b",
     r"\btext[- ]safe\b",
     r"\btitle[- ]safe\b",
@@ -202,112 +175,6 @@ _PROMPT_REMOVAL_PATTERNS: tuple[str, ...] = (
     r"\bmedallion(?:\s+zone|\s+opening|\s+window)?\b",
     r"\bgilt ornament language\b",
 )
-
-
-def _clean_enrichment_text(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip()
-
-
-def _is_generic_enrichment_text(value: Any) -> bool:
-    text = _clean_enrichment_text(value)
-    return bool(text) and bool(GENERIC_ENRICHMENT_PATTERN.search(text))
-
-
-def _specific_enrichment_text(value: Any, *, min_length: int = 1) -> str:
-    text = _clean_enrichment_text(value)
-    if not text or len(text) < int(min_length) or _is_generic_enrichment_text(text):
-        return ""
-    return text
-
-
-def _specific_enrichment_list(values: Any, *, min_length: int = 1) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        text = _specific_enrichment_text(value, min_length=min_length)
-        if not text:
-            continue
-        token = text.lower()
-        if token in seen:
-            continue
-        seen.add(token)
-        cleaned.append(text)
-    return cleaned
-
-
-def _specific_era_text(value: Any) -> str:
-    if isinstance(value, list):
-        for item in value:
-            text = _specific_enrichment_text(item, min_length=6)
-            if text:
-                return text
-        return ""
-    return _specific_enrichment_text(value, min_length=6)
-
-
-def _specific_protagonist(enrichment: dict[str, Any]) -> str:
-    return _specific_enrichment_text(enrichment.get("protagonist", ""), min_length=6)
-
-
-def _filtered_enrichment_scenes(enrichment: dict[str, Any]) -> list[str]:
-    return _specific_enrichment_list(enrichment.get("iconic_scenes", []), min_length=30)
-
-
-def _motif_scene_for_title_author(title: str, author: str) -> str:
-    try:
-        motif = prompt_generator._motif_for_book({"title": title, "author": author})  # type: ignore[attr-defined]
-        return _clean_enrichment_text(getattr(motif, "iconic_scene", "") or "")
-    except Exception:
-        return ""
-
-
-def _append_protagonist_to_scene(scene: str, protagonist: str, *, lead_in: str = "The main character is") -> str:
-    base_scene = _clean_enrichment_text(scene)
-    hero = _specific_enrichment_text(protagonist, min_length=6)
-    if not base_scene or not hero:
-        return base_scene
-    if hero.lower() in base_scene.lower():
-        return base_scene
-    return f"{base_scene.rstrip(' .!?')}. {lead_in} {hero}"
-
-
-def _is_generic_enrichment(enrichment: dict[str, Any]) -> bool:
-    if not isinstance(enrichment, dict) or not enrichment:
-        return True
-    placeholder_hits = False
-    for key in (
-        "iconic_scenes",
-        "scene",
-        "protagonist",
-        "setting_primary",
-        "setting_details",
-        "emotional_tone",
-        "mood",
-        "era",
-        "visual_motifs",
-        "symbolic_elements",
-        "key_characters",
-    ):
-        value = enrichment.get(key)
-        if isinstance(value, list):
-            if any(_is_generic_enrichment_text(item) for item in value):
-                placeholder_hits = True
-                break
-        elif _is_generic_enrichment_text(value):
-            placeholder_hits = True
-            break
-    has_specific_data = any(
-        (
-            bool(_filtered_enrichment_scenes(enrichment)),
-            bool(_specific_protagonist(enrichment)),
-            bool(_specific_enrichment_text(enrichment.get("setting_primary", ""), min_length=8)),
-            bool(_specific_enrichment_list(enrichment.get("visual_motifs", []), min_length=3)),
-            bool(_specific_enrichment_list(enrichment.get("symbolic_elements", []), min_length=3)),
-        )
-    )
-    return bool(placeholder_hits and not has_specific_data)
 
 
 def _host_matches_allowlist(host: str, pattern: str) -> bool:
@@ -353,33 +220,12 @@ def _prompt_reference_tokens(value: str) -> list[str]:
     return [token for token in tokens if len(token) >= 4]
 
 
-def _looks_like_scene_first_prompt(prompt: str) -> bool:
-    text = " ".join(str(prompt or "").lower().split()).strip()
-    if not text.startswith("book cover illustration only"):
-        return False
-    first_320 = text[:320]
-    return "{scene}" in first_320 or (
-        "this circular medallion illustration" in first_320
-        and ("must depict" in first_320 or "scene:" in first_320 or "illustration must" in first_320)
-    )
-
-
-def _validate_prompt_relevance(
-    prompt: str,
-    book_title: str,
-    book_author: str,
-    *,
-    runtime: config.Config | None = None,
-    book_number: int = 0,
-    variant_index: int = 0,
-) -> str:
+def _validate_prompt_relevance(prompt: str, book_title: str, book_author: str) -> str:
     """Ensure prompt keeps strong title/author anchoring before provider dispatch."""
     base_prompt = " ".join(str(prompt or "").split())
     title = str(book_title or "").strip()
     author = str(book_author or "").strip()
     if not title:
-        return base_prompt
-    if _looks_like_scene_first_prompt(base_prompt):
         return base_prompt
 
     prompt_lower = base_prompt.lower()
@@ -390,32 +236,20 @@ def _validate_prompt_relevance(
     if has_reference:
         return base_prompt
 
-    scene_anchor = ""
-    protagonist = ""
-    if runtime is not None and int(book_number or 0) > 0:
-        enrichment = _enriched_book_lookup(runtime).get(int(book_number), {})
-        if isinstance(enrichment, dict):
-            protagonist = _specific_protagonist(enrichment)
-            scene_anchor = _scene_for_variant(
-                enrichment=enrichment,
-                title=title,
-                author=author,
-                variant_index=max(0, int(variant_index)),
-            )
-    if not scene_anchor:
-        scene_anchor = _motif_scene_for_title_author(title, author)
+    motif_scene = ""
+    try:
+        motif = prompt_generator._motif_for_book({"title": title, "author": author})  # type: ignore[attr-defined]
+        motif_scene = str(getattr(motif, "iconic_scene", "") or "").strip()
+    except Exception:
+        motif_scene = ""
 
     prefix_parts = [f"Book cover illustration for '{title}'"]
     if author:
         prefix_parts[0] = f"{prefix_parts[0]} by {author}"
-    if scene_anchor:
-        prefix_parts.append(
-            f"CRITICAL SCENE REQUIREMENT — the illustration must specifically depict: {scene_anchor.rstrip(' .!?')}."
-        )
-        if protagonist and protagonist.lower() not in scene_anchor.lower():
-            prefix_parts.append(f"The main character shown is {protagonist}.")
+    if motif_scene:
+        prefix_parts.append(f"Primary scene anchor: {motif_scene}")
     prefix = ". ".join(prefix_parts).strip().rstrip(".") + "."
-    logger.warning("Prompt lacked explicit book reference. Prepending title/scene anchor for '%s'.", title)
+    logger.warning("Prompt lacked explicit book reference. Prepending title/motif anchor for '%s'.", title)
     if not base_prompt:
         return prefix
     return f"{prefix} {base_prompt}".strip()
@@ -496,7 +330,6 @@ class GenerationResult:
     similarity_warning: str | None = None
     similar_to_book: int | None = None
     distinctiveness_score: float | None = None
-    failure_meta: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -507,292 +340,49 @@ class GenerationResult:
 class GenerationError(Exception):
     """Terminal generation error."""
 
-
-class RetryableGenerationError(GenerationError):
-    """Generation error that should be retried."""
-
     def __init__(self, message: str, status_code: int | None = None):
         super().__init__(message)
         self.status_code = status_code
 
 
-def _generation_failure_status_code(exc: Exception) -> int | None:
-    status_code = getattr(exc, "status_code", None)
-    if isinstance(status_code, int) and status_code > 0:
-        return status_code
-    response = getattr(exc, "response", None)
-    response_code = getattr(response, "status_code", None)
-    if isinstance(response_code, int) and response_code > 0:
-        return response_code
-    return None
+class RetryableGenerationError(GenerationError):
+    """Generation error that should be retried."""
+
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message, status_code=status_code)
 
 
-def _generation_failure_meta(
-    *,
-    exc: Exception,
-    model: str,
-    provider: str,
-    book_number: int,
-    variant: int,
-    retry_count: int,
-    max_attempts: int,
-) -> dict[str, Any]:
-    status_code = _generation_failure_status_code(exc)
-    payload = {
-        "book_number": int(book_number),
-        "variant": int(variant),
-        "model": str(model or "").strip(),
-        "provider": str(provider or "").strip().lower(),
-        "retry_count": int(retry_count),
-        "max_attempts": int(max_attempts),
-        "status_code": status_code,
-        "error": str(exc),
-        "error_type": exc.__class__.__name__,
-    }
-    return payload
-
-
-def _log_generation_attempt_failure(
-    *,
-    exc: Exception,
-    model: str,
-    provider: str,
-    book_number: int,
-    variant: int,
-    retry_count: int,
-    max_attempts: int,
-    retryable: bool,
-) -> dict[str, Any]:
-    payload = _generation_failure_meta(
-        exc=exc,
-        model=model,
-        provider=provider,
-        book_number=book_number,
-        variant=variant,
-        retry_count=retry_count,
-        max_attempts=max_attempts,
-    )
-    logger.warning(
-        "Generation attempt failed for book %s model %s variant %s via %s (%s/%s): %s",
-        book_number,
-        model,
-        variant,
-        provider,
-        retry_count,
-        max_attempts,
-        exc,
-        extra={**payload, "retryable": bool(retryable)},
-    )
-    return payload
-
-
-def _enriched_book_lookup(runtime: config.Config) -> dict[int, dict[str, Any]]:
-    catalog_id = str(getattr(runtime, "catalog_id", config.DEFAULT_CATALOG_ID) or config.DEFAULT_CATALOG_ID)
-    config_dir = getattr(runtime, "config_dir", config.CONFIG_DIR)
-    path = config.enriched_catalog_path(catalog_id=catalog_id, config_dir=config_dir)
-    try:
-        mtime = float(path.stat().st_mtime)
-    except OSError:
-        mtime = -1.0
-    cache_key = str(path.resolve()) if path.exists() else str(path)
-    with _ENRICHED_BOOK_LOOKUP_LOCK:
-        if _ENRICHED_BOOK_LOOKUP_CACHE["path"] == cache_key and _ENRICHED_BOOK_LOOKUP_CACHE["mtime"] == mtime:
-            return dict(_ENRICHED_BOOK_LOOKUP_CACHE["lookup"])
-
-    raw_payload = safe_json.load_json(path, {"rows": []})
-    rows = []
-    if isinstance(raw_payload, dict):
-        for key in ("rows", "books", "items"):
-            candidate = raw_payload.get(key)
-            if isinstance(candidate, list):
-                rows = candidate
-                break
-    elif isinstance(raw_payload, list):
-        rows = raw_payload
-
-    lookup: dict[int, dict[str, Any]] = {}
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        number = int(row.get("number", 0) or 0)
-        enrichment = row.get("enrichment", {})
-        if number > 0 and isinstance(enrichment, dict):
-            lookup[number] = enrichment
-
-    with _ENRICHED_BOOK_LOOKUP_LOCK:
-        _ENRICHED_BOOK_LOOKUP_CACHE["path"] = cache_key
-        _ENRICHED_BOOK_LOOKUP_CACHE["mtime"] = mtime
-        _ENRICHED_BOOK_LOOKUP_CACHE["lookup"] = dict(lookup)
-    return lookup
-
-
-def _scene_pool_for_enrichment(
-    *,
-    enrichment: dict[str, Any],
-    title: str,
-    author: str = "",
-    count: int = 1,
-) -> list[str]:
-    total = max(1, int(count or 1))
-    pool: list[str] = []
-    seen: set[str] = set()
-    generic_enrichment = _is_generic_enrichment(enrichment)
-    motif_scene = _motif_scene_for_title_author(title, author)
-
-    def _push_unique(value: Any) -> None:
-        trimmed = _clean_enrichment_text(value)
-        if not trimmed or len(trimmed) < 20 or GENERIC_SCENE_FALLBACK_PATTERN.search(trimmed):
-            return
-        token = trimmed.lower()
-        if token in seen:
-            return
-        seen.add(token)
-        pool.append(trimmed)
-
-    if generic_enrichment and motif_scene:
-        _push_unique(motif_scene)
-
-    for scene in _filtered_enrichment_scenes(enrichment):
-        _push_unique(scene)
-
-    protagonist = _specific_protagonist(enrichment)
-    setting = _specific_enrichment_text(enrichment.get("setting_primary", ""), min_length=8)
-    raw_setting_details = enrichment.get("setting_details", "")
-    if isinstance(raw_setting_details, list):
-        detail_parts: list[str] = []
-        for item in raw_setting_details:
-            detail = _specific_enrichment_text(item, min_length=3)
-            if detail:
-                detail_parts.append(detail)
-        setting_details = ", ".join(detail_parts)
-    else:
-        setting_details = _specific_enrichment_text(raw_setting_details, min_length=3)
-    if protagonist:
-        _push_unique(
-            f"{protagonist} in a pivotal moment"
-            f"{f' set in {setting}' if setting else ' from the story'}"
-        )
-    if setting:
-        _push_unique(f"{setting}{f', {setting_details}' if setting_details else ''} — establishing atmosphere of the story's world")
-
-    motifs = _specific_enrichment_list(enrichment.get("visual_motifs", []), min_length=3)
-    symbols = _specific_enrichment_list(enrichment.get("symbolic_elements", []), min_length=3)
-    symbolic_pool = [*motifs, *symbols][:4]
-    if len(symbolic_pool) >= 2:
-        _push_unique(f"symbolic arrangement of {', '.join(symbolic_pool)} — visual metaphor for the story's themes")
-
-    if not pool and motif_scene:
-        _push_unique(motif_scene)
-    if not pool:
-        _push_unique(f'a scene from "{title or "the story"}"')
-
-    variation_prefixes = [
-        "",
-        "intimate close-up view of ",
-        "wide panoramic establishing shot of ",
-        "dramatic chiaroscuro lighting on ",
-        "serene contemplative depiction of ",
-        "dynamic action-filled moment of ",
-    ]
-    results: list[str] = []
-    for index in range(total):
-        if index < len(pool):
-            results.append(pool[index])
-            continue
-        base_scene = pool[index % len(pool)] if pool else ""
-        prefix = variation_prefixes[(index // max(1, len(pool))) % len(variation_prefixes)] if pool else ""
-        results.append(f"{prefix}{base_scene}".strip())
-    return [scene for scene in results if scene]
-
-
-def _scene_for_variant(
-    *,
-    enrichment: dict[str, Any],
-    title: str,
-    author: str = "",
-    variant_index: int = 0,
-    scene_override: str = "",
-) -> str:
-    override = re.sub(r"\s+", " ", str(scene_override or "")).strip()
-    if override:
-        return override
-    pool = _scene_pool_for_enrichment(
-        enrichment=enrichment,
-        title=title,
-        author=author,
-        count=max(1, int(variant_index) + 1),
-    )
-    if not pool:
+def _summarize_error_payload(payload: str, *, limit: int = 240) -> str:
+    text = str(payload or "").strip()
+    if not text:
         return ""
-    clamped_index = max(0, int(variant_index))
-    return str(pool[clamped_index if clamped_index < len(pool) else 0] or "").strip()
+    try:
+        body = json.loads(text)
+    except json.JSONDecodeError:
+        return text[:limit]
 
+    queue: list[Any] = [
+        body.get("error"),
+        body.get("message"),
+        body.get("detail"),
+        body.get("details"),
+    ]
+    while queue:
+        item = queue.pop(0)
+        if isinstance(item, dict):
+            for key in ("message", "detail", "error", "details", "reason"):
+                value = item.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()[:limit]
+                if isinstance(value, (dict, list)):
+                    queue.append(value)
+        elif isinstance(item, list):
+            queue.extend(item)
+        elif isinstance(item, str) and item.strip():
+            return item.strip()[:limit]
 
-def _ensure_prompt_enrichment(
-    prompt: str,
-    *,
-    runtime: config.Config,
-    book_number: int,
-    title: str,
-    author: str,
-    variant_index: int = 0,
-    scene_override: str = "",
-) -> str:
-    text = str(prompt or "").strip()
-    enrichment = _enriched_book_lookup(runtime).get(int(book_number), {})
-    if not isinstance(enrichment, dict):
-        enrichment = {}
-    protagonist = _specific_protagonist(enrichment)
-    populated_scenes = [_append_protagonist_to_scene(scene, protagonist) for scene in _filtered_enrichment_scenes(enrichment)]
-    first_scene = _append_protagonist_to_scene(
-        _scene_for_variant(
-            enrichment=enrichment,
-            title=title,
-            author=author,
-            variant_index=variant_index,
-            scene_override=scene_override,
-        ),
-        protagonist,
-    )
-    scene_sentence = first_scene.rstrip(" .!?")
-    setting = _specific_enrichment_text(enrichment.get("setting_primary", ""), min_length=8)
-    emotional_tone = _specific_enrichment_text(enrichment.get("emotional_tone", "") or enrichment.get("mood", ""), min_length=6)
-    era = _specific_era_text(enrichment.get("era", ""))
-
-    if emotional_tone and text:
-        text = GENERIC_MOOD_PATTERN.sub(emotional_tone, text)
-    if not first_scene:
-        return text
-
-    result = GENERIC_SCENE_PATTERN.sub(first_scene, text)
-    lowered = result.lower()
-    scene_present = bool(first_scene[:30].strip()) and first_scene[:30].lower() in lowered
-    if not scene_present and populated_scenes:
-        scene_present = any(scene[:30].lower() in lowered for scene in populated_scenes[:3] if scene[:30].strip())
-    if not scene_present:
-        parts = [f"The illustration must depict: {scene_sentence or first_scene}."]
-        if protagonist and protagonist.lower() not in first_scene.lower():
-            parts.append(f"Character: {protagonist}.")
-        if setting:
-            parts.append(f"Setting: {setting}.")
-        if emotional_tone:
-            parts.append(f"Mood: {emotional_tone}.")
-        if era:
-            parts.append(f"Era: {era}.")
-        prefix = result.rstrip()
-        if prefix and prefix[-1] not in ".!?":
-            prefix = f"{prefix}."
-        result = " ".join(part for part in [prefix, *parts] if part).strip()
-        logger.info(
-            "Injected enrichment into generation prompt for book %s (%s by %s)",
-            book_number,
-            title or f"Book {book_number}",
-            author or "Unknown author",
-        )
-
-    if emotional_tone and result:
-        result = GENERIC_MOOD_PATTERN.sub(emotional_tone, result)
-    return result.strip()
+    compact = json.dumps(body, ensure_ascii=True)
+    return compact[:limit]
 
 
 class BaseProvider:
@@ -996,11 +586,14 @@ class OpenAIProvider(BaseProvider):
         )
         if response.status_code in RETRYABLE_STATUS_CODES:
             raise RetryableGenerationError(
-                f"OpenAI temporary error {response.status_code}: {response.text[:240]}",
+                f"OpenAI temporary error {response.status_code}: {_summarize_error_payload(response.text, limit=240)}",
                 status_code=response.status_code,
             )
         if response.status_code >= 400:
-            raise GenerationError(f"OpenAI error {response.status_code}: {response.text[:300]}")
+            raise GenerationError(
+                f"OpenAI error {response.status_code}: {_summarize_error_payload(response.text, limit=300)}",
+                status_code=response.status_code,
+            )
 
         body = response.json()
         candidate = (body.get("data") or [{}])[0]
@@ -1075,7 +668,7 @@ class OpenRouterProvider(BaseProvider):
                     retry_after = float(10 * attempt)
                 if attempt >= 3:
                     raise RetryableGenerationError(
-                        f"OpenRouter rate-limited after retries (429): {response.text[:240]}",
+                        f"OpenRouter rate-limited after retries (429): {_summarize_error_payload(response.text, limit=240)}",
                         status_code=429,
                     )
                 logger.warning("OpenRouter 429; retrying in %.1fs (attempt %d/3)", retry_after, attempt)
@@ -1086,11 +679,14 @@ class OpenRouterProvider(BaseProvider):
         assert response is not None
         if response.status_code in RETRYABLE_STATUS_CODES:
             raise RetryableGenerationError(
-                f"OpenRouter temporary error {response.status_code}: {response.text[:240]}",
+                f"OpenRouter temporary error {response.status_code}: {_summarize_error_payload(response.text, limit=240)}",
                 status_code=response.status_code,
             )
         if response.status_code >= 400:
-            raise GenerationError(f"OpenRouter error {response.status_code}: {response.text[:300]}")
+            raise GenerationError(
+                f"OpenRouter error {response.status_code}: {_summarize_error_payload(response.text, limit=300)}",
+                status_code=response.status_code,
+            )
 
         body = response.json()
 
@@ -1197,11 +793,14 @@ class FalProvider(BaseProvider):
         )
         if response.status_code in RETRYABLE_STATUS_CODES:
             raise RetryableGenerationError(
-                f"fal.ai temporary error {response.status_code}: {response.text[:240]}",
+                f"fal.ai temporary error {response.status_code}: {_summarize_error_payload(response.text, limit=240)}",
                 status_code=response.status_code,
             )
         if response.status_code >= 400:
-            raise GenerationError(f"fal.ai error {response.status_code}: {response.text[:300]}")
+            raise GenerationError(
+                f"fal.ai error {response.status_code}: {_summarize_error_payload(response.text, limit=300)}",
+                status_code=response.status_code,
+            )
 
         body = response.json()
         images = body.get("images") or body.get("output", {}).get("images") or []
@@ -1348,11 +947,14 @@ class GoogleCloudProvider(BaseProvider):
 
         if response.status_code in RETRYABLE_STATUS_CODES:
             raise RetryableGenerationError(
-                f"Google temporary error {response.status_code}: {response.text[:240]}",
+                f"Google temporary error {response.status_code}: {_summarize_error_payload(response.text, limit=240)}",
                 status_code=response.status_code,
             )
         if response.status_code >= 400:
-            raise GenerationError(f"Google error {response.status_code}: {response.text[:300]}")
+            raise GenerationError(
+                f"Google error {response.status_code}: {_summarize_error_payload(response.text, limit=300)}",
+                status_code=response.status_code,
+            )
 
         body = response.json()
         candidates = body.get("candidates", [])
@@ -1667,9 +1269,22 @@ def generate_image(
     runtime = config.get_config()
 
     negative_prompt = _merge_negative_prompt(negative_prompt)
+    requested_provider = str(params.get("provider", "") or "").strip().lower()
     model_prefix = _model_provider_prefix(runtime, model)
-    provider = model_prefix or params.get("provider") or runtime.resolve_model_provider(model)
-    provider = str(provider).lower()
+    provider_candidates = _model_provider_chain(
+        runtime,
+        model=model,
+        primary=requested_provider or runtime.resolve_model_provider(model),
+    )
+    if requested_provider and requested_provider in provider_candidates:
+        provider = requested_provider
+    elif model_prefix and model_prefix in provider_candidates:
+        provider = model_prefix
+    elif provider_candidates:
+        provider = provider_candidates[0]
+    else:
+        provider = requested_provider or model_prefix or runtime.resolve_model_provider(model)
+    provider = str(provider).strip().lower()
     provider_model = _resolve_provider_model_name(provider=provider, model=model, runtime=runtime)
     width = int(params.get("width", runtime.image_width))
     height = int(params.get("height", runtime.image_height))
@@ -1832,22 +1447,6 @@ def generate_all_models(
                     diversified_prompt,
                     book_title=book_title,
                     book_author=book_author,
-                    runtime=runtime,
-                    book_number=book_number,
-                    variant_index=max(0, variant - 1),
-                )
-            if preserve_prompt_text:
-                diversified_prompt = _sanitize_prompt_text(diversified_prompt)
-            else:
-                diversified_prompt = _sanitize_prompt_text(
-                    _ensure_prompt_enrichment(
-                        diversified_prompt,
-                        runtime=runtime,
-                        book_number=book_number,
-                        title=book_title,
-                        author=book_author,
-                        variant_index=max(0, variant - 1),
-                    )
                 )
             seed = _variant_seed(rng=rng, book_number=book_number, model=model, variant=variant)
             if resume and image_path.exists():
@@ -2187,6 +1786,7 @@ def generate_single_book(
             library_matches[0].prompt_template,
             title=title,
             author=author,
+            book=book_entry,
         )
         if not negative_prompt:
             selected_negative_prompt = library_matches[0].negative_prompt
@@ -2267,16 +1867,6 @@ def generate_batch(
             completed += 1
             variant_id = int(variant_entry.get("variant_id", completed))
             prompt = _sanitize_prompt_text(str(variant_entry.get("prompt", "")))
-            prompt = _sanitize_prompt_text(
-                _ensure_prompt_enrichment(
-                    prompt,
-                    runtime=runtime,
-                    book_number=book_number,
-                    title=title,
-                    author=str(book_entry.get("author", "")).strip(),
-                    variant_index=max(0, variant_id - 1),
-                )
-            )
             negative_prompt = str(variant_entry.get("negative_prompt", ""))
             image_path = output_dir / str(book_number) / f"variant_{variant_id}.png"
 
@@ -2427,12 +2017,7 @@ def _generate_one(
 
     start = time.perf_counter()
     last_error: str | None = None
-    last_failure_meta: dict[str, Any] | None = None
-    model_prefix = _model_provider_prefix(runtime, model)
-    if model_prefix:
-        provider_chain = [model_prefix]
-    else:
-        provider_chain = _provider_fallback_chain(runtime, primary=provider)
+    provider_chain = _model_provider_chain(runtime, model=model, primary=provider)
     provider_index = 0
     active_provider = provider_chain[provider_index]
     consecutive_provider_failures = 0
@@ -2532,16 +2117,6 @@ def _generate_one(
             )
         except RetryableGenerationError as exc:
             last_error = str(exc)
-            last_failure_meta = _log_generation_attempt_failure(
-                exc=exc,
-                model=model,
-                provider=active_provider,
-                book_number=book_number,
-                variant=variant,
-                retry_count=attempt,
-                max_attempts=max_attempts,
-                retryable=True,
-            )
             consecutive_provider_failures += 1
             if consecutive_provider_failures >= 3 and provider_index < (len(provider_chain) - 1):
                 previous_provider = active_provider
@@ -2586,16 +2161,6 @@ def _generate_one(
             time.sleep(backoff)
         except GenerationError as exc:
             last_error = str(exc)
-            last_failure_meta = _log_generation_attempt_failure(
-                exc=exc,
-                model=model,
-                provider=active_provider,
-                book_number=book_number,
-                variant=variant,
-                retry_count=attempt,
-                max_attempts=max_attempts,
-                retryable=False,
-            )
             if _is_artifact_generation_error(last_error) and artifact_retry_count < ARTIFACT_RETRY_LIMIT:
                 artifact_retry_count += 1
                 working_prompt = _artifact_retry_prompt(prompt=working_prompt, retry_index=artifact_retry_count)
@@ -2610,6 +2175,21 @@ def _generate_one(
                 )
                 continue
             consecutive_provider_failures += 1
+            if _should_immediately_failover(active_provider, exc) and provider_index < (len(provider_chain) - 1):
+                previous_provider = active_provider
+                provider_index += 1
+                active_provider = provider_chain[provider_index]
+                consecutive_provider_failures = 0
+                logger.warning(
+                    "Immediate provider failover triggered for book %s model %s variant %s after provider credits/auth issue: %s -> %s (%s)",
+                    book_number,
+                    model,
+                    variant,
+                    previous_provider,
+                    active_provider,
+                    exc,
+                )
+                continue
             if consecutive_provider_failures >= 3 and provider_index < (len(provider_chain) - 1):
                 previous_provider = active_provider
                 provider_index += 1
@@ -2628,16 +2208,6 @@ def _generate_one(
                 break
         except requests.RequestException as exc:
             last_error = f"Request failure: {exc}"
-            last_failure_meta = _log_generation_attempt_failure(
-                exc=exc,
-                model=model,
-                provider=active_provider,
-                book_number=book_number,
-                variant=variant,
-                retry_count=attempt,
-                max_attempts=max_attempts,
-                retryable=True,
-            )
             consecutive_provider_failures += 1
             if consecutive_provider_failures >= 3 and provider_index < (len(provider_chain) - 1):
                 previous_provider = active_provider
@@ -2680,12 +2250,56 @@ def _generate_one(
         cost=0.0,
         provider=active_provider,
         attempts=attempt,
-        failure_meta=last_failure_meta,
     )
 
 
 def _provider_request_delay(runtime: config.Config, provider: str) -> float:
     return float(runtime.provider_request_delay.get(provider, runtime.request_delay))
+
+
+def _canonical_model_family(runtime: config.Config, model: str) -> str:
+    token = runtime.resolve_model_alias(model).strip()
+    if not token:
+        return ""
+    parts = [part.strip() for part in token.split("/") if part.strip()]
+    while len(parts) > 1 and parts[0].lower() in runtime.provider_keys:
+        parts.pop(0)
+    return "/".join(parts)
+
+
+def _model_provider_chain(runtime: config.Config, *, model: str, primary: str) -> list[str]:
+    token = runtime.resolve_model_alias(model).strip()
+    explicit_provider = _model_provider_prefix(runtime, token)
+    if not explicit_provider:
+        return _provider_fallback_chain(runtime, primary=primary)
+
+    any_key = runtime.has_any_api_key()
+
+    def _provider_enabled(provider: str) -> bool:
+        if not any_key:
+            return True
+        return bool(runtime.get_api_key(provider).strip())
+
+    providers: list[str] = []
+
+    def _append(provider: str | None) -> None:
+        candidate = str(provider or "").strip().lower()
+        if not candidate or candidate in providers or not _provider_enabled(candidate):
+            return
+        providers.append(candidate)
+
+    _append(explicit_provider)
+    family = _canonical_model_family(runtime, token)
+    for candidate_model in [token, *runtime.all_models]:
+        candidate_token = runtime.resolve_model_alias(candidate_model).strip()
+        if not candidate_token:
+            continue
+        if _canonical_model_family(runtime, candidate_token) != family:
+            continue
+        _append(_model_provider_prefix(runtime, candidate_token) or runtime.resolve_model_provider(candidate_token))
+    if not providers and explicit_provider:
+        providers.append(explicit_provider)
+    return providers
 
 
 def _provider_fallback_chain(runtime: config.Config, *, primary: str) -> list[str]:
@@ -2736,16 +2350,35 @@ def _create_provider_instance(
 
 
 def _resolve_provider_model_name(provider: str, model: str, runtime: config.Config | None = None) -> str:
-    """Strip provider prefix from provider/model notation."""
+    """Strip provider prefix from provider/model notation, including nested provider families."""
     cfg = runtime or config.get_config()
     token = cfg.resolve_model_alias(model)
     if "/" not in token:
         return token
 
-    prefix, suffix = token.split("/", 1)
-    if prefix.lower() == provider.lower() and suffix:
-        return suffix
+    parts = [part.strip() for part in token.split("/") if part.strip()]
+    for index, part in enumerate(parts):
+        if part.lower() != provider.lower():
+            continue
+        suffix = "/".join(parts[index + 1 :]).strip()
+        if suffix:
+            return suffix
     return token
+
+
+def _should_immediately_failover(provider: str, exc: Exception) -> bool:
+    token = str(provider or "").strip().lower()
+    if token != "openrouter":
+        return False
+    status_code = getattr(exc, "status_code", None)
+    error_text = str(exc).lower()
+    return bool(
+        status_code == 402
+        or "error 402" in error_text
+        or '"code":402' in error_text
+        or "requires more credits" in error_text
+        or "insufficient credits" in error_text
+    )
 
 
 def _merge_negative_prompt(negative_prompt: str | None) -> str:
@@ -2758,13 +2391,28 @@ def _merge_negative_prompt(negative_prompt: str | None) -> str:
     return f"{custom} {baseline}".strip()
 
 
-def _apply_library_prompt_tokens(template: str, *, title: str, author: str) -> str:
-    return (
+def _apply_library_prompt_tokens(
+    template: str,
+    *,
+    title: str,
+    author: str,
+    book: dict[str, Any] | None = None,
+) -> str:
+    context = content_relevance.resolve_prompt_context(book or {"title": title, "author": author})
+    prompt = (
         str(template or "")
         .replace("{title}", str(title or ""))
         .replace("{author}", str(author or ""))
         .replace("{TITLE}", str(title or ""))
         .replace("{AUTHOR}", str(author or ""))
+        .replace("{SCENE}", str(context.get("scene_with_protagonist", "") or context.get("scene", "")))
+        .replace("{MOOD}", str(context.get("mood", "")))
+        .replace("{ERA}", str(context.get("era", "")))
+    )
+    return content_relevance.ensure_prompt_book_context(
+        prompt=prompt,
+        book=book or {"title": title, "author": author},
+        require_scene_anchor=True,
     )
 
 
