@@ -128,3 +128,15 @@ def test_resolve_full_resolution_composite_source_rewrites_thumbnail_url_to_asse
     )
 
     assert result == "/api/asset?path=Output%20Covers%2Fsaved_composites%2F4%2Fcover%20image.jpg"
+
+
+def test_get_blob_url_rewrites_project_relative_string_to_asset_endpoint():
+    result = _run_app_hook(
+        "getBlobUrl",
+        "/Output%20Covers/saved_composites/4/cover%20image.jpg?v=2026-03-11T06%3A33%3A58.279Z",
+    )
+
+    parsed = urlparse(result)
+    query = parse_qs(parsed.query)
+    assert parsed.path == "/api/asset"
+    assert query["path"] == ["Output Covers/saved_composites/4/cover image.jpg"]

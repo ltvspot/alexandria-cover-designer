@@ -611,7 +611,10 @@ window.buildProjectThumbnailUrl = (value, size = 'large', versionToken = '') => 
 window.blobUrls = new Map();
 window.getBlobUrl = (data, key) => {
   if (!data) return '';
-  if (typeof data === 'string') return window.normalizeAssetUrl(data);
+  if (typeof data === 'string') {
+    const assetUrl = window.buildProjectAssetUrl ? window.buildProjectAssetUrl(data) : '';
+    return assetUrl || window.normalizeAssetUrl(data);
+  }
 
   const blob = data instanceof Blob ? data : new Blob([data]);
   if (blob.type && !blob.type.startsWith('image/')) return '';
@@ -646,6 +649,7 @@ window.__APP_TEST_HOOKS__.buildProjectAssetUrl = (value, versionToken = '') => w
 window.__APP_TEST_HOOKS__.buildProjectThumbnailUrl = (value, size = 'large', versionToken = '') => (
   window.buildProjectThumbnailUrl(value, size, versionToken)
 );
+window.__APP_TEST_HOOKS__.getBlobUrl = (value) => window.getBlobUrl(value);
 window.__APP_TEST_HOOKS__.resolveFullResolutionCompositeSource = (value) => resolveFullResolutionCompositeSource(value);
 
 function warnIfSuspiciousCompositeBlob(blob, source) {
