@@ -190,6 +190,24 @@ def test_synthetic_provider_and_small_helpers():
     assert ig._host_matches_allowlist("foo.bar.com", "*") is True
 
 
+def test_generation_result_defaults_include_failure_meta():
+    result = ig.GenerationResult(
+        book_number=1,
+        variant=1,
+        prompt="prompt",
+        model="openrouter/google/gemini-3-pro-image-preview",
+        image_path=None,
+        success=False,
+        error="boom",
+        generation_time=0.0,
+        cost=0.0,
+        provider="openrouter",
+    )
+
+    assert result.failure_meta == {}
+    assert result.to_dict()["failure_meta"] == {}
+
+
 def test_negative_prompt_merge_and_nano_alias_resolution(tmp_path: Path, monkeypatch):
     runtime = _Runtime(tmp_path)
     monkeypatch.setattr(ig.config, "get_config", lambda: runtime)

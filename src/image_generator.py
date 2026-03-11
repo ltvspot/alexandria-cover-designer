@@ -14,7 +14,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -327,6 +327,7 @@ class GenerationResult:
     skipped: bool = False
     dry_run: bool = False
     attempts: int = 0
+    failure_meta: dict[str, Any] = field(default_factory=dict)
     similarity_warning: str | None = None
     similar_to_book: int | None = None
     distinctiveness_score: float | None = None
@@ -2017,6 +2018,7 @@ def _generate_one(
 
     start = time.perf_counter()
     last_error: str | None = None
+    last_failure_meta: dict[str, Any] = {}
     provider_chain = _model_provider_chain(runtime, model=model, primary=provider)
     provider_index = 0
     active_provider = provider_chain[provider_index]
@@ -2047,6 +2049,12 @@ def _generate_one(
             provider_advanced = True
         if provider_index >= len(provider_chain):
             last_error = "All providers are in cooldown"
+            last_failure_meta = {
+                "provider": active_provider,
+                "error": last_error,
+                "error_type": "provider_cooldown",
+                "retry_count": attempt,
+            }
             break
         if provider_advanced:
             consecutive_provider_failures = 0
@@ -2117,6 +2125,13 @@ def _generate_one(
             )
         except RetryableGenerationError as exc:
             last_error = str(exc)
+            last_failure_meta = {
+                "provider": active_provider,
+                "error": last_error,
+                "error_type": "retryable_generation_error",
+                "retry_count": attempt,
+                "status_code": int(exc.status_code or 0),
+            }
             consecutive_provider_failures += 1
             if consecutive_provider_failures >= 3 and provider_index < (len(provider_chain) - 1):
                 previous_provider = active_provider
@@ -2161,6 +2176,13 @@ def _generate_one(
             time.sleep(backoff)
         except GenerationError as exc:
             last_error = str(exc)
+            last_failure_meta = {
+                "provider": active_provider,
+                "error": last_error,
+                "error_type": "generation_error",
+                "retry_count": attempt,
+                "status_code": int(exc.status_code or 0),
+            }
             if _is_artifact_generation_error(last_error) and artifact_retry_count < ARTIFACT_RETRY_LIMIT:
                 artifact_retry_count += 1
                 working_prompt = _artifact_retry_prompt(prompt=working_prompt, retry_index=artifact_retry_count)
@@ -2208,6 +2230,12 @@ def _generate_one(
                 break
         except requests.RequestException as exc:
             last_error = f"Request failure: {exc}"
+            last_failure_meta = {
+                "provider": active_provider,
+                "error": last_error,
+                "error_type": "request_exception",
+                "retry_count": attempt,
+            }
             consecutive_provider_failures += 1
             if consecutive_provider_failures >= 3 and provider_index < (len(provider_chain) - 1):
                 previous_provider = active_provider
@@ -2250,6 +2278,7 @@ def _generate_one(
         cost=0.0,
         provider=active_provider,
         attempts=attempt,
+        failure_meta=last_failure_meta,
     )
 
 
