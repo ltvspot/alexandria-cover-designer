@@ -67,6 +67,17 @@ const ALEXANDRIA_BASE_PROMPT_IDS = {
   romanticRealism: 'alexandria-base-romantic-realism',
   esotericMysticism: 'alexandria-base-esoteric-mysticism',
 };
+const PROMPT_ID_ALIASES = {
+  'alexandria-wildcard-antique-map-illustration': 'alexandria-wildcard-antique-map',
+  'alexandria-wildcard-baroque-chiaroscuro': 'alexandria-wildcard-baroque-dramatic',
+  'alexandria-wildcard-bauhaus-minimalism': 'alexandria-wildcard-soviet-constructivist',
+  'alexandria-wildcard-gothic-revival': 'alexandria-wildcard-twilight-symbolism',
+  'alexandria-wildcard-misty-romanticism': 'alexandria-wildcard-pre-raphaelite-dream',
+  'alexandria-wildcard-mughal-court-painting': 'alexandria-wildcard-persian-miniature',
+  'alexandria-wildcard-naturalist-field-study': 'alexandria-wildcard-naturalist-field-drawing',
+  'alexandria-wildcard-romantic-landscape': 'alexandria-wildcard-pre-raphaelite-garden',
+  'alexandria-wildcard-scientific-diagram': 'alexandria-wildcard-naturalist-field-drawing',
+};
 const GENRE_PROMPT_MAP = {
   religious: {
     base: ALEXANDRIA_BASE_PROMPT_IDS.classicalDevotion,
@@ -368,6 +379,12 @@ const GENRE_PROMPT_ALIASES = {
 function modelIdToLabel(modelId) {
   const model = OpenRouter.MODELS.find((m) => m.id === modelId);
   return model?.label || modelId;
+}
+
+function resolvePromptIdAlias(promptId) {
+  const token = _normalizePromptText(promptId);
+  if (!token) return '';
+  return String(PROMPT_ID_ALIASES[token.toLowerCase()] || token).trim();
 }
 
 function statusTagClass(status) {
@@ -941,8 +958,8 @@ function buildVariantPromptPayloads({
   assignments.forEach((assignment, index) => {
     const variant = Number(assignment?.variant || 0) || (index + 1);
     const planItem = previousByVariant.get(variant) || null;
-    const assignedPromptId = String(planItem?.promptId || promptId || assignment?.promptId || '').trim();
-    const assignedTemplate = assignedPromptId ? DB.dbGet('prompts', assignedPromptId) : null;
+    const assignedPromptId = resolvePromptIdAlias(planItem?.promptId || promptId || assignment?.promptId || '');
+    const assignedTemplate = assignedPromptId ? findPromptById(assignedPromptId) : null;
     if (assignedPromptId && !assignedTemplate) missingPromptIds.push(assignedPromptId);
     const assignedSceneInput = String(planItem?.sceneVal || sceneVal || '').trim();
     const assignedScene = sceneForVariant(book, variant, assignedSceneInput);
@@ -1020,7 +1037,7 @@ function normalizedPromptName(value) {
 }
 
 function findPromptById(promptId) {
-  const token = _normalizePromptText(promptId);
+  const token = resolvePromptIdAlias(promptId);
   if (!token) return null;
   return sortPromptsForUI(DB.dbGetAll('prompts')).find((prompt) => _normalizePromptText(prompt?.id) === token) || null;
 }
@@ -1090,9 +1107,9 @@ function defaultAutoPromptConfigForBook(book) {
 function buildVariantPromptAssignments({ book, variantCount, referenceDate = new Date() }) {
   const total = Math.max(1, Number(variantCount || 1));
   const config = defaultAutoPromptConfigForBook(book);
-  const basePromptId = String(config?.base || ALEXANDRIA_BASE_PROMPT_IDS.romanticRealism || '').trim();
+  const basePromptId = resolvePromptIdAlias(config?.base || ALEXANDRIA_BASE_PROMPT_IDS.romanticRealism || '');
   const wildcardIds = Array.isArray(config?.wildcards)
-    ? config.wildcards.map((value) => String(value || '').trim()).filter(Boolean)
+    ? config.wildcards.map((value) => resolvePromptIdAlias(value)).filter(Boolean)
     : [];
   const wildcardSeed = wildcardIds.length
     ? (_hashString(`${book?.title || ''}::${book?.author || ''}`) + _dayOfYear(referenceDate)) % wildcardIds.length
@@ -1126,11 +1143,11 @@ function buildEditableVariantPromptPlan({ book, variantCount, previousPlan = [],
   return assignments.map((assignment) => {
     const variant = Number(assignment.variant || 1);
     const previous = preserveExisting ? previousByVariant.get(variant) : null;
-    const autoPromptId = String(assignment.promptId || '').trim();
-    const previousAutoPromptId = String(previous?.autoPromptId || '').trim();
+    const autoPromptId = resolvePromptIdAlias(assignment.promptId || '');
+    const previousAutoPromptId = resolvePromptIdAlias(previous?.autoPromptId || '');
     const previousAutoTemplate = promptTemplateForPromptId(previousAutoPromptId);
     const usesAutoAssignment = previous ? Boolean(previous.usesAutoAssignment) : true;
-    const manualPromptId = String(previous?.promptId || '').trim();
+    const manualPromptId = resolvePromptIdAlias(previous?.promptId || '');
     const promptId = usesAutoAssignment ? autoPromptId : (manualPromptId || autoPromptId);
     const templatePrompt = promptTemplateForPromptId(promptId) || promptTemplateForPromptId(autoPromptId);
     let customPrompt = String(previous?.customPrompt || '').trim();
@@ -1799,9 +1816,9 @@ window.Pages.iterate = {
     const applyPromptSelection = (promptId, { forceAlexandriaDefaults = false, variantNumber = _activeVariantPrompt } = {}) => {
       const item = _variantPromptPlan.find((entry) => Number(entry?.variant || 0) === Number(variantNumber || 0));
       if (!item) return null;
-      const selectedPromptId = String(promptId || '').trim();
-      const resolvedPromptId = selectedPromptId || String(item.autoPromptId || '').trim();
-      const selected = resolvedPromptId ? DB.dbGet('prompts', String(resolvedPromptId)) : null;
+      const selectedPromptId = resolvePromptIdAlias(promptId || '');
+      const resolvedPromptId = selectedPromptId || resolvePromptIdAlias(item.autoPromptId || '');
+      const selected = resolvedPromptId ? findPromptById(resolvedPromptId) : null;
       item.usesAutoAssignment = !selectedPromptId;
       item.promptId = resolvedPromptId;
       item.customPrompt = String(selected?.prompt_template || '');

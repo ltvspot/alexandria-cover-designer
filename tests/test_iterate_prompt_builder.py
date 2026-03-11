@@ -299,6 +299,38 @@ def test_iterate_variant_payloads_auto_rotate_assign_distinct_scenes():
     assert len(set(scenes)) == 4
 
 
+def test_iterate_variant_payloads_resolve_legacy_prompt_id_aliases():
+    prompts = [
+        {
+            "id": "alexandria-wildcard-antique-map",
+            "name": "Antique Map",
+            "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.",
+            "tags": ["alexandria", "wildcard"],
+        },
+    ]
+    result = _run_iterate_variant_payloads(
+        {
+            "book": {
+                "title": "Gulliver's Travels",
+                "author": "Jonathan Swift",
+                "genre": "adventure",
+            },
+            "variantCount": 1,
+            "promptId": "alexandria-wildcard-antique-map-illustration",
+            "customPrompt": "",
+            "sceneVal": "Gulliver wakes on the beach bound by hundreds of tiny ropes while Lilliputians climb over him",
+            "moodVal": "satirical wonder with unease",
+            "eraVal": "18th-century voyage literature",
+        },
+        prompts=prompts,
+    )
+
+    assert result["missingPromptIds"] == []
+    assert result["entries"][0]["assignedPromptId"] == "alexandria-wildcard-antique-map"
+    assert result["entries"][0]["assignedTemplate"]["id"] == "alexandria-wildcard-antique-map"
+    assert result["entries"][0]["promptPayload"]["libraryPromptId"] == "alexandria-wildcard-antique-map"
+
+
 def test_iterate_science_genre_maps_to_scientific_wildcards():
     prompts = [
         {"id": "alexandria-wildcard-scientific-diagram", "name": "Scientific Diagram", "tags": ["alexandria", "wildcard"]},
