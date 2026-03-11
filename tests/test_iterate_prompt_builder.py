@@ -64,6 +64,18 @@ def _run_iterate_prompt_builder(payload: dict) -> dict:
     return _run_iterate_hook(function_name="buildGenerationJobPrompt", payload=payload)
 
 
+def _run_iterate_variant_payloads(payload: dict, prompts: list[dict] | None = None) -> dict:
+    return _run_iterate_hook(function_name="buildVariantPromptPayloads", payload=payload, prompts=prompts)
+
+
+def _run_iterate_variant_summary_lines(entries: list[dict]) -> list[str]:
+    return _run_iterate_hook(function_name="formatVariantSummaryLines", payload={"entries": entries})
+
+
+def _run_iterate_ui_defaults() -> dict:
+    return _run_iterate_hook(function_name="iterateUiDefaults", payload={})
+
+
 def test_iterate_prompt_builder_keeps_library_prompt_precomposed():
     result = _run_iterate_prompt_builder(
         {
@@ -128,6 +140,28 @@ def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto(
     assert result["styleId"] == "romantic-sublime"
     assert result["preservePromptText"] is False
     assert result["libraryPromptId"] == ""
+
+
+def test_iterate_ui_defaults_use_four_variants_and_auto_rotate_label():
+    result = _run_iterate_ui_defaults()
+
+    assert result["defaultVariantCount"] == 4
+    assert result["autoRotateLabel"] == "Auto-Rotate (Recommended)"
+
+
+def test_iterate_variant_summary_lines_are_single_line_and_compact():
+    lines = _run_iterate_variant_summary_lines(
+        [
+            {
+                "variant": 1,
+                "assignedTemplate": {"name": "BASE 4 — Romantic Realism"},
+                "assignedScene": "Gulliver wakes on the beach in Lilliput.",
+            }
+        ]
+    )
+
+    assert lines == ["Variant 1: Romantic Realism — Gulliver wakes on the beach in Lilliput."]
+    assert "\n" not in lines[0]
 
 
 def test_iterate_scene_pool_filters_generic_enrichment_and_uses_prompt_context():
@@ -222,6 +256,47 @@ def test_iterate_variant_prompt_plan_falls_back_to_literature_defaults_for_unkno
         "alexandria-wildcard-art-nouveau-poster",
         "alexandria-wildcard-pre-raphaelite-dream",
     }
+
+
+def test_iterate_variant_payloads_auto_rotate_assign_distinct_scenes():
+    prompts = [
+        {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "base"]},
+        {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-impressionist-plein-air", "name": "WILDCARD 8 — Impressionist Plein Air", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-romantic-landscape", "name": "WILDCARD 10 — Romantic Landscape", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-art-nouveau-poster", "name": "WILDCARD 11 — Art Nouveau Poster", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-pre-raphaelite-dream", "name": "WILDCARD 23 — Pre-Raphaelite Dream", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+    ]
+    result = _run_iterate_variant_payloads(
+        {
+            "book": {
+                "title": "Gulliver's Travels",
+                "author": "Jonathan Swift",
+                "genre": "adventure",
+                "enrichment": {
+                    "iconic_scenes": [
+                        "Gulliver wakes on the beach bound by hundreds of tiny ropes while Lilliputians climb over him",
+                        "Gulliver stands in the grand palace of the Emperor of Lilliput while courtiers stare upward",
+                        "Gulliver is carried by Glumdalclitch through the fields of Brobdingnag",
+                        "Gulliver converses with the King of Brobdingnag on a massive throne",
+                    ],
+                    "emotional_tone": "satirical wonder with unease",
+                    "era": "18th-century voyage literature",
+                },
+            },
+            "variantCount": 4,
+            "promptId": "",
+            "customPrompt": "",
+            "sceneVal": "",
+            "moodVal": "",
+            "eraVal": "",
+        },
+        prompts=prompts,
+    )
+
+    scenes = [str(entry["assignedScene"]) for entry in result["entries"]]
+    assert len(scenes) == 4
+    assert len(set(scenes)) == 4
 
 
 def test_iterate_science_genre_maps_to_scientific_wildcards():

@@ -2354,6 +2354,50 @@ def test_assert_composite_validation_within_limits_allows_edge_artifact_only(tmp
     qr._assert_composite_validation_within_limits(runtime=cfg, book_number=3)
 
 
+def test_assert_composite_validation_within_limits_rebuilds_stale_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    report_path = cfg.tmp_dir / "composited" / "4" / "composite_validation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "book_number": 4,
+                "total": 1,
+                "invalid": 1,
+                "items": [
+                    {
+                        "output_path": "tmp/composited/4/model/variant_1.jpg",
+                        "valid": False,
+                        "issues": ["border_bleed_detected", "edge_artifact_risk"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def _fake_rebuild(*, runtime, book_number):  # type: ignore[no-untyped-def]
+        assert runtime is cfg
+        assert book_number == 4
+        refreshed = {
+            "book_number": 4,
+            "total": 1,
+            "invalid": 0,
+            "items": [
+                {
+                    "output_path": "tmp/composited/4/model/variant_1.jpg",
+                    "valid": True,
+                    "issues": [],
+                }
+            ],
+        }
+        report_path.write_text(json.dumps(refreshed), encoding="utf-8")
+        return refreshed
+
+    monkeypatch.setattr(qr, "_rebuild_composite_validation_report", _fake_rebuild)
+    qr._assert_composite_validation_within_limits(runtime=cfg, book_number=4)
+
+
 def _build_runtime_for_startup_checks(tmp_path: Path) -> config.Config:
     base = tmp_path / "runtime"
     input_dir = base / "Input Covers"
@@ -3142,6 +3186,72 @@ def test_execute_generation_payload_preserves_precomposed_prompt_when_compose_pr
     assert captured["prompt_text"] == prompt
     assert captured["library_prompt_id"] is None
     assert captured["preserve_prompt_text"] is True
+
+
+def test_execute_generation_payload_trusts_resolved_frontend_prompt_without_preserve_flag(tmp_path: Path, monkeypatch):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg = replace(cfg, openrouter_api_key="test-key")
+    monkeypatch.setattr(qr.config, "get_config", lambda *_args, **_kwargs: cfg)
+
+    captured: dict[str, Any] = {}
+
+    def _fake_generate_single_book(**kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(qr.image_generator, "generate_single_book", _fake_generate_single_book)
+    monkeypatch.setattr(qr, "_serialize_generation_results", lambda **_kwargs: [])
+    monkeypatch.setattr(qr.cover_compositor, "composite_all_variants", lambda **_kwargs: None)
+    monkeypatch.setattr(qr, "_record_generation_costs", lambda **_kwargs: None)
+    monkeypatch.setattr(qr.state_db_store, "append_generation_records", lambda **_kwargs: 0)
+    monkeypatch.setattr(qr.state_db_store, "export_history_payload", lambda **_kwargs: {"items": []})
+    monkeypatch.setattr(qr, "_build_review_data_payload", lambda *_args, **_kwargs: {"books": []})
+    monkeypatch.setattr(qr, "_invalidate_cache", lambda *_args, **_kwargs: 1)
+    monkeypatch.setattr(
+        qr,
+        "_book_row_for_number",
+        lambda **_kwargs: {
+            "number": 52,
+            "title": "Gulliver's Travels",
+            "author": "Jonathan Swift",
+            "enrichment": {
+                "iconic_scenes": [
+                    "Gulliver bound by tiny ropes in Lilliput while miniature figures swarm over him",
+                    "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him",
+                ],
+                "emotional_tone": "satirical wonder with unease",
+                "era": "18th-century voyage literature",
+            },
+        },
+    )
+
+    prompt = (
+        "Book cover illustration only — no text. "
+        "This circular medallion illustration MUST depict the following specific scene: "
+        "Gulliver stands before the giant court of Brobdingnag while nobles crowd around him. "
+        "Mood: satirical wonder with unease. "
+        "Era reference: 18th-century voyage literature."
+    )
+
+    qr._execute_generation_payload(
+        {
+            "catalog": "classics",
+            "book": 52,
+            "models": ["openrouter/google/gemini-3-pro-image-preview"],
+            "variants": 1,
+            "variant": 1,
+            "prompt": prompt,
+            "prompt_source": "custom",
+            "compose_prompt": False,
+            "provider": "all",
+            "cover_source": "drive",
+            "dry_run": True,
+        }
+    )
+
+    assert captured["prompt_text"] == prompt
+    assert "Brobdingnag" in captured["prompt_text"]
+    assert "Lilliput" not in captured["prompt_text"]
 
 
 def test_execute_generation_payload_sanitizes_unresolved_placeholders_before_generation(tmp_path: Path, monkeypatch):

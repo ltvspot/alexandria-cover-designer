@@ -8,6 +8,9 @@ let _lastVisibleModelIds = [];
 let _defaultSelectedModelIds = [];
 let _variantPromptPlan = [];
 let _activeVariantPrompt = 1;
+const DEFAULT_VARIANT_COUNT = 4;
+const AUTO_ROTATE_PROMPT_OPTION_LABEL = 'Auto-Rotate (Recommended)';
+const AUTO_ROTATE_PROMPT_INFO = 'Automatically varies artistic styles and scenes across your covers.';
 const PREFERRED_DEFAULT_MODELS = [
   'openrouter/google/gemini-3-pro-image-preview',
   'nano-banana-pro',
@@ -873,8 +876,117 @@ function buildGenerationJobPrompt({ book, templateObj, promptId, customPrompt, s
   };
 }
 
+function formatPromptPreview(entries) {
+  return (Array.isArray(entries) ? entries : []).map((entry) => {
+    const variant = Number(entry?.variant || 0) || 1;
+    const prompt = String(entry?.promptPayload?.prompt || '').trim();
+    return `Variant ${variant}\n${prompt}`;
+  }).join('\n\n');
+}
+
+function compactStyleLabel(value) {
+  return String(value || '')
+    .replace(/^(?:BASE|WILDCARD)\s+\d+\s+[—-]\s+/i, '')
+    .trim() || 'Style';
+}
+
+function compactSceneLabel(value, maxLength = 72) {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  const shortened = normalized
+    .replace(/^the illustration must depict:\s*/i, '')
+    .replace(/\.\s*The main character shown is .*$/i, '')
+    .replace(/\.\s*The main characters shown are .*$/i, '')
+    .trim();
+  if (shortened.length <= maxLength) return shortened;
+  return `${shortened.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function formatVariantSummaryLines(entries) {
+  return (Array.isArray(entries) ? entries : []).map((entry) => {
+    const styleLabel = compactStyleLabel(
+      entry?.assignedTemplate?.name
+      || entry?.promptPayload?.styleLabel
+      || 'Style',
+    );
+    const sceneLabel = compactSceneLabel(entry?.assignedScene || entry?.scene_description || '');
+    return `Variant ${Number(entry?.variant || 0) || 1}: ${styleLabel}${sceneLabel ? ` — ${sceneLabel}` : ''}`.trim();
+  });
+}
+
+function buildVariantPromptPayloads({
+  book,
+  variantCount,
+  promptId = '',
+  customPrompt = '',
+  sceneVal = '',
+  moodVal = '',
+  eraVal = '',
+  variantPlan = null,
+  referenceDate = new Date(),
+}) {
+  const total = Math.max(1, Number(variantCount || DEFAULT_VARIANT_COUNT));
+  const assignments = buildVariantPromptAssignments({ book, variantCount: total, referenceDate });
+  const previousByVariant = new Map(
+    (Array.isArray(variantPlan) ? variantPlan : [])
+      .map((item) => [Number(item?.variant || 0), item])
+      .filter(([variant]) => variant > 0)
+  );
+  const styles = typeof StyleDiversifier?.selectDiverseStyles === 'function'
+    ? StyleDiversifier.selectDiverseStyles(total)
+    : [];
+  const entries = [];
+  const missingPromptIds = [];
+
+  assignments.forEach((assignment, index) => {
+    const variant = Number(assignment?.variant || 0) || (index + 1);
+    const planItem = previousByVariant.get(variant) || null;
+    const assignedPromptId = String(planItem?.promptId || promptId || assignment?.promptId || '').trim();
+    const assignedTemplate = assignedPromptId ? DB.dbGet('prompts', assignedPromptId) : null;
+    if (assignedPromptId && !assignedTemplate) missingPromptIds.push(assignedPromptId);
+    const assignedSceneInput = String(planItem?.sceneVal || sceneVal || '').trim();
+    const assignedScene = sceneForVariant(book, variant, assignedSceneInput);
+    const assignedMood = String(planItem?.moodVal || moodVal || '').trim() || defaultMoodForBook(book);
+    const assignedEra = String(planItem?.eraVal || eraVal || '').trim() || defaultEraForBook(book);
+    const assignedCustomPrompt = String(planItem?.customPrompt || customPrompt || '').trim();
+    const promptPayload = buildGenerationJobPrompt({
+      book,
+      templateObj: assignedTemplate,
+      promptId: assignedPromptId,
+      customPrompt: assignedCustomPrompt,
+      sceneVal: assignedScene,
+      moodVal: assignedMood,
+      eraVal: assignedEra,
+      style: styles[index % Math.max(1, styles.length)] || { id: 'none', label: 'Default' },
+    });
+    entries.push({
+      variant,
+      assignedPromptId,
+      assignedTemplate,
+      assignedScene,
+      assignedMood,
+      assignedEra,
+      promptPayload,
+      scene_description: assignedScene,
+      mood: assignedMood,
+      era: assignedEra,
+    });
+  });
+
+  return {
+    entries,
+    missingPromptIds: Array.from(new Set(missingPromptIds)),
+  };
+}
+
 window.__ITERATE_TEST_HOOKS__ = window.__ITERATE_TEST_HOOKS__ || {};
 window.__ITERATE_TEST_HOOKS__.buildGenerationJobPrompt = buildGenerationJobPrompt;
+window.__ITERATE_TEST_HOOKS__.buildVariantPromptPayloads = (payload) => buildVariantPromptPayloads(payload);
+window.__ITERATE_TEST_HOOKS__.formatVariantSummaryLines = ({ entries }) => formatVariantSummaryLines(entries);
+window.__ITERATE_TEST_HOOKS__.iterateUiDefaults = () => ({
+  defaultVariantCount: DEFAULT_VARIANT_COUNT,
+  autoRotateLabel: AUTO_ROTATE_PROMPT_OPTION_LABEL,
+});
 window.__ITERATE_TEST_HOOKS__.buildScenePool = buildScenePool;
 window.__ITERATE_TEST_HOOKS__.defaultSceneForBook = defaultSceneForBook;
 window.__ITERATE_TEST_HOOKS__.applyPromptPlaceholders = applyPromptPlaceholders;
@@ -1247,17 +1359,18 @@ window.Pages.iterate = {
       .sort((a, b) => Number(a.number || 0) - Number(b.number || 0))
       .map((book) => `<option value="${book.id}">${book.number}. ${book.title}</option>`)
       .join('');
-    const promptOptions = ['<option value="">Default auto</option>']
+    const promptOptions = [`<option value="">${AUTO_ROTATE_PROMPT_OPTION_LABEL}</option>`]
       .concat(prompts.map((p) => `<option value="${p.id}">${p.name}</option>`))
       .join('');
 
     content.innerHTML = `
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Generate Illustrations</h3>
-          <div class="filters-bar">
-            <span class="text-muted">Quick</span>
-            <label class="checkbox-item"><input id="iterModeToggle" type="checkbox" checked /> <span>Advanced</span></label>
+        <div class="card-header iterate-card-header">
+          <div>
+            <h3 class="card-title">Generate Illustrations</h3>
+            <p class="text-sm text-muted iterate-flow-note">Book → Variants → Style → Generate. Model changes and prompt customization live under Advanced.</p>
           </div>
+          <button class="btn btn-secondary btn-sm" id="iterAdvancedToggle" type="button" aria-expanded="false">Advanced</button>
         </div>
 
         <div class="form-group">
@@ -1283,71 +1396,91 @@ window.Pages.iterate = {
           </div>
         </div>
 
-        <div id="iterAdvanced">
+        <div class="form-row iterate-primary-row">
           <div class="form-group">
-            <label class="form-label">Models (best → budget, top → bottom)</label>
-            <input class="form-input model-search-input" id="iterModelSearch" placeholder="Search model name / provider / id..." />
-            <div class="model-toolbar mt-8">
-              <button class="filter-chip active" data-model-filter="recommended">Recommended</button>
-              <button class="filter-chip" data-model-filter="all">All</button>
-              <button class="filter-chip" data-model-filter="openrouter">OpenRouter</button>
-              <button class="filter-chip" data-model-filter="gemini">Gemini</button>
-              <button class="filter-chip" data-model-filter="nano">Nano Pro only</button>
-              <button class="filter-chip" data-model-action="select-visible">Select visible</button>
-              <button class="filter-chip" data-model-action="clear">Clear</button>
-            </div>
-            <p class="text-xs text-muted mt-8" id="iterModelSummary"></p>
-            <p class="text-xs text-muted mt-8" id="iterCostBreakdown"></p>
-            <div class="model-card-grid" id="iterModelGrid"></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Variants per model</label>
-              <select class="form-select" id="iterVariants">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i === 0 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Prompt template (active variant)</label>
-              <select class="form-select" id="iterPromptSel">${promptOptions}</select>
-              <div class="text-xs text-muted mt-8" id="iterWildcardSuggestion"></div>
-            </div>
+            <label class="form-label">Variants</label>
+            <select class="form-select" id="iterVariants">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i + 1 === DEFAULT_VARIANT_COUNT ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>
           </div>
           <div class="form-group">
-            <div class="flex justify-between items-center">
-              <label class="form-label">Variant prompt plan</label>
-              <span class="text-xs text-muted" id="iterVariantPlanSummary">Variant 1 starts with the baseline prompt; the rest rotate wildcard prompts.</span>
-            </div>
-            <div class="grid-auto" id="iterVariantPromptPlan"></div>
-          </div>
-          <div class="form-group">
-            <div class="flex justify-between items-center">
-              <label class="form-label">Custom prompt</label>
-              <span class="text-xs text-muted" id="iterVariantEditorLabel">Editing variant 1.</span>
-            </div>
-            <textarea class="form-textarea" id="iterPrompt" rows="4" placeholder="Override the prompt. Use {title}, {author}, {SCENE}, {MOOD}, and {ERA} placeholders..."></textarea>
-            <div id="iterVarFields" class="mt-8 hidden">
-              <label class="form-label mt-8">Scene description</label>
-              <textarea class="form-textarea" id="iterScene" rows="2" placeholder="e.g. A radiant divine figure emerging from concentric celestial spheres..."></textarea>
-              <label class="form-label mt-8">Mood</label>
-              <input class="form-input" id="iterMood" type="text" placeholder="e.g. mystical, luminous, sacred" />
-              <label class="form-label mt-8">Era (optional)</label>
-              <input class="form-input" id="iterEra" type="text" placeholder="e.g. 2nd century Gnostic" />
-            </div>
-          </div>
-          <div class="form-group">
-            <div class="flex justify-between items-center">
-              <label class="form-label">Prompt preview</label>
-              <span class="text-xs text-muted" id="iterPromptValidation">Awaiting book selection.</span>
-            </div>
-            <textarea class="form-textarea" id="iterPromptPreview" rows="7" readonly placeholder="Resolved prompt preview will appear here..."></textarea>
+            <label class="form-label">Style</label>
+            <select class="form-select" id="iterPromptSel">${promptOptions}</select>
+            <div class="text-xs text-muted mt-8" id="iterPromptRotationInfo">${escapeHtml(AUTO_ROTATE_PROMPT_INFO)}</div>
+            <div class="text-xs text-muted mt-8" id="iterWildcardSuggestion"></div>
           </div>
         </div>
 
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center iterate-primary-actions">
           <span class="text-muted" id="iterCostEst">Est. cost: $0.000</span>
           <div class="flex gap-8">
             <button class="btn btn-secondary" id="iterCancelBtn">Cancel All</button>
             <button class="btn btn-primary" id="iterGenBtn">Generate</button>
           </div>
+        </div>
+
+        <div class="iterate-variant-summary hidden" id="iterVariantSummary"></div>
+
+        <div class="iterate-model-summary-card mt-16">
+          <div>
+            <div class="form-label iterate-inline-label">Model</div>
+            <div class="iterate-model-selected" id="iterModelCollapsedValue">Loading recommended model…</div>
+          </div>
+          <button class="btn-link" id="iterModelToggle" type="button" aria-expanded="false">Change model</button>
+        </div>
+
+        <div id="iterAdvanced" class="hidden mt-16">
+          <div class="advanced-block hidden" id="iterModelControls">
+            <label class="form-label">Models (best → budget, top → bottom)</label>
+            <input class="form-input model-search-input" id="iterModelSearch" placeholder="Search model name / provider / id..." />
+            <div class="model-toolbar mt-8">
+              <button class="filter-chip active" type="button" data-model-filter="recommended">Recommended</button>
+              <button class="filter-chip" type="button" data-model-filter="all">All</button>
+              <button class="filter-chip" type="button" data-model-filter="openrouter">OpenRouter</button>
+              <button class="filter-chip" type="button" data-model-filter="gemini">Gemini</button>
+              <button class="filter-chip" type="button" data-model-filter="nano">Nano Pro only</button>
+              <button class="filter-chip" type="button" data-model-action="select-visible">Select visible</button>
+              <button class="filter-chip" type="button" data-model-action="clear">Clear</button>
+            </div>
+            <p class="text-xs text-muted mt-8" id="iterModelSummary"></p>
+            <p class="text-xs text-muted mt-8" id="iterCostBreakdown"></p>
+            <div class="model-card-grid" id="iterModelGrid"></div>
+          </div>
+
+          <details class="advanced-block" id="iterCustomizePanel">
+            <summary>Customize variants</summary>
+            <div class="advanced-panel-body">
+              <div class="form-group">
+                <div class="flex justify-between items-center">
+                  <label class="form-label">Variant prompt plan</label>
+                  <span class="text-xs text-muted" id="iterVariantPlanSummary">Variant 1 starts with the baseline prompt; the rest rotate wildcard prompts.</span>
+                </div>
+                <div class="grid-auto" id="iterVariantPromptPlan"></div>
+              </div>
+
+              <div class="form-group">
+                <div class="flex justify-between items-center">
+                  <label class="form-label">Custom prompt</label>
+                  <span class="text-xs text-muted" id="iterVariantEditorLabel">Editing variant 1.</span>
+                </div>
+                <textarea class="form-textarea" id="iterPrompt" rows="4" placeholder="Override the prompt. Use {title}, {author}, {SCENE}, {MOOD}, and {ERA} placeholders..."></textarea>
+                <div id="iterVarFields" class="mt-8 hidden">
+                  <label class="form-label mt-8">Scene description</label>
+                  <textarea class="form-textarea" id="iterScene" rows="2" placeholder="e.g. A radiant divine figure emerging from concentric celestial spheres..."></textarea>
+                  <label class="form-label mt-8">Mood</label>
+                  <input class="form-input" id="iterMood" type="text" placeholder="e.g. mystical, luminous, sacred" />
+                  <label class="form-label mt-8">Era (optional)</label>
+                  <input class="form-input" id="iterEra" type="text" placeholder="e.g. 2nd century Gnostic" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <div class="flex justify-between items-center">
+                  <label class="form-label">Prompt preview</label>
+                  <span class="text-xs text-muted" id="iterPromptValidation">Awaiting book selection.</span>
+                </div>
+                <textarea class="form-textarea prompt-preview-textarea" id="iterPromptPreview" rows="7" readonly placeholder="Resolved prompt preview will appear here..."></textarea>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -1371,10 +1504,14 @@ window.Pages.iterate = {
     const enrichGenericBtn = document.getElementById('iterReenrichGenericBtn');
     const enrichmentBadgeEl = document.getElementById('iterEnrichmentBadge');
     const enrichmentSummaryEl = document.getElementById('iterEnrichmentSummary');
-    const modeToggle = document.getElementById('iterModeToggle');
+    const advancedToggleBtn = document.getElementById('iterAdvancedToggle');
     const advanced = document.getElementById('iterAdvanced');
+    const modelToggleBtn = document.getElementById('iterModelToggle');
+    const modelControlsEl = document.getElementById('iterModelControls');
+    const modelCollapsedValueEl = document.getElementById('iterModelCollapsedValue');
     const variantsEl = document.getElementById('iterVariants');
     const promptSelEl = document.getElementById('iterPromptSel');
+    const promptRotationInfoEl = document.getElementById('iterPromptRotationInfo');
     const wildcardSuggestionEl = document.getElementById('iterWildcardSuggestion');
     const customPromptEl = document.getElementById('iterPrompt');
     const varFieldsEl = document.getElementById('iterVarFields');
@@ -1386,6 +1523,7 @@ window.Pages.iterate = {
     const variantPlanEl = document.getElementById('iterVariantPromptPlan');
     const variantPlanSummaryEl = document.getElementById('iterVariantPlanSummary');
     const variantEditorLabelEl = document.getElementById('iterVariantEditorLabel');
+    const variantSummaryEl = document.getElementById('iterVariantSummary');
     const modelSearchEl = document.getElementById('iterModelSearch');
     const modelGridEl = document.getElementById('iterModelGrid');
     const modelSummaryEl = document.getElementById('iterModelSummary');
@@ -1434,7 +1572,7 @@ window.Pages.iterate = {
       return books.find((row) => Number(row.id) === bookId) || null;
     };
 
-    const selectedVariantCount = () => Math.max(1, Number(variantsEl?.value || 1));
+    const selectedVariantCount = () => Math.max(1, Number(variantsEl?.value || DEFAULT_VARIANT_COUNT));
 
     const activeVariantState = () => _variantPromptPlan.find((item) => Number(item?.variant || 0) === _activeVariantPrompt) || null;
 
@@ -1442,7 +1580,7 @@ window.Pages.iterate = {
 
     const buildPromptSelectOptions = (selectedPromptId = '') => {
       const selectedId = String(selectedPromptId || '').trim();
-      return ['<option value="">Default auto</option>']
+      return [`<option value="">${AUTO_ROTATE_PROMPT_OPTION_LABEL}</option>`]
         .concat(
           sortPromptsForUI(DB.dbGetAll('prompts')).map((prompt) => {
             const promptId = String(prompt?.id || '').trim();
@@ -1464,16 +1602,16 @@ window.Pages.iterate = {
       }
       const manualOverrides = _variantPromptPlan.filter((item) => !item.usesAutoAssignment).length;
       variantPlanSummaryEl.textContent = _variantPromptPlan.length > 1
-        ? `${manualOverrides} manual override${manualOverrides === 1 ? '' : 's'}. Default auto uses the baseline prompt for variant 1 and rotating wildcard prompts for the rest.`
-        : `${manualOverrides ? 'Manual prompt selected.' : 'Default auto uses the baseline prompt.'}`;
+        ? `${manualOverrides} manual override${manualOverrides === 1 ? '' : 's'}. ${AUTO_ROTATE_PROMPT_OPTION_LABEL} uses the baseline prompt for variant 1 and rotating wildcard prompts for the rest.`
+        : `${manualOverrides ? 'Manual prompt selected.' : `${AUTO_ROTATE_PROMPT_OPTION_LABEL} uses the baseline prompt.`}`;
       const activeItem = activeVariantState() || _variantPromptPlan[0];
-      const activePromptLabel = promptNameForId(activeItem?.promptId || '') || 'Default auto';
+      const activePromptLabel = promptNameForId(activeItem?.promptId || '') || AUTO_ROTATE_PROMPT_OPTION_LABEL;
       const activeAutoLabel = promptNameForId(activeItem?.autoPromptId || '') || activePromptLabel;
       variantEditorLabelEl.textContent = activeItem
         ? `Editing variant ${activeItem.variant} of ${_variantPromptPlan.length}. ${activeItem.usesAutoAssignment ? `Auto assignment: ${activeAutoLabel}.` : `Manual selection: ${activePromptLabel}.`}`
         : 'Editing variant 1.';
       variantPlanEl.innerHTML = _variantPromptPlan.map((item) => {
-        const manualPromptLabel = promptNameForId(item.promptId) || 'Default auto';
+        const manualPromptLabel = promptNameForId(item.promptId) || AUTO_ROTATE_PROMPT_OPTION_LABEL;
         const autoPromptLabel = promptNameForId(item.autoPromptId) || manualPromptLabel;
         const scenePreview = _normalizePromptText(item.sceneVal || '').slice(0, 140);
         const isActive = Number(item.variant) === _activeVariantPrompt;
@@ -1541,36 +1679,82 @@ window.Pages.iterate = {
       syncVariantEditor({ forceDefaults: true });
     };
 
+    const syncAdvancedVisibility = (expanded) => {
+      const shouldShow = Boolean(expanded);
+      advanced?.classList.toggle('hidden', !shouldShow);
+      if (advancedToggleBtn) {
+        advancedToggleBtn.textContent = shouldShow ? 'Hide Advanced' : 'Advanced';
+        advancedToggleBtn.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
+      }
+    };
+
+    const syncModelControlVisibility = (expanded) => {
+      const shouldShow = Boolean(expanded);
+      modelControlsEl?.classList.toggle('hidden', !shouldShow);
+      if (modelToggleBtn) {
+        modelToggleBtn.textContent = shouldShow ? 'Hide models' : 'Change model';
+        modelToggleBtn.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
+      }
+    };
+
+    const updatePromptRotationInfo = (promptId = '') => {
+      if (!promptRotationInfoEl) return;
+      promptRotationInfoEl.textContent = String(promptId || '').trim()
+        ? 'Saved style selected. Open Advanced to customize scenes or prompt text.'
+        : AUTO_ROTATE_PROMPT_INFO;
+    };
+
+    const updateVariantSummary = () => {
+      if (!variantSummaryEl) return;
+      const book = selectedBook();
+      if (!book) {
+        variantSummaryEl.classList.add('hidden');
+        variantSummaryEl.innerHTML = '';
+        return;
+      }
+      const { entries, missingPromptIds } = buildVariantPromptPayloads({
+        book,
+        variantCount: selectedVariantCount(),
+        variantPlan: _variantPromptPlan,
+      });
+      if (missingPromptIds.length) {
+        variantSummaryEl.classList.remove('hidden');
+        variantSummaryEl.innerHTML = `<div class="text-xs text-muted">Missing prompt templates: ${escapeHtml(missingPromptIds.join(', '))}</div>`;
+        return;
+      }
+      const lines = formatVariantSummaryLines(entries);
+      variantSummaryEl.classList.toggle('hidden', !lines.length);
+      variantSummaryEl.innerHTML = lines.map((line) => `<div class="iterate-variant-line">${escapeHtml(line)}</div>`).join('');
+    };
+
     const updatePromptPreview = () => {
       if (!promptPreviewEl || !promptValidationEl) return;
       const book = selectedBook();
-      const item = activeVariantState();
-      if (!book || !item) {
+      if (!book) {
         promptPreviewEl.value = '';
         promptValidationEl.textContent = 'Awaiting book selection.';
+        updateVariantSummary();
         return;
       }
-      const promptId = String(item.promptId || '').trim();
-      const templateObj = promptId ? DB.dbGet('prompts', promptId) : null;
-      const resolvedScene = sceneForVariant(book, item.variant, item.sceneVal || sceneEl?.value || '');
-      const resolvedPrompt = resolvePrompt(
-        templateObj,
+      const { entries, missingPromptIds } = buildVariantPromptPayloads({
         book,
-        item.customPrompt || customPromptEl?.value || '',
-        resolvedScene,
-        item.moodVal || moodEl?.value || '',
-        item.eraVal || eraEl?.value || '',
-      );
-      const validation = validatePromptBeforeGeneration({ prompt: resolvedPrompt, book });
-      promptPreviewEl.value = resolvedPrompt;
-      const prefix = _variantPromptPlan.length > 1 ? `Variant ${item.variant}: ` : '';
-      if (validation.errors.length) {
-        promptValidationEl.textContent = `${prefix}${validation.errors[0]}`;
-      } else if (validation.warnings.length) {
-        promptValidationEl.textContent = `${prefix}${validation.warnings[0]}`;
-      } else {
-        promptValidationEl.textContent = `${prefix}Prompt is resolved and ready.`;
+        variantCount: selectedVariantCount(),
+        variantPlan: _variantPromptPlan,
+      });
+      if (missingPromptIds.length) {
+        promptPreviewEl.value = '';
+        promptValidationEl.textContent = `Missing prompt templates: ${missingPromptIds.join(', ')}`;
+        updateVariantSummary();
+        return;
       }
+      promptPreviewEl.value = formatPromptPreview(entries);
+      const validationIssues = entries.flatMap((entry) => {
+        const validation = validatePromptBeforeGeneration({ prompt: entry?.promptPayload?.prompt || '', book });
+        const issues = validation.errors.length ? validation.errors : validation.warnings;
+        return issues.map((issue) => `Variant ${entry.variant}: ${issue}`);
+      });
+      promptValidationEl.textContent = validationIssues[0] || `${entries.length} variant prompt${entries.length === 1 ? '' : 's'} ready.`;
+      updateVariantSummary();
     };
 
     const updateWildcardSuggestion = (book) => {
@@ -1627,6 +1811,7 @@ window.Pages.iterate = {
       _activeVariantPrompt = item.variant;
       syncVariantEditor({ forceDefaults: forceAlexandriaDefaults });
       updateWildcardSuggestion(selectedBook());
+      updatePromptRotationInfo(selectedPromptId);
       return selected;
     };
 
@@ -1635,11 +1820,14 @@ window.Pages.iterate = {
       if (!book) {
         rebuildVariantPromptPlan({ preserveExisting: false, resetActiveVariant: true });
         updateWildcardSuggestion(book);
+        updatePromptRotationInfo('');
         updatePromptPreview();
         return;
       }
+      if (!preserveExisting && variantsEl) variantsEl.value = String(DEFAULT_VARIANT_COUNT);
       rebuildVariantPromptPlan({ preserveExisting, resetActiveVariant });
       updateWildcardSuggestion(book);
+      updatePromptRotationInfo('');
     };
 
     _defaultSelectedModelIds = defaultSelectedModelIds(OpenRouter.MODELS);
@@ -1649,8 +1837,15 @@ window.Pages.iterate = {
     let activeModelFilter = 'recommended';
     let modelSearchText = '';
 
-    modeToggle?.addEventListener('change', () => {
-      advanced.classList.toggle('hidden', !modeToggle.checked);
+    advancedToggleBtn?.addEventListener('click', () => {
+      const expanded = advanced?.classList.contains('hidden');
+      syncAdvancedVisibility(expanded);
+    });
+
+    modelToggleBtn?.addEventListener('click', () => {
+      const expanded = modelControlsEl?.classList.contains('hidden');
+      syncAdvancedVisibility(true);
+      syncModelControlVisibility(expanded);
     });
 
     selectEl?.addEventListener('change', () => {
@@ -1730,7 +1925,7 @@ window.Pages.iterate = {
     });
 
     const updateCost = () => {
-      const variants = Number(variantsEl?.value || 1);
+      const variants = Number(variantsEl?.value || DEFAULT_VARIANT_COUNT);
       const selected = Array.from(_selectedModelIds);
       const total = selected.reduce((sum, modelId) => sum + Number(OpenRouter.MODEL_COSTS[modelId] || 0) * variants, 0);
       const est = document.getElementById('iterCostEst');
@@ -1753,6 +1948,23 @@ window.Pages.iterate = {
       }
     };
 
+    const updateCollapsedModelSummary = () => {
+      if (!modelCollapsedValueEl) return;
+      const selected = Array.from(_selectedModelIds);
+      if (!selected.length) {
+        modelCollapsedValueEl.textContent = 'No model selected';
+        return;
+      }
+      if (selected.length === 1) {
+        const modelId = selected[0];
+        const unit = Number(OpenRouter.MODEL_COSTS[modelId] || 0);
+        modelCollapsedValueEl.textContent = `${modelIdToLabel(modelId)} ($${unit.toFixed(3)}/image)`;
+        return;
+      }
+      const unitTotal = selected.reduce((sum, modelId) => sum + Number(OpenRouter.MODEL_COSTS[modelId] || 0), 0);
+      modelCollapsedValueEl.textContent = `${selected.length} models selected ($${unitTotal.toFixed(3)}/variant)`;
+    };
+
     const renderModels = () => {
       if (!modelGridEl || !modelSummaryEl) return;
       const rendered = renderModelCards({
@@ -1772,6 +1984,7 @@ window.Pages.iterate = {
       const defaultLabels = _defaultSelectedModelIds.map((id) => modelIdToLabel(id)).join(', ') || 'first model';
       modelSummaryEl.textContent = `${_selectedModelIds.size} model selected · showing ${rendered.visibleCount}/${OpenRouter.MODELS.length}. Default selection: ${defaultLabels}. Selected: ${selectedLabels || 'none'}${selectedSuffix}.`;
       updateCost();
+      updateCollapsedModelSummary();
     };
 
     modelSearchEl?.addEventListener('input', () => {
@@ -1838,6 +2051,18 @@ window.Pages.iterate = {
     });
     promptSelEl?.addEventListener('change', () => {
       const promptId = String(promptSelEl.value || '').trim();
+      if (_variantPromptPlan.length > 1) {
+        _variantPromptPlan.forEach((item) => {
+          applyPromptSelection(promptId, {
+            forceAlexandriaDefaults: true,
+            variantNumber: Number(item?.variant || 0) || 1,
+          });
+        });
+        _activeVariantPrompt = 1;
+        syncVariantEditor({ forceDefaults: true });
+        updatePromptPreview();
+        return;
+      }
       applyPromptSelection(promptId, { forceAlexandriaDefaults: true });
     });
     customPromptEl?.addEventListener('input', () => {
@@ -1865,6 +2090,9 @@ window.Pages.iterate = {
       updatePromptPreview();
     });
     renderModels();
+    syncAdvancedVisibility(false);
+    syncModelControlVisibility(false);
+    updatePromptRotationInfo(String(promptSelEl?.value || '').trim());
 
     document.getElementById('iterCancelBtn')?.addEventListener('click', () => JobQueue.cancelAll());
     document.getElementById('iterGenBtn')?.addEventListener('click', () => this.handleGenerate());
@@ -1886,6 +2114,7 @@ window.Pages.iterate = {
       _variantPromptPlan = [];
       _activeVariantPrompt = 1;
       updateWildcardSuggestion(null);
+      updatePromptRotationInfo('');
       syncVariantEditor({ forceDefaults: false });
       updatePromptPreview();
     }
@@ -1906,7 +2135,7 @@ window.Pages.iterate = {
       return;
     }
 
-    const variantCount = Number(document.getElementById('iterVariants')?.value || 1);
+    const variantCount = Number(document.getElementById('iterVariants')?.value || DEFAULT_VARIANT_COUNT);
     const books = DB.dbGetAll('books');
     const book = books.find((b) => Number(b.id) === bookId);
     if (!book) return;
@@ -1919,42 +2148,24 @@ window.Pages.iterate = {
         previousPlan: [],
         preserveExisting: false,
       });
-    const variantPromptPlanByNumber = new Map(
-      variantPromptPlan.map((item) => [Number(item?.variant || 0), item])
-    );
-    const styleSelections = StyleDiversifier.selectDiverseStyles(selectedModels.length * variantCount);
+    const { entries: variantEntries, missingPromptIds } = buildVariantPromptPayloads({
+      book,
+      variantCount,
+      variantPlan: variantPromptPlan,
+    });
+    if (missingPromptIds.length) {
+      Toast.error(`Missing prompt templates: ${missingPromptIds.join(', ')}`);
+      return;
+    }
     const selectedCoverId = String(book.cover_jpg_id || book.drive_cover_id || '').trim();
     const selectedCoverBookNumber = Number(book.number || book.id || bookId || 0);
-    const scenePool = buildScenePool(book);
 
     const jobs = [];
-    let styleIndex = 0;
     let validationError = '';
     selectedModels.forEach((model) => {
-      for (let variant = 1; variant <= variantCount; variant += 1) {
+      variantEntries.forEach((entry) => {
         if (validationError) return;
-        const variantPlan = variantPromptPlanByNumber.get(variant) || null;
-        const style = styleSelections[styleIndex % styleSelections.length];
-        styleIndex += 1;
-        const variantPromptId = String(variantPlan?.promptId || '').trim();
-        const variantTemplateObj = variantPromptId ? DB.dbGet('prompts', variantPromptId) : null;
-        const variantCustomPrompt = String(variantPlan?.customPrompt || '').trim();
-        const variantSceneInput = String(variantPlan?.sceneVal || '').trim();
-        const variantMoodVal = String(variantPlan?.moodVal || '').trim();
-        const variantEraVal = String(variantPlan?.eraVal || '').trim();
-        const variantScene = variantSceneInput && !_isGenericContent(variantSceneInput)
-          ? _normalizePromptText(variantSceneInput)
-          : (scenePool[(variant - 1) % scenePool.length] || defaultSceneForBook(book));
-        const promptPayload = buildGenerationJobPrompt({
-          book,
-          templateObj: variantTemplateObj,
-          promptId: variantPromptId,
-          customPrompt: variantCustomPrompt,
-          sceneVal: variantScene,
-          moodVal: variantMoodVal,
-          eraVal: variantEraVal,
-          style,
-        });
+        const promptPayload = entry?.promptPayload || {};
         const validation = validatePromptBeforeGeneration({ prompt: promptPayload.prompt, book });
         if (!validation.ok) {
           validationError = validation.errors[0];
@@ -1964,7 +2175,7 @@ window.Pages.iterate = {
           id: uuid(),
           book_id: bookId,
           model,
-          variant,
+          variant: Number(entry?.variant || 1),
           status: 'queued',
           prompt: promptPayload.prompt,
           style_id: promptPayload.styleId,
@@ -1974,6 +2185,9 @@ window.Pages.iterate = {
           compose_prompt: promptPayload.composePrompt,
           preserve_prompt_text: promptPayload.preservePromptText,
           library_prompt_id: promptPayload.libraryPromptId,
+          scene_description: String(entry?.assignedScene || '').trim(),
+          mood: String(entry?.assignedMood || '').trim(),
+          era: String(entry?.assignedEra || '').trim(),
           selected_cover_id: selectedCoverId,
           selected_cover_book_number: selectedCoverBookNumber,
           quality_score: null,
@@ -1991,7 +2205,7 @@ window.Pages.iterate = {
           _compositeError: null,
           created_at: new Date().toISOString(),
         });
-      }
+      });
     });
 
     if (validationError) {
@@ -2380,7 +2594,7 @@ window.Pages.iterate = {
     const promptSel = document.getElementById('iterPromptSel');
     if (!promptSel) return;
     const prompts = sortPromptsForUI(DB.dbGetAll('prompts'));
-    promptSel.innerHTML = ['<option value="">Default auto</option>']
+    promptSel.innerHTML = [`<option value="">${AUTO_ROTATE_PROMPT_OPTION_LABEL}</option>`]
       .concat(prompts.map((p) => `<option value="${p.id}">${p.name}</option>`))
       .join('');
     if (selectedId) {

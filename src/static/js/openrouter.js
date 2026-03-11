@@ -135,6 +135,9 @@ window.OpenRouter = {
     if (typeof options.compose_prompt === 'boolean') payload.compose_prompt = options.compose_prompt;
     if (options.preserve_prompt_text === true) payload.preserve_prompt_text = true;
     if (options.library_prompt_id) payload.library_prompt_id = String(options.library_prompt_id).trim();
+    if (options.scene_description) payload.scene_description = String(options.scene_description).trim();
+    if (options.mood) payload.mood = String(options.mood).trim();
+    if (options.era) payload.era = String(options.era).trim();
 
     const generateResp = await fetch('/api/generate', {
       method: 'POST',

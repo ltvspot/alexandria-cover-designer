@@ -306,6 +306,21 @@ main.content {
   background: #f8fafc;
 }
 
+.btn-link {
+  border: none;
+  background: transparent;
+  color: #92631a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn-link:hover {
+  color: #7a5312;
+  text-decoration: underline;
+}
+
 .btn-danger {
   background: var(--danger);
   color: #fff;
@@ -384,6 +399,97 @@ main.content {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.iterate-card-header {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.iterate-flow-note {
+  margin: 4px 0 0;
+}
+
+.iterate-primary-row {
+  align-items: end;
+}
+
+.iterate-primary-actions {
+  margin-top: 4px;
+}
+
+.iterate-variant-summary {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.iterate-variant-line {
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iterate-variant-line + .iterate-variant-line {
+  margin-top: 6px;
+}
+
+.iterate-model-summary-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.iterate-inline-label {
+  margin-bottom: 2px;
+}
+
+.iterate-model-selected {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.advanced-block {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.advanced-block + .advanced-block {
+  margin-top: 12px;
+}
+
+.advanced-block > summary {
+  cursor: pointer;
+  color: var(--navy);
+  font-weight: 600;
+  list-style: none;
+}
+
+.advanced-block > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel-body {
+  margin-top: 14px;
+}
+
+.prompt-preview-textarea {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 12px;
+  background: #f8fafc;
 }
 
 .book-combobox {
@@ -1350,6 +1456,15 @@ tr:hover td {
   .pipeline-row {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .iterate-model-summary-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .iterate-variant-line {
+    white-space: normal;
   }
 
   .model-card-grid {

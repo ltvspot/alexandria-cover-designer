@@ -50,6 +50,7 @@ try:
     from src import book_enricher
     from src import catalog_manager
     from src import config
+    from src import content_relevance
     from src import cost_tracker
     from src import cover_compositor
     from src import pdf_compositor
@@ -90,6 +91,7 @@ except ModuleNotFoundError:  # pragma: no cover
     import book_enricher  # type: ignore
     import catalog_manager  # type: ignore
     import config  # type: ignore
+    import content_relevance  # type: ignore
     import cost_tracker  # type: ignore
     import cover_compositor  # type: ignore
     import pdf_compositor  # type: ignore
@@ -306,6 +308,8 @@ def _json_list_rows_cache_entry(path: Path) -> dict[str, Any]:
 def _prime_catalog_file_caches(runtime: config.Config) -> None:
     _json_list_rows_cache_entry(runtime.book_catalog_path)
     _json_list_rows_cache_entry(config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir))
+_ENRICHMENT_RUN_LOCK = threading.Lock()
+_ENRICHMENT_RUN_STATUS: dict[str, dict[str, Any]] = {}
 
 
 def _budget_presets_for_runtime(runtime: config.Config) -> list[dict[str, Any]]:
@@ -2436,7 +2440,11 @@ def _execute_generation_payload(
     composed_prompt_payload: dict[str, Any] = {}
     book_row = _book_row_for_number(runtime=runtime, book_number=book)
     raw_request_prompt = str(prompt or "").strip()
-    precomposed_prompt = bool(raw_request_prompt) and not compose_prompt and preserve_prompt_text
+    precomposed_prompt = _should_use_resolved_frontend_prompt(
+        raw_request_prompt,
+        compose_prompt=compose_prompt,
+        preserve_prompt_text=preserve_prompt_text,
+    )
     if compose_prompt and book_row is not None:
         default_diversified_prompt = prompt_generator.build_diversified_prompt(
             book_title=str(book_row.get("title", "")),
@@ -2482,22 +2490,30 @@ def _execute_generation_payload(
         if prompt_source == "template" or not raw_request_prompt:
             prompt = str(composed_prompt_payload.get("prompt", base_prompt_for_composer)).strip()
 
-    if book_row is not None and not precomposed_prompt:
+    needs_backend_scene_anchor = (
+        prompt_source != "custom"
+        or not raw_request_prompt
+        or content_relevance.is_generic_text(str(prompt or "")[:320])
+        or content_relevance.prompt_contains_unresolved_placeholders(prompt)
+    )
+    if book_row is not None and (not precomposed_prompt or needs_backend_scene_anchor):
         prompt = _ensure_prompt_book_context(
             prompt=prompt,
             book=book_row,
-            require_motif=(prompt_source != "custom" or not raw_request_prompt),
+            require_motif=needs_backend_scene_anchor,
             variant_index=max(0, requested_variant - 1),
             scene_override=scene_description,
         )
     if book_row is not None:
-        prompt = _sanitize_prompt_placeholders(
-            prompt,
-            book_row,
-            variant_index=max(0, requested_variant - 1),
-            scene_override=scene_description,
-        )
-        if not precomposed_prompt:
+        if precomposed_prompt:
+            prompt = " ".join(str(prompt or "").split()).strip()
+        else:
+            prompt = _sanitize_prompt_placeholders(
+                prompt,
+                book_row,
+                variant_index=max(0, requested_variant - 1),
+                scene_override=scene_description,
+            )
             prompt = _ensure_enriched_prompt(
                 prompt,
                 book_row,
@@ -2505,7 +2521,17 @@ def _execute_generation_payload(
                 scene_override=scene_description,
             )
     if book_row is not None:
-        logger.info("Generation prompt for book %s (%s): %s", book, prompt_source, prompt)
+        prompt_excerpt = prompt[:200].rstrip()
+        if len(prompt) > 200:
+            prompt_excerpt = f"{prompt_excerpt}..."
+        logger.info(
+            "Generation prompt for book %s variant %s (%s, prompt_processing=%s): %s",
+            book,
+            requested_variant,
+            prompt_source,
+            "frontend_resolved" if precomposed_prompt else "backend_enriched",
+            prompt_excerpt,
+        )
         _validate_prompt_before_generation(prompt, book_row)
 
     dry_run = forced_dry_run or (not runtime.has_any_api_key())
@@ -2879,6 +2905,52 @@ def _composite_validation_report_path(runtime: config.Config, book_number: int) 
     return runtime.tmp_dir / "composited" / str(int(book_number)) / "composite_validation.json"
 
 
+def _rebuild_composite_validation_report(*, runtime: config.Config, book_number: int) -> dict[str, Any]:
+    report_path = _composite_validation_report_path(runtime, book_number)
+    book_dir = report_path.parent
+    output_paths = sorted(path for path in book_dir.rglob("variant_*.jpg") if path.is_file())
+    if not output_paths:
+        return {}
+
+    cover_path = cover_compositor._find_cover_jpg(  # type: ignore[attr-defined]
+        runtime.input_dir,
+        int(book_number),
+        catalog_path=runtime.book_catalog_path,
+    )
+    regions = _load_json(config.cover_regions_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir), {})
+    region = cover_compositor._region_from_dict(  # type: ignore[attr-defined]
+        cover_compositor._region_for_book(regions, int(book_number))  # type: ignore[attr-defined]
+    )
+
+    with Image.open(cover_path) as cover_image:
+        cover_rgb = cover_image.convert("RGB")
+        items: list[dict[str, Any]] = []
+        for output_path in output_paths:
+            with Image.open(output_path) as composited_image:
+                validation = cover_compositor.validate_composite_output(
+                    cover=cover_rgb,
+                    composited=composited_image.convert("RGB"),
+                    region=region,
+                    output_path=output_path,
+                )
+            items.append(
+                {
+                    **validation.to_dict(),
+                    "validated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+    report = {
+        "book_number": int(book_number),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "total": len(items),
+        "invalid": sum(1 for row in items if not bool(row.get("valid", False))),
+        "items": items,
+    }
+    safe_json.atomic_write_json(report_path, report)
+    return report
+
+
 def _visual_qa_dir_for_runtime(runtime: config.Config) -> Path:
     return runtime.tmp_dir / "visual-qa"
 
@@ -3246,6 +3318,14 @@ def _assert_composite_validation_within_limits(*, runtime: config.Config, book_n
         return
     max_invalid = max(0, _safe_int(getattr(runtime, "composite_max_invalid_variants", 0), 0))
     if invalid > max_invalid:
+        rebuilt = _rebuild_composite_validation_report(runtime=runtime, book_number=book_number)
+        if isinstance(rebuilt, dict) and rebuilt:
+            report = rebuilt
+            total = _safe_int(report.get("total"), 0)
+            invalid = _safe_int(report.get("invalid"), 0)
+        if invalid <= max_invalid:
+            logger.info("Composite validation recheck passed for book %s", book_number)
+            return
         items = report.get("items", [])
         blocking_invalid = 0
         evaluated_invalid_rows = 0
@@ -4611,6 +4691,15 @@ def write_iterate_data(*, runtime: config.Config | None = None, prompts_path: Pa
             ),
             template_id=default_template_id,
         )
+        prompt_context = content_relevance.resolve_prompt_context(
+            {
+                "number": number,
+                "title": title,
+                "author": author,
+                "genre": book.get("genre", prompt_row.get("genre", "")),
+                "enrichment": enriched_by_book.get(number, {}),
+            }
+        )
         books.append(
             {
                 "number": number,
@@ -4635,6 +4724,7 @@ def write_iterate_data(*, runtime: config.Config | None = None, prompts_path: Pa
                     "negative": composed.get("negative", ""),
                 },
                 "enrichment": enriched_by_book.get(number, {}),
+                "prompt_context": prompt_context,
                 "smart_prompts": smart_variants if isinstance(smart_variants, list) else [],
                 "local_cover_available": _folder_has_local_cover(runtime.input_dir / folder_name) or bool(cover_jpg_id),
                 "winner_variant": winner_variant,
@@ -5093,7 +5183,11 @@ def _sync_catalog_from_drive(*, runtime: config.Config, force: bool = False, lim
         )
     except Exception:
         pass
-    _invalidate_cache("/api/iterate-data", "/cgi-bin/catalog.py", "/cgi-bin/catalog.py/status")
+    _invalidate_cache("/api/iterate-data", "/api/enrichment-health", "/cgi-bin/catalog.py", "/cgi-bin/catalog.py/status")
+    added_books = [
+        row for row in catalog_rows
+        if isinstance(row, dict) and _safe_int(row.get("number"), 0) not in existing_numbers
+    ]
     return {
         "ok": True,
         "catalog": runtime.catalog_id,
@@ -5104,7 +5198,193 @@ def _sync_catalog_from_drive(*, runtime: config.Config, force: bool = False, lim
         "unmatched_drive_entries": int(merge_stats.get("unmatched", 0)),
         "added_drive_entries": int(merge_stats.get("added", 0)),
         "auto_enrichment": auto_enrichment,
+        "added_books": added_books,
         "books": cgi_books,
+    }
+
+
+def _queue_auto_enrichment_for_books(*, runtime: config.Config, books: list[dict[str, Any]]) -> dict[str, Any]:
+    if not isinstance(books, list) or not books:
+        return {"queued": 0, "skipped": 0}
+
+    enriched_path = config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir)
+    queued = 0
+    skipped = 0
+    for row in books:
+        if not isinstance(row, dict):
+            continue
+        result = book_enricher._maybe_enrich_async(
+            book=row,
+            output_path=enriched_path,
+            descriptions_path=runtime.config_dir / "book_descriptions.json",
+            provider=runtime.llm_provider,
+            model=runtime.llm_model,
+            max_tokens=runtime.llm_max_tokens,
+            cost_per_1k_tokens=runtime.llm_cost_per_1k_tokens,
+            usage_path=_llm_usage_path_for_runtime(runtime),
+            delay_seconds=0.25,
+        )
+        if result.get("queued"):
+            queued += 1
+        else:
+            skipped += 1
+    return {"queued": queued, "skipped": skipped}
+
+
+def _enrichment_run_state(catalog_id: str) -> dict[str, Any]:
+    with _ENRICHMENT_RUN_LOCK:
+        state = _ENRICHMENT_RUN_STATUS.get(str(catalog_id), {})
+        return dict(state) if isinstance(state, dict) else {}
+
+
+def _set_enrichment_run_state(catalog_id: str, state: dict[str, Any]) -> None:
+    with _ENRICHMENT_RUN_LOCK:
+        _ENRICHMENT_RUN_STATUS[str(catalog_id)] = dict(state)
+
+
+def _start_generic_enrichment_background(
+    *,
+    runtime: config.Config,
+    delay_seconds: float = 0.5,
+    batch_size: int = 50,
+) -> dict[str, Any]:
+    catalog_id = str(runtime.catalog_id)
+    current = _enrichment_run_state(catalog_id)
+    if current.get("running"):
+        return {"ok": True, "started": False, "status": current}
+
+    started_at = datetime.now(timezone.utc).isoformat()
+    _set_enrichment_run_state(
+        catalog_id,
+        {
+            "running": True,
+            "started_at": started_at,
+            "delay_seconds": float(delay_seconds),
+            "batch_size": int(batch_size),
+            "summary": {},
+            "error": "",
+        },
+    )
+
+    def _run() -> None:
+        try:
+            enriched_path = config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir)
+            summary = book_enricher.enrich_catalog(
+                catalog_path=runtime.book_catalog_path,
+                output_path=enriched_path,
+                replace_generic=True,
+                provider=runtime.llm_provider,
+                model=runtime.llm_model,
+                max_tokens=runtime.llm_max_tokens,
+                cost_per_1k_tokens=runtime.llm_cost_per_1k_tokens,
+                usage_path=_llm_usage_path_for_runtime(runtime),
+                descriptions_path=runtime.config_dir / "book_descriptions.json",
+                delay_seconds=delay_seconds,
+                batch_size=batch_size,
+            )
+            write_iterate_data(runtime=runtime)
+            _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/enrichment-health")
+            _set_enrichment_run_state(
+                catalog_id,
+                {
+                    "running": False,
+                    "started_at": started_at,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "delay_seconds": float(delay_seconds),
+                    "batch_size": int(batch_size),
+                    "summary": summary,
+                    "error": "",
+                },
+            )
+        except Exception as exc:  # pragma: no cover - background path
+            logger.warning("Background generic enrichment failed for %s: %s", catalog_id, exc)
+            _set_enrichment_run_state(
+                catalog_id,
+                {
+                    "running": False,
+                    "started_at": started_at,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "delay_seconds": float(delay_seconds),
+                    "batch_size": int(batch_size),
+                    "summary": {},
+                    "error": str(exc),
+                },
+            )
+
+    thread = threading.Thread(
+        target=_run,
+        name=f"generic-enrichment-{catalog_id}",
+        daemon=True,
+    )
+    thread.start()
+    return {"ok": True, "started": True, "status": _enrichment_run_state(catalog_id)}
+
+
+def _enrichment_health_payload(*, runtime: config.Config) -> dict[str, Any]:
+    catalog_rows = _catalog_books_payload(runtime.book_catalog_path)
+    enriched_path = config.enriched_catalog_path(catalog_id=runtime.catalog_id, config_dir=runtime.config_dir)
+    enriched_rows = _load_json(enriched_path, [])
+    enriched_by_number = {
+        _safe_int(row.get("number"), 0): row
+        for row in enriched_rows if isinstance(row, dict) and _safe_int(row.get("number"), 0) > 0
+    } if isinstance(enriched_rows, list) else {}
+
+    total_books = 0
+    enriched_real = 0
+    enriched_generic = 0
+    no_enrichment = 0
+    generic_books: list[dict[str, Any]] = []
+
+    for row in catalog_rows:
+        if not isinstance(row, dict):
+            continue
+        number = _safe_int(row.get("number"), 0)
+        if number <= 0:
+            continue
+        total_books += 1
+        enriched_row = enriched_by_number.get(number, {})
+        enrichment = enriched_row.get("enrichment") if isinstance(enriched_row, dict) else None
+        if not isinstance(enrichment, dict) or not enrichment:
+            no_enrichment += 1
+            continue
+        reasons = book_enricher._enrichment_generic_reasons(enrichment)
+        if reasons:
+            enriched_generic += 1
+            generic_books.append(
+                {
+                    "number": number,
+                    "title": str(row.get("title", "")),
+                    "reason": ", ".join(reasons),
+                }
+            )
+        else:
+            enriched_real += 1
+
+    generic_ratio = (enriched_generic / total_books) if total_books > 0 else 0.0
+    if generic_ratio < 0.05 and no_enrichment == 0:
+        health = "healthy"
+    elif generic_ratio < 0.20:
+        health = "warning"
+    else:
+        health = "critical"
+
+    usage_payload = _load_json(_llm_usage_path_for_runtime(runtime), {})
+    last_run = {}
+    if isinstance(usage_payload, dict):
+        candidate = usage_payload.get("last_run", {})
+        last_run = candidate if isinstance(candidate, dict) else {}
+
+    return {
+        "ok": True,
+        "catalog": runtime.catalog_id,
+        "total_books": total_books,
+        "enriched_real": enriched_real,
+        "enriched_generic": enriched_generic,
+        "no_enrichment": no_enrichment,
+        "generic_books": generic_books[:50],
+        "last_enrichment_run": str(last_run.get("timestamp", "")),
+        "health": health,
+        "run_status": _enrichment_run_state(runtime.catalog_id),
     }
 
 
@@ -5702,6 +5982,29 @@ def _ensure_enriched_prompt(
     if emotional_tone and result:
         result = _GENERIC_MOOD_PATTERN.sub(emotional_tone, result)
     return result.strip()
+
+
+def _should_use_resolved_frontend_prompt(
+    prompt: str,
+    *,
+    compose_prompt: bool,
+    preserve_prompt_text: bool,
+) -> bool:
+    """Trust fully resolved frontend prompts instead of rebuilding scenes server-side."""
+    normalized = " ".join(str(prompt or "").split()).strip()
+    if not normalized or compose_prompt:
+        return False
+    if _PLACEHOLDER_PATTERN.search(normalized):
+        return False
+    if preserve_prompt_text:
+        return True
+    lowered = normalized[:320].lower()
+    has_scene_anchor = any(token in lowered for token in ("scene:", "must depict", "illustration must"))
+    generic_marker = next(
+        (marker for marker in _PROMPT_VALIDATION_GENERIC_MARKERS if marker and marker in lowered),
+        "",
+    )
+    return len(normalized) >= 100 and has_scene_anchor and not generic_marker
 
 
 def _compose_prompt_for_book(
@@ -8765,6 +9068,8 @@ def serve_review_webapp(
                 payload["catalog"] = runtime_req.catalog_id
                 payload["catalogs"] = [item.to_dict() for item in config.list_catalogs()]
                 return _cache_and_send(payload)
+            if path == "/api/enrichment-health":
+                return _cache_and_send(_enrichment_health_payload(runtime=runtime_req))
             if path == "/api/cover-regions":
                 regions_path = config.cover_regions_path(catalog_id=runtime_req.catalog_id, config_dir=runtime_req.config_dir)
                 payload = _load_json(
@@ -9434,6 +9739,10 @@ def serve_review_webapp(
                         status=HTTPStatus.BAD_REQUEST,
                         endpoint=path,
                     )
+                summary["auto_enrichment"] = _queue_auto_enrichment_for_books(
+                    runtime=runtime_req,
+                    books=summary.get("added_books", []) if isinstance(summary, dict) else [],
+                )
                 return self._send_json(summary)
 
             if MUTATION_API_TOKEN:
@@ -9590,7 +9899,12 @@ def serve_review_webapp(
                             catalog_id,
                             source_dir=str(body.get("source_dir", "")).strip() or None,
                         )
-                        _invalidate_cache("/api/catalogs", "/api/review-data", "/api/iterate-data")
+                        _invalidate_cache("/api/catalogs", "/api/review-data", "/api/iterate-data", "/api/enrichment-health")
+                        target_runtime = config.get_config(catalog_id)
+                        summary["auto_enrichment"] = _queue_auto_enrichment_for_books(
+                            runtime=target_runtime,
+                            books=summary.get("imported_books", []) if isinstance(summary, dict) else [],
+                        )
                         return self._send_json({"ok": True, "summary": summary})
                     elif action == "settings":
                         settings = body.get("settings", body)
@@ -9943,7 +10257,11 @@ def serve_review_webapp(
                 selected_cover_id = str(resolved_selected_cover_id or "").strip()
                 composed_prompt_payload: dict[str, Any] = {}
                 book_row = _book_row_for_number(runtime=runtime_req, book_number=book)
-                precomposed_prompt = bool(str(prompt).strip()) and not compose_prompt and preserve_prompt_text
+                precomposed_prompt = _should_use_resolved_frontend_prompt(
+                    str(prompt or "").strip(),
+                    compose_prompt=compose_prompt,
+                    preserve_prompt_text=preserve_prompt_text,
+                )
                 if compose_prompt:
                     if book_row is not None:
                         default_prompt = ""
@@ -9979,13 +10297,15 @@ def serve_review_webapp(
                         if prompt_source == "template" or not str(prompt).strip():
                             prompt = str(composed_prompt_payload.get("prompt", prompt)).strip()
                 if book_row is not None:
-                    prompt = _sanitize_prompt_placeholders(
-                        prompt,
-                        book_row,
-                        variant_index=max(0, requested_variant - 1),
-                        scene_override=scene_description,
-                    )
-                    if not precomposed_prompt:
+                    if precomposed_prompt:
+                        prompt = " ".join(str(prompt or "").split()).strip()
+                    else:
+                        prompt = _sanitize_prompt_placeholders(
+                            prompt,
+                            book_row,
+                            variant_index=max(0, requested_variant - 1),
+                            scene_override=scene_description,
+                        )
                         prompt = _ensure_enriched_prompt(
                             prompt,
                             book_row,
@@ -10029,6 +10349,7 @@ def serve_review_webapp(
                             "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
                             "prompt_components": composed_prompt_payload,
                             "inferred_genre": str(composed_prompt_payload.get("genre", "")).strip(),
+                            "prompt_processing": "frontend_resolved" if precomposed_prompt else "backend_enriched",
                         },
                     )
                 except job_store.IdempotencyConflictError as exc:
@@ -10579,11 +10900,16 @@ def serve_review_webapp(
                     )
 
                 enriched_path = config.enriched_catalog_path(catalog_id=runtime_req.catalog_id, config_dir=runtime_req.config_dir)
-                summary = book_enricher.enrich_catalog(
-                    catalog_path=runtime_req.book_catalog_path,
+                book_row = _book_row_for_number(runtime=runtime_req, book_number=book_number)
+                if not isinstance(book_row, dict):
+                    return self._send_json(
+                        {"ok": False, "error": "book not found"},
+                        status=HTTPStatus.NOT_FOUND,
+                    )
+
+                summary = book_enricher.enrich_single_book(
+                    book=book_row,
                     output_path=enriched_path,
-                    books=[book_number],
-                    force_refresh=True,
                     provider=runtime_req.llm_provider,
                     model=runtime_req.llm_model,
                     max_tokens=runtime_req.llm_max_tokens,
@@ -10603,7 +10929,7 @@ def serve_review_webapp(
                         None,
                 )
                 write_iterate_data(runtime=runtime_req)
-                _invalidate_cache("/api/iterate-data", "/api/prompt-performance")
+                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/enrichment-health")
                 usage_last = summary.get("usage", {}).get("last_run", {}) if isinstance(summary.get("usage"), dict) else {}
                 _record_cost_entry(
                     runtime=runtime_req,
@@ -10616,7 +10942,7 @@ def serve_review_webapp(
                     tokens_out=_safe_int(usage_last.get("output_tokens"), 0),
                     images_generated=0,
                     duration_seconds=0.0,
-                    metadata={"books_enriched": _safe_int(summary.get("books_enriched_in_run"), 0)},
+                    metadata={"books_enriched": 1, "source": str(summary.get("source", ""))},
                 )
                 _invalidate_cache("/api/analytics/", "/api/dashboard-data")
                 return self._send_json({"ok": True, "summary": summary, "book": enriched_row})
@@ -10624,20 +10950,26 @@ def serve_review_webapp(
             if path == "/api/enrich-all":
                 enriched_path = config.enriched_catalog_path(catalog_id=runtime_req.catalog_id, config_dir=runtime_req.config_dir)
                 force = bool(body.get("force", False))
+                replace_generic = bool(body.get("replace_generic", False))
+                delay_seconds = max(0.0, _safe_float(body.get("delay"), 0.5))
+                batch_size = max(1, _safe_int(body.get("batch_size"), 50))
                 summary = book_enricher.enrich_catalog(
                     catalog_path=runtime_req.book_catalog_path,
                     output_path=enriched_path,
                     books=None,
                     force_refresh=force,
+                    replace_generic=replace_generic,
                     provider=runtime_req.llm_provider,
                     model=runtime_req.llm_model,
                     max_tokens=runtime_req.llm_max_tokens,
                     cost_per_1k_tokens=runtime_req.llm_cost_per_1k_tokens,
                     usage_path=_llm_usage_path_for_runtime(runtime_req),
                     descriptions_path=runtime_req.config_dir / "book_descriptions.json",
+                    delay_seconds=delay_seconds,
+                    batch_size=batch_size,
                 )
                 write_iterate_data(runtime=runtime_req)
-                _invalidate_cache("/api/iterate-data", "/api/prompt-performance")
+                _invalidate_cache("/api/iterate-data", "/api/prompt-performance", "/api/enrichment-health")
                 usage_last = summary.get("usage", {}).get("last_run", {}) if isinstance(summary.get("usage"), dict) else {}
                 _record_cost_entry(
                     runtime=runtime_req,
@@ -10654,6 +10986,17 @@ def serve_review_webapp(
                 )
                 _invalidate_cache("/api/analytics/", "/api/dashboard-data")
                 return self._send_json({"ok": True, "summary": summary})
+
+            if path == "/api/enrich-generic":
+                delay_seconds = max(0.0, _safe_float(body.get("delay"), 0.5))
+                batch_size = max(1, _safe_int(body.get("batch_size"), 50))
+                payload = _start_generic_enrichment_background(
+                    runtime=runtime_req,
+                    delay_seconds=delay_seconds,
+                    batch_size=batch_size,
+                )
+                _invalidate_cache("/api/enrichment-health")
+                return self._send_json(payload)
 
             if path == "/api/generate-smart-prompts":
                 book_number = _safe_int(body.get("book"), 0)
@@ -11704,7 +12047,11 @@ def serve_review_webapp(
                 selected_cover_id = str(resolved_selected_cover_id or "").strip()
                 composed_prompt_payload: dict[str, Any] = {}
                 book_row = _book_row_for_number(runtime=runtime_req, book_number=book)
-                precomposed_prompt = bool(str(prompt).strip()) and not compose_prompt and preserve_prompt_text
+                precomposed_prompt = _should_use_resolved_frontend_prompt(
+                    str(prompt or "").strip(),
+                    compose_prompt=compose_prompt,
+                    preserve_prompt_text=preserve_prompt_text,
+                )
                 if compose_prompt:
                     if book_row is not None:
                         default_prompt = ""
@@ -11741,13 +12088,15 @@ def serve_review_webapp(
                         if prompt_source == "template" or not str(prompt).strip():
                             prompt = str(composed_prompt_payload.get("prompt", prompt)).strip()
                 if book_row is not None:
-                    prompt = _sanitize_prompt_placeholders(
-                        prompt,
-                        book_row,
-                        variant_index=max(0, requested_variant - 1),
-                        scene_override=scene_description,
-                    )
-                    if not precomposed_prompt:
+                    if precomposed_prompt:
+                        prompt = " ".join(str(prompt or "").split()).strip()
+                    else:
+                        prompt = _sanitize_prompt_placeholders(
+                            prompt,
+                            book_row,
+                            variant_index=max(0, requested_variant - 1),
+                            scene_override=scene_description,
+                        )
                         prompt = _ensure_enriched_prompt(
                             prompt,
                             book_row,
@@ -11821,6 +12170,7 @@ def serve_review_webapp(
                                 "composed_prompt": str(composed_prompt_payload.get("prompt", "")).strip(),
                                 "prompt_components": composed_prompt_payload,
                                 "inferred_genre": str(composed_prompt_payload.get("genre", "")).strip(),
+                                "prompt_processing": "frontend_resolved" if precomposed_prompt else "backend_enriched",
                             },
                         )
                     except job_store.IdempotencyConflictError as exc:
@@ -16978,6 +17328,7 @@ def _build_api_docs_html() -> str:
         ("GET", "/api/events/batch/{batchId}", "Batch SSE stream", "batchId,catalog", "event-stream", "Real-time stream for one batch run."),
         ("GET", "/api/review-data?catalog=classics&limit=25&offset=0", "Review data", "catalog,limit,offset,sort,order,search,status,tags", "{\"books\":[...],\"pagination\":{...}}", "Paginated review books, winners, and filters."),
         ("GET", "/api/iterate-data?catalog=classics&limit=25&offset=0", "Iterate data", "catalog,limit,offset,sort,order,search,status", "{\"books\":[...],\"pagination\":{...}}", "Paginated iterate books + model configuration."),
+        ("GET", "/api/enrichment-health", "Enrichment health", "catalog", "{\"health\":\"warning\",...}", "Catalog-wide enrichment quality summary with generic/missing counts."),
         ("GET", "/api/config/cover-source-default", "Default cover source", "catalog", "{\"default\":\"drive\"}", "Return server-selected default cover source based on environment."),
         ("GET", "/api/prompts", "Prompt library list", "catalog,q,category,tags", "{\"prompts\":[...]}", "Search/list prompt library with usage, win rate, and version counts."),
         ("POST", "/api/prompts", "Create prompt", "{\"name\":\"...\",\"prompt_template\":\"...\"}", "{\"ok\":true,\"prompt\":{...}}", "Create a prompt-library entry."),
@@ -17025,6 +17376,7 @@ def _build_api_docs_html() -> str:
         ("POST", "/api/save-selections", "Save winners", "{\"selections\":{...}}", "{\"ok\":true}", "Persist winner selections with metadata."),
         ("POST", "/api/enrich-book", "Enrich one book", "{\"book\":15}", "{\"ok\":true,\"book\":{...}}", "Generate/refresh LLM enrichment metadata for one title."),
         ("POST", "/api/enrich-all", "Enrich all books", "{}", "{\"ok\":true,\"summary\":{...}}", "Generate enrichment metadata across the full catalog."),
+        ("POST", "/api/enrich-generic", "Re-enrich generic books", "{\"delay\":0.5,\"batch_size\":50}", "{\"ok\":true,\"started\":true}", "Start a background run that only re-enriches generic placeholder rows."),
         ("POST", "/api/generate-smart-prompts", "Generate intelligent prompts", "{\"book\":15,\"count\":5}", "{\"ok\":true,\"book\":{...}}", "Generate AI-authored prompts plus quality scores."),
         ("POST", "/api/generate-mockup", "Generate one mockup", "{\"book\":15,\"template\":\"desk_scene\"}", "{\"ok\":true}", "Generate one mockup template for one book."),
         ("POST", "/api/generate-all-mockups", "Generate mockup batch", "{\"book\":15}|{\"all_books\":true}", "{\"ok\":true}", "Generate all selected templates for one/all books."),
