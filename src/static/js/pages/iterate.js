@@ -8,13 +8,17 @@ let _lastVisibleModelIds = [];
 let _defaultSelectedModelIds = [];
 let _variantPromptPlan = [];
 let _activeVariantPrompt = 1;
+let _selectedVariantCount = null;
 let _sequentialRunState = null;
 let _lastGeneratedJobIds = [];
 let _resultsSortMode = 'model';
 const DEFAULT_VARIANT_COUNT = 10;
 const SEQUENTIAL_BATCH_SIZE = 4;
+const MAX_VARIANT_COUNT = 10;
 const AUTO_ROTATE_PROMPT_OPTION_LABEL = 'Auto-Rotate (Recommended)';
 const AUTO_ROTATE_PROMPT_INFO = 'Automatically varies artistic styles and scenes across your covers.';
+const ENRICHMENT_HEALTH_RETRY_DELAYS_MS = [2000, 4000, 8000];
+const ENRICHMENT_HEALTH_RETRYABLE_STATUSES = new Set([502, 503, 504]);
 const PREFERRED_DEFAULT_MODELS = [
   'openrouter/google/gemini-3-pro-image-preview',
   'nano-banana-pro',
@@ -1234,6 +1238,8 @@ window.__ITERATE_TEST_HOOKS__.formatVariantSummaryLines = ({ entries }) => forma
 window.__ITERATE_TEST_HOOKS__.iterateUiDefaults = () => ({
   defaultVariantCount: DEFAULT_VARIANT_COUNT,
   autoRotateLabel: AUTO_ROTATE_PROMPT_OPTION_LABEL,
+  variantOptionsHtml: variantCountOptionsHtml(DEFAULT_VARIANT_COUNT),
+  enrichmentRetryDelaysMs: [...ENRICHMENT_HEALTH_RETRY_DELAYS_MS],
 });
 window.__ITERATE_TEST_HOOKS__.buildScenePool = buildScenePool;
 window.__ITERATE_TEST_HOOKS__.buildExpandedScenePool = ({ book, minimumCount }) => (
@@ -1246,6 +1252,9 @@ window.__ITERATE_TEST_HOOKS__.isGenericContent = _isGenericContent;
 window.__ITERATE_TEST_HOOKS__.buildIterateGenerationJobs = (payload) => buildIterateGenerationJobs(payload);
 window.__ITERATE_TEST_HOOKS__.sortIterateResultJobs = ({ jobs, sortMode }) => sortIterateResultJobs(jobs, sortMode);
 window.__ITERATE_TEST_HOOKS__.saveRawRequestPayloadForJob = ({ job }) => saveRawRequestPayloadForJob(job);
+window.__ITERATE_TEST_HOOKS__.variantCountOptionsHtml = ({ selectedVariantCount }) => variantCountOptionsHtml(selectedVariantCount);
+window.__ITERATE_TEST_HOOKS__.buildEnrichmentBadgeState = (payload) => buildEnrichmentBadgeState(payload);
+window.__ITERATE_TEST_HOOKS__.isRetryableEnrichmentHealthError = ({ error }) => _isRetryableEnrichmentHealthError(error);
 
 function sortPromptsForUI(prompts) {
   return [...(Array.isArray(prompts) ? prompts : [])].sort((left, right) => {
@@ -1318,6 +1327,73 @@ function _dayOfYear(referenceDate = new Date()) {
   const diff = current - start;
   const oneDay = 1000 * 60 * 60 * 24;
   return Math.floor(diff / oneDay);
+}
+
+function _sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function normalizeVariantCount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_VARIANT_COUNT;
+  return Math.max(1, Math.min(MAX_VARIANT_COUNT, Math.round(parsed)));
+}
+
+function variantCountOptionsHtml(selectedVariantCount = DEFAULT_VARIANT_COUNT) {
+  const selected = normalizeVariantCount(selectedVariantCount);
+  return Array.from({ length: MAX_VARIANT_COUNT }, (_, index) => {
+    const value = index + 1;
+    return `<option value="${value}"${value === selected ? ' selected' : ''}>${value}</option>`;
+  }).join('');
+}
+
+function _isRetryableEnrichmentHealthError(error) {
+  const status = Number(error?.status || 0);
+  if (ENRICHMENT_HEALTH_RETRYABLE_STATUSES.has(status)) return true;
+  if (error?.retryable === true) return true;
+  return error instanceof TypeError;
+}
+
+function buildEnrichmentBadgeState({ payload = null, isChecking = false, isFailure = false } = {}) {
+  if (isChecking) {
+    return {
+      badgeText: 'Checking enrichment…',
+      badgeClassName: 'tag tag-pending',
+      summaryText: 'Loading enrichment health.',
+      buttonDisabled: true,
+      buttonText: 'Re-enrich Generic Books',
+    };
+  }
+
+  if (isFailure) {
+    return {
+      badgeText: 'Unable to check enrichment',
+      badgeClassName: 'tag tag-pending',
+      summaryText: 'Unable to check enrichment right now.',
+      buttonDisabled: false,
+      buttonText: 'Re-enrich Generic Books',
+    };
+  }
+
+  const latestEnrichmentHealth = payload && typeof payload === 'object' ? payload : {};
+  const health = String(latestEnrichmentHealth?.health || 'warning').toLowerCase();
+  const total = Number(latestEnrichmentHealth?.total_books || 0);
+  const real = Number(latestEnrichmentHealth?.enriched_real || 0);
+  const generic = Number(latestEnrichmentHealth?.enriched_generic || 0);
+  const missing = Number(latestEnrichmentHealth?.no_enrichment || 0);
+  const runStatus = latestEnrichmentHealth?.run_status || {};
+  const isRunning = Boolean(runStatus && runStatus.running);
+  const label = health === 'healthy' ? 'Healthy' : (health === 'critical' ? 'Critical' : 'Warning');
+  const countSuffix = total > 0 ? ` (${real}/${total} real)` : (real > 0 ? ` (${real} real)` : '');
+  return {
+    badgeText: `Enrichment: ${label}${countSuffix}`,
+    badgeClassName: `tag ${health === 'healthy' ? 'tag-success' : (health === 'critical' ? 'tag-failed' : 'tag-pending')}`,
+    summaryText: isRunning
+      ? `Background re-enrichment is running. Real: ${real}/${total}. Generic: ${generic}. Missing: ${missing}.`
+      : `Real: ${real}/${total}. Generic: ${generic}. Missing: ${missing}.`,
+    buttonDisabled: isRunning || (generic <= 0 && missing <= 0),
+    buttonText: isRunning ? 'Re-enriching…' : 'Re-enrich Generic Books',
+  };
 }
 
 function suggestedWildcardPromptForBook(book, referenceDate = new Date()) {
@@ -1756,6 +1832,7 @@ window.Pages.iterate = {
     await OpenRouter.init();
 
     const prompts = sortPromptsForUI(DB.dbGetAll('prompts'));
+    const initialVariantCount = normalizeVariantCount(_selectedVariantCount || DEFAULT_VARIANT_COUNT);
     const options = books
       .sort((a, b) => Number(a.number || 0) - Number(b.number || 0))
       .map((book) => `<option value="${book.id}">${book.number}. ${book.title}</option>`)
@@ -1800,7 +1877,7 @@ window.Pages.iterate = {
         <div class="form-row iterate-primary-row">
           <div class="form-group">
             <label class="form-label">Variants</label>
-            <select class="form-select" id="iterVariants">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i + 1 === DEFAULT_VARIANT_COUNT ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>
+            <select class="form-select" id="iterVariants">${variantCountOptionsHtml(initialVariantCount)}</select>
           </div>
           <div class="form-group">
             <label class="form-label">Style</label>
@@ -1918,40 +1995,64 @@ window.Pages.iterate = {
     const resultsActionsEl = document.getElementById('iterResultsActions');
     let latestEnrichmentHealth = null;
 
+    _selectedVariantCount = normalizeVariantCount(variantsEl?.value || _selectedVariantCount || DEFAULT_VARIANT_COUNT);
+    if (variantsEl) variantsEl.value = String(_selectedVariantCount);
+
     const renderEnrichmentHealth = (payload) => {
       latestEnrichmentHealth = payload && typeof payload === 'object' ? payload : null;
       if (!enrichmentBadgeEl || !enrichmentSummaryEl || !enrichGenericBtn) return;
-      const health = String(latestEnrichmentHealth?.health || 'warning').toLowerCase();
-      const total = Number(latestEnrichmentHealth?.total_books || 0);
-      const real = Number(latestEnrichmentHealth?.enriched_real || 0);
-      const generic = Number(latestEnrichmentHealth?.enriched_generic || 0);
-      const missing = Number(latestEnrichmentHealth?.no_enrichment || 0);
-      const runStatus = latestEnrichmentHealth?.run_status || {};
-      const isRunning = Boolean(runStatus && runStatus.running);
-      const label = health === 'healthy' ? 'Healthy' : (health === 'critical' ? 'Critical' : 'Warning');
-      enrichmentBadgeEl.textContent = `Enrichment: ${label}`;
-      enrichmentBadgeEl.className = `tag ${health === 'healthy' ? 'tag-success' : (health === 'critical' ? 'tag-failed' : 'tag-pending')}`;
-      enrichmentSummaryEl.textContent = isRunning
-        ? `Background re-enrichment is running. Real: ${real}/${total}. Generic: ${generic}. Missing: ${missing}.`
-        : `Real: ${real}/${total}. Generic: ${generic}. Missing: ${missing}.`;
-      enrichGenericBtn.disabled = isRunning || (generic <= 0 && missing <= 0);
-      enrichGenericBtn.textContent = isRunning ? 'Re-enriching…' : 'Re-enrich Generic Books';
+      const next = buildEnrichmentBadgeState({ payload: latestEnrichmentHealth });
+      enrichmentBadgeEl.textContent = next.badgeText;
+      enrichmentBadgeEl.className = next.badgeClassName;
+      enrichmentSummaryEl.textContent = next.summaryText;
+      enrichGenericBtn.disabled = next.buttonDisabled;
+      enrichGenericBtn.textContent = next.buttonText;
+    };
+
+    const renderEnrichmentHealthChecking = () => {
+      if (!enrichmentBadgeEl || !enrichmentSummaryEl || !enrichGenericBtn) return;
+      const next = buildEnrichmentBadgeState({ isChecking: true });
+      enrichmentBadgeEl.textContent = next.badgeText;
+      enrichmentBadgeEl.className = next.badgeClassName;
+      enrichmentSummaryEl.textContent = next.summaryText;
+      enrichGenericBtn.disabled = next.buttonDisabled;
+      enrichGenericBtn.textContent = next.buttonText;
+    };
+
+    const renderEnrichmentHealthFailure = () => {
+      latestEnrichmentHealth = null;
+      if (!enrichmentBadgeEl || !enrichmentSummaryEl || !enrichGenericBtn) return;
+      const next = buildEnrichmentBadgeState({ isFailure: true });
+      enrichmentBadgeEl.textContent = next.badgeText;
+      enrichmentBadgeEl.className = next.badgeClassName;
+      enrichmentSummaryEl.textContent = next.summaryText;
+      enrichGenericBtn.disabled = next.buttonDisabled;
+      enrichGenericBtn.textContent = next.buttonText;
     };
 
     const fetchEnrichmentHealth = async ({ silent = false } = {}) => {
-      try {
-        const response = await fetch(`/api/enrichment-health?catalog=${encodeURIComponent(catalogId)}`, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json();
-        renderEnrichmentHealth(payload);
-        return payload;
-      } catch (err) {
-        if (!silent) Toast.error(`Enrichment health failed: ${err.message || err}`);
-        if (enrichmentBadgeEl) enrichmentBadgeEl.textContent = 'Enrichment: Unavailable';
-        if (enrichmentSummaryEl) enrichmentSummaryEl.textContent = 'Unable to load enrichment health.';
-        if (enrichGenericBtn) enrichGenericBtn.disabled = false;
-        return null;
+      renderEnrichmentHealthChecking();
+      let lastError = null;
+      for (let attempt = 0; attempt <= ENRICHMENT_HEALTH_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          const response = await fetch(`/api/enrichment-health?catalog=${encodeURIComponent(catalogId)}`, { cache: 'no-store' });
+          if (!response.ok) {
+            const error = new Error(`HTTP ${response.status}`);
+            error.status = response.status;
+            throw error;
+          }
+          const payload = await response.json();
+          renderEnrichmentHealth(payload);
+          return payload;
+        } catch (err) {
+          lastError = err;
+          if (!_isRetryableEnrichmentHealthError(err) || attempt >= ENRICHMENT_HEALTH_RETRY_DELAYS_MS.length) break;
+          await _sleep(ENRICHMENT_HEALTH_RETRY_DELAYS_MS[attempt]);
+        }
       }
+      renderEnrichmentHealthFailure();
+      if (!silent && lastError) Toast.error(`Enrichment health failed: ${lastError.message || lastError}`);
+      return null;
     };
 
     const selectedBook = () => {
@@ -1959,7 +2060,11 @@ window.Pages.iterate = {
       return books.find((row) => Number(row.id) === bookId) || null;
     };
 
-    const selectedVariantCount = () => Math.max(1, Number(variantsEl?.value || DEFAULT_VARIANT_COUNT));
+    const selectedVariantCount = () => {
+      const value = normalizeVariantCount(variantsEl?.value || _selectedVariantCount || DEFAULT_VARIANT_COUNT);
+      _selectedVariantCount = value;
+      return value;
+    };
 
     const activeVariantState = () => _variantPromptPlan.find((item) => Number(item?.variant || 0) === _activeVariantPrompt) || null;
 
@@ -2204,7 +2309,6 @@ window.Pages.iterate = {
         updatePromptPreview();
         return;
       }
-      if (!preserveExisting && variantsEl) variantsEl.value = String(DEFAULT_VARIANT_COUNT);
       rebuildVariantPromptPlan({ preserveExisting, resetActiveVariant });
       updateWildcardSuggestion(book);
       updatePromptRotationInfo('');
@@ -2406,6 +2510,8 @@ window.Pages.iterate = {
     });
 
     variantsEl?.addEventListener('change', () => {
+      _selectedVariantCount = normalizeVariantCount(variantsEl.value || DEFAULT_VARIANT_COUNT);
+      variantsEl.value = String(_selectedVariantCount);
       updateCost();
       autoSelectGenrePrompt({ preserveExisting: true, resetActiveVariant: false });
     });
@@ -2490,7 +2596,7 @@ window.Pages.iterate = {
       syncVariantEditor({ forceDefaults: false });
       updatePromptPreview();
     }
-    renderEnrichmentHealth({ health: 'warning', total_books: 0, enriched_real: 0, enriched_generic: 0, no_enrichment: 0, run_status: {} });
+    renderEnrichmentHealthChecking();
     await fetchEnrichmentHealth({ silent: true });
     this.loadExistingResults();
   },

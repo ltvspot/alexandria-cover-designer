@@ -76,6 +76,21 @@ def _run_iterate_ui_defaults() -> dict:
     return _run_iterate_hook(function_name="iterateUiDefaults", payload={})
 
 
+def _run_iterate_variant_options_html(selected_variant_count: int) -> str:
+    return _run_iterate_hook(
+        function_name="variantCountOptionsHtml",
+        payload={"selectedVariantCount": selected_variant_count},
+    )
+
+
+def _run_iterate_enrichment_badge_state(payload: dict) -> dict:
+    return _run_iterate_hook(function_name="buildEnrichmentBadgeState", payload=payload)
+
+
+def _run_iterate_enrichment_retryable(error: dict) -> bool:
+    return _run_iterate_hook(function_name="isRetryableEnrichmentHealthError", payload={"error": error})
+
+
 def _run_iterate_generation_jobs(payload: dict) -> dict:
     return _run_iterate_hook(function_name="buildIterateGenerationJobs", payload=payload)
 
@@ -159,6 +174,45 @@ def test_iterate_ui_defaults_use_ten_variants_and_auto_rotate_label():
 
     assert result["defaultVariantCount"] == 10
     assert result["autoRotateLabel"] == "Auto-Rotate (Recommended)"
+    assert result["enrichmentRetryDelaysMs"] == [2000, 4000, 8000]
+    assert 'value="10" selected' in result["variantOptionsHtml"]
+    assert 'value="4" selected' not in result["variantOptionsHtml"]
+
+
+def test_iterate_variant_option_html_preserves_selected_count():
+    html = _run_iterate_variant_options_html(7)
+
+    assert 'value="7" selected' in html
+    assert 'value="10" selected' not in html
+
+
+def test_iterate_enrichment_badge_state_uses_real_counts_and_failure_copy():
+    healthy = _run_iterate_enrichment_badge_state(
+        {
+            "payload": {
+                "health": "healthy",
+                "enriched_real": 2397,
+                "total_books": 2397,
+                "enriched_generic": 0,
+                "no_enrichment": 0,
+                "run_status": {},
+            }
+        }
+    )
+    failed = _run_iterate_enrichment_badge_state({"isFailure": True})
+
+    assert healthy["badgeText"] == "Enrichment: Healthy (2397/2397 real)"
+    assert healthy["summaryText"] == "Real: 2397/2397. Generic: 0. Missing: 0."
+    assert failed["badgeText"] == "Unable to check enrichment"
+    assert failed["summaryText"] == "Unable to check enrichment right now."
+
+
+def test_iterate_enrichment_retry_policy_only_retries_cold_start_failures():
+    assert _run_iterate_enrichment_retryable({"status": 502}) is True
+    assert _run_iterate_enrichment_retryable({"status": 503}) is True
+    assert _run_iterate_enrichment_retryable({"status": 504}) is True
+    assert _run_iterate_enrichment_retryable({"retryable": True}) is True
+    assert _run_iterate_enrichment_retryable({"status": 500}) is False
 
 
 def test_iterate_variant_summary_lines_are_single_line_and_compact():
