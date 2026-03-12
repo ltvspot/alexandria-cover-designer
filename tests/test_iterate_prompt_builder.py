@@ -124,7 +124,9 @@ def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto(
     )
 
     assert result["prompt"].startswith("Create a breathtaking legacy prompt.")
-    assert 'Create a colorful circular medallion illustration for "A Room with a View" by E. M. Forster.' in result["prompt"]
+    assert 'Create a colorful circular medallion illustration for "A Room with a View" by E. M. Forster.' not in result["prompt"]
+    assert "no medallion" in result["prompt"].lower()
+    assert "no circular framing" in result["prompt"].lower()
     assert result["styleLabel"] == "Romantic Sublime"
     assert result["styleId"] == "romantic-sublime"
     assert result["preservePromptText"] is False

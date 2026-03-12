@@ -10243,6 +10243,7 @@ def serve_review_webapp(
                         provider=provider,
                         cover_source=cover_source,
                         selected_cover_id=selected_cover_id,
+                        library_prompt_id=library_prompt_id,
                         drive_folder_id=drive_folder_id,
                         input_folder_id=input_folder_id,
                         credentials_path=credentials_path,
@@ -10252,6 +10253,7 @@ def serve_review_webapp(
                         metadata={
                             "prompt_source": prompt_source,
                             "template_id": template_id,
+                            "compose_prompt": bool(compose_prompt),
                             **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
                             "variant": requested_variant,
                             "scene_description": scene_description,
@@ -12061,6 +12063,7 @@ def serve_review_webapp(
                             metadata={
                                 "prompt_source": prompt_source,
                                 "template_id": template_id,
+                                "compose_prompt": bool(compose_prompt),
                                 **({"preserve_prompt_text": True} if preserve_prompt_text else {}),
                                 "variant": requested_variant,
                                 "scene_description": scene_description,

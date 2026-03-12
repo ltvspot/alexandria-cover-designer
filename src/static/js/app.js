@@ -330,7 +330,7 @@ window.JobQueue = {
       while (attempts < this.MAX_RETRIES + 1) {
         attempts += 1;
         const retryPrompt = attempts > 1
-          ? `${job.prompt} IMPORTANT: This must be a circular vignette illustration centered and fully contained.`
+          ? `${job.prompt} IMPORTANT: Keep the artwork as a full rectangular canvas with edge-to-edge scene detail. No medallion composition, no circular vignette, no circular framing, and no decorative borders.`
           : job.prompt;
         const currentBookRow = DB.dbGet('books', Number(job.book_id || 0))
           || DB.dbGetAll('books').find((row) => Number(row?.id || 0) === Number(job.book_id || 0))

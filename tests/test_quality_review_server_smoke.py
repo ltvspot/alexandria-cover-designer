@@ -834,6 +834,48 @@ def test_quality_review_server_generate_dry_run_resolves_placeholder_prompt_from
         _stop_server(process)
 
 
+def test_quality_review_server_async_generate_preserves_precomposed_prompt_flags():
+    process, base_url = _start_server()
+    try:
+        request = Request(
+            f"{base_url}/api/generate",
+            method="POST",
+            data=json.dumps(
+                {
+                    "catalog": "classics",
+                    "book": 11,
+                    "models": ["openrouter/google/gemini-3-pro-image-preview"],
+                    "variants": 1,
+                    "variant": 1,
+                    "prompt": (
+                        "Book cover illustration only — no text, no title, no author name, no lettering of any kind. "
+                        "No border, no frame, no ornamental elements, no medallion, no decorative edges. "
+                        "This illustration MUST depict the following specific scene: Romeo and Juliet meet beneath a moonlit balcony. "
+                        "Full scene composition filling the entire canvas, no circular framing."
+                    ),
+                    "prompt_source": "custom",
+                    "compose_prompt": False,
+                    "preserve_prompt_text": True,
+                    "library_prompt_id": "alexandria-base-romantic-realism",
+                    "cover_source": "drive",
+                    "async": True,
+                    "dry_run": True,
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urlopen(request, timeout=20) as response:
+            assert response.status == 200
+            body = json.loads(response.read().decode("utf-8"))
+        payload = body.get("job", {}).get("payload", {})
+        assert payload.get("compose_prompt") is False
+        assert payload.get("preserve_prompt_text") is True
+        assert payload.get("library_prompt_id") == "alexandria-base-romantic-realism"
+        assert "no medallion" in str(payload.get("prompt", "")).lower()
+    finally:
+        _stop_server(process)
+
+
 def test_quality_review_server_rejects_invalid_json_body():
     process, base_url = _start_server()
     try:

@@ -837,7 +837,13 @@ function resolvePrompt(templateObj, book, customPrompt, sceneVal, moodVal, eraVa
   if (custom) {
     return applyPromptPlaceholders(custom, book, sceneVal, moodVal, eraVal).trim();
   }
-  const base = templateObj?.prompt_template || `Create a colorful circular medallion illustration for "{title}" by {author}.`;
+  const base = templateObj?.prompt_template
+    || 'Book cover illustration only — no text, no title, no author name, no lettering of any kind. '
+    + 'No border, no frame, no ornamental elements, no medallion, no decorative edges. '
+    + 'This illustration MUST depict the following specific scene: {SCENE}. '
+    + 'Every figure, object, and setting element in this scene must be clearly recognizable and faithful to the source material. '
+    + 'The mood is {MOOD}. Era reference: {ERA}. '
+    + 'Full scene composition filling the entire canvas, no circular framing. Square format, high resolution, print-ready.';
   const resolved = applyPromptPlaceholders(base, book, sceneVal, moodVal, eraVal);
   if (!resolved.toLowerCase().includes('no text')) {
     return `${resolved} No text, no letters, no words, no numbers.`.trim();

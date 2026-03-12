@@ -85,7 +85,7 @@ function defaultBatchPrompt(book, variant = 1, variantCount = 1) {
     sceneDescription = `${protagonist} in ${setting}, depicting: ${sceneDescription}`;
   }
 
-  return `Create a beautiful, highly detailed circular medallion illustration for "${title}" by ${author}. The illustration must depict: ${sceneDescription}. Mood: ${mood}.${era ? ` Era: ${era}.` : ''} The subject must be centred and fully contained within the circle, edges fading softly into empty space. Highly detailed, painterly, suitable for a luxury book cover. No text, no letters, no words.`;
+  return `Book cover illustration only — no text, no title, no author name, no lettering of any kind. No border, no frame, no ornamental elements, no medallion, no decorative edges. This illustration MUST depict: ${sceneDescription}. Mood: ${mood}.${era ? ` Era: ${era}.` : ''} Full scene composition filling the entire canvas, no circular framing. Highly detailed, painterly, suitable for a luxury book cover. No text, no letters, no words.`;
 }
 
 function buildBatchJob(book, model, variant, variantCount = 1) {
