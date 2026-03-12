@@ -2460,14 +2460,7 @@ def _model_provider_prefix(runtime: config.Config, model: str) -> str | None:
 
 
 def _post_process_image(image: Image.Image, width: int, height: int) -> Image.Image:
-    processed = image.convert("RGBA").resize((width, height), Image.LANCZOS)
-
-    mask = Image.new("L", (width, height), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, width - 1, height - 1), fill=255)
-    processed.putalpha(mask)
-
-    return processed
+    return image.convert("RGBA").resize((width, height), Image.LANCZOS)
 
 
 def _clip(value: float) -> float:
@@ -2673,6 +2666,40 @@ def _circular_crop_penalty(rgb: np.ndarray, mask: np.ndarray) -> tuple[float, di
     }
 
 
+def _transparent_corner_crop_penalty(alpha: np.ndarray) -> tuple[float, dict[str, float]]:
+    h, w = alpha.shape[:2]
+    if h <= 24 or w <= 24:
+        return 0.0, {
+            "deep_corner_transparent_ratio": 0.0,
+            "outer_transparent_ratio": 0.0,
+            "center_opaque_ratio": 0.0,
+        }
+
+    yy, xx = np.ogrid[:h, :w]
+    nx = (xx - ((w - 1.0) / 2.0)) / max(1.0, w / 2.0)
+    ny = (yy - ((h - 1.0) / 2.0)) / max(1.0, h / 2.0)
+    radial = np.sqrt((nx ** 2) + (ny ** 2))
+    deep_corner_band = radial >= 1.05
+    outer_band = radial >= 0.82
+    center_band = radial <= 0.55
+
+    deep_corner_transparent_ratio = float((alpha[deep_corner_band] < 0.10).mean()) if np.any(deep_corner_band) else 0.0
+    outer_transparent_ratio = float((alpha[outer_band] < 0.10).mean()) if np.any(outer_band) else 0.0
+    center_opaque_ratio = float((alpha[center_band] > 0.90).mean()) if np.any(center_band) else 0.0
+
+    transparency_gate = _clip((deep_corner_transparent_ratio - 0.42) / 0.24)
+    structure_gate = (
+        (0.56 * _clip((outer_transparent_ratio - 0.10) / 0.24))
+        + (0.44 * _clip((center_opaque_ratio - 0.82) / 0.12))
+    )
+    penalty = transparency_gate * structure_gate
+    return _clip(penalty), {
+        "deep_corner_transparent_ratio": deep_corner_transparent_ratio,
+        "outer_transparent_ratio": outer_transparent_ratio,
+        "center_opaque_ratio": center_opaque_ratio,
+    }
+
+
 def _content_guardrail_score(image: Image.Image) -> tuple[float, list[str], dict[str, float]]:
     rgba = np.array(image.convert("RGBA"), dtype=np.uint8)
     rgb = rgba[..., :3].astype(np.float32)
@@ -2714,6 +2741,7 @@ def _content_guardrail_score(image: Image.Image) -> tuple[float, list[str], dict
     ring_penalty, ring_metrics = _ring_artifact_penalty(edge_map=edge_map, mask=mask)
     frame_penalty, frame_metrics = _rectangular_frame_penalty(edge_map=edge_map, mask=mask)
     circular_crop_penalty, circular_metrics = _circular_crop_penalty(rgb=rgb, mask=mask)
+    transparent_corner_penalty, transparent_metrics = _transparent_corner_crop_penalty(alpha=alpha)
     dull_penalty, color_metrics = _dull_palette_penalty(rgb=rgb, mask=mask)
 
     score = (
@@ -2721,6 +2749,7 @@ def _content_guardrail_score(image: Image.Image) -> tuple[float, list[str], dict
         + (0.22 * ring_penalty)
         + (0.20 * frame_penalty)
         + (0.34 * circular_crop_penalty)
+        + (0.36 * transparent_corner_penalty)
         + (0.16 * dull_penalty)
     )
     score = _clip(score)
@@ -2732,7 +2761,7 @@ def _content_guardrail_score(image: Image.Image) -> tuple[float, list[str], dict
         issues.append("inner_frame_or_ring_artifact")
     if frame_penalty > 0.22:
         issues.append("rectangular_frame_artifact")
-    if circular_crop_penalty > 0.26:
+    if circular_crop_penalty > 0.26 or transparent_corner_penalty > 0.24:
         issues.append("circular_crop_artifact")
     if dull_penalty > 0.12:
         issues.append("low_vibrancy")
@@ -2755,6 +2784,10 @@ def _content_guardrail_score(image: Image.Image) -> tuple[float, list[str], dict
         "circular_corner_foreground_ratio": float(circular_metrics.get("corner_foreground_ratio", 0.0)),
         "circular_corner_background_match_ratio": float(circular_metrics.get("corner_background_match_ratio", 0.0)),
         "circular_corner_color_spread": float(circular_metrics.get("corner_color_spread", 0.0)),
+        "transparent_corner_penalty": float(transparent_corner_penalty),
+        "transparent_deep_corner_ratio": float(transparent_metrics.get("deep_corner_transparent_ratio", 0.0)),
+        "transparent_outer_ratio": float(transparent_metrics.get("outer_transparent_ratio", 0.0)),
+        "transparent_center_opaque_ratio": float(transparent_metrics.get("center_opaque_ratio", 0.0)),
         "mean_saturation": float(color_metrics.get("mean_saturation", 0.0)),
     }
     return score, issues, metrics

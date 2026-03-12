@@ -353,6 +353,19 @@ def test_content_guardrail_flags_circular_crop_artifact():
     assert float(metrics_artifact.get("circular_crop_penalty", 0.0)) > 0.26
 
 
+def test_content_guardrail_flags_transparent_corner_crop_artifact():
+    artifact = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(artifact, "RGBA")
+    draw.ellipse((18, 18, 238, 238), fill=(34, 74, 132, 255))
+    draw.rectangle((86, 92, 174, 176), fill=(195, 148, 92, 255))
+
+    score_artifact, issues_artifact, metrics_artifact = ig._content_guardrail_score(artifact)
+    assert score_artifact > ig.MAX_CONTENT_VIOLATION_SCORE
+    assert "circular_crop_artifact" in issues_artifact
+    assert float(metrics_artifact.get("transparent_corner_penalty", 0.0)) > 0.24
+    assert float(metrics_artifact.get("transparent_deep_corner_ratio", 0.0)) > 0.95
+
+
 def test_content_guardrail_detects_rectangular_internal_frame():
     framed = Image.new("RGBA", (256, 256), (96, 78, 52, 255))
     draw = ImageDraw.Draw(framed, "RGBA")
