@@ -3615,6 +3615,84 @@ def test_execute_generation_payload_forwards_preserve_prompt_text_flag(tmp_path:
     assert captured["preserve_prompt_text"] is True
 
 
+def test_execute_generation_payload_preserves_resolved_library_prompt_text(tmp_path: Path, monkeypatch):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg = replace(cfg, openrouter_api_key="test-key")
+    monkeypatch.setattr(qr.config, "get_config", lambda *_args, **_kwargs: cfg)
+
+    captured: dict[str, Any] = {}
+
+    def _fake_generate_single_book(**kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(qr.image_generator, "generate_single_book", _fake_generate_single_book)
+    monkeypatch.setattr(qr, "_serialize_generation_results", lambda **_kwargs: [])
+    monkeypatch.setattr(qr.cover_compositor, "composite_all_variants", lambda **_kwargs: None)
+    monkeypatch.setattr(qr, "_record_generation_costs", lambda **_kwargs: None)
+    monkeypatch.setattr(qr.state_db_store, "append_generation_records", lambda **_kwargs: 0)
+    monkeypatch.setattr(qr.state_db_store, "export_history_payload", lambda **_kwargs: {"items": []})
+    monkeypatch.setattr(qr, "_build_review_data_payload", lambda *_args, **_kwargs: {"books": []})
+    monkeypatch.setattr(qr, "_invalidate_cache", lambda *_args, **_kwargs: 1)
+    monkeypatch.setattr(
+        qr,
+        "_book_row_for_number",
+        lambda **_kwargs: {
+            "number": 3,
+            "title": "Gulliver's Travels",
+            "author": "Jonathan Swift",
+            "enrichment": {
+                "iconic_scenes": [
+                    "Gulliver waking up on a beach, bound by hundreds of tiny ropes staked into the ground by six-inch-tall Lilliputians who climb over his body."
+                ],
+                "protagonist": "Lemuel Gulliver — a ship's surgeon with a stout build, dressed in 18th-century sailor attire, featuring a long coat and a tricorn hat.",
+                "emotional_tone": "A mix of humor, satire, and critical reflection on human nature.",
+                "era": "Early 18th century, published in 1726.",
+            },
+        },
+    )
+
+    prompt = (
+        "Book cover illustration only — no text, no title, no author name, no lettering of any kind. "
+        "No border, no frame, no ornamental elements, no medallion, no decorative edges. "
+        "This illustration MUST depict the following specific scene: Gulliver waking up on a beach, "
+        "bound by hundreds of tiny ropes staked into the ground by six-inch-tall Lilliputians who climb over his body. "
+        "The main characters shown are Lemuel Gulliver — a ship's surgeon with a stout build, dressed in 18th-century sailor attire, featuring a long coat and a tricorn hat. "
+        "Every figure, object, and setting element in this scene must be clearly recognizable and faithful to the source material. "
+        "Rendered in the style of Alphonse Mucha and Edward Burne-Jones — MANDATORY Art Nouveau Pre-Raphaelite illustration style. "
+        "Color palette MUST use: deep midnight navy blue (#0a1628) as dominant background, warm burnished gold (#c5941a) and antique brass (#b5884e) for all highlights and light sources, "
+        "rich cobalt (#0047ab) and cerulean blue (#2a7ab0) for mid-tones and clothing, earth ochre (#cc7722) and burnt sienna (#8a3324) for skin and landscapes. "
+        "Overall texture: gilded illuminated manuscript with visible gold leaf effect. "
+        "The mood is A mix of humor, satire, and critical reflection on human nature. "
+        "Era reference: Early 18th century, published in 1726. Full scene composition filling the entire canvas, no circular framing. "
+        "Square format, high resolution, print-ready."
+    )
+
+    qr._execute_generation_payload(
+        {
+            "catalog": "classics",
+            "book": 3,
+            "models": ["openrouter/google/gemini-3-pro-image-preview"],
+            "variants": 1,
+            "variant": 1,
+            "prompt": prompt,
+            "prompt_source": "template",
+            "compose_prompt": False,
+            "preserve_prompt_text": True,
+            "library_prompt_id": "alexandria-base-classical-devotion",
+            "provider": "all",
+            "cover_source": "drive",
+            "dry_run": True,
+        }
+    )
+
+    assert captured["library_prompt_id"] == "alexandria-base-classical-devotion"
+    assert captured["preserve_prompt_text"] is True
+    assert captured["prompt_text"] == prompt
+    assert "Alphonse Mucha and Edward Burne-Jones" in captured["prompt_text"]
+    assert "#0a1628" in captured["prompt_text"]
+
+
 def test_execute_generation_payload_drive_source_downloads_cover_before_composite(tmp_path: Path, monkeypatch):
     cfg = _build_runtime_for_startup_checks(tmp_path)
     cfg = replace(cfg, openai_api_key="test-key", gdrive_source_folder_id="source-folder-id")

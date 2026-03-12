@@ -2491,12 +2491,19 @@ def _execute_generation_payload(
         if prompt_source == "template" or not raw_request_prompt:
             prompt = str(composed_prompt_payload.get("prompt", base_prompt_for_composer)).strip()
 
-    needs_backend_scene_anchor = (
-        prompt_source != "custom"
-        or not raw_request_prompt
-        or content_relevance.is_generic_text(str(prompt or "")[:320])
-        or content_relevance.prompt_contains_unresolved_placeholders(prompt)
-    )
+    prompt_has_generic_lead = content_relevance.is_generic_text(str(prompt or "")[:320])
+    prompt_has_unresolved_placeholders = content_relevance.prompt_contains_unresolved_placeholders(prompt)
+    if precomposed_prompt:
+        # Respect fully resolved frontend prompts, including Alexandria library prompts,
+        # unless they still contain placeholders or generic fallback text.
+        needs_backend_scene_anchor = prompt_has_generic_lead or prompt_has_unresolved_placeholders
+    else:
+        needs_backend_scene_anchor = (
+            prompt_source != "custom"
+            or not raw_request_prompt
+            or prompt_has_generic_lead
+            or prompt_has_unresolved_placeholders
+        )
     if book_row is not None and (not precomposed_prompt or needs_backend_scene_anchor):
         prompt = _ensure_prompt_book_context(
             prompt=prompt,
