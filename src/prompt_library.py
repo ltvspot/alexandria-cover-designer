@@ -37,17 +37,18 @@ ALEXANDRIA_SYSTEM_NEGATIVE_PROMPT = (
     "no minimalist design, no stock photo look, no cartoonish style, no anime influence, no spelling mistakes, "
     "no blurry illustration, no off-centre composition, no white or light backgrounds. "
     "No ornamental borders, no frames, no scrollwork, no filigree, no decorative edges, no corner ornaments, "
-    "no dividers."
+    "no dividers. No circular vignette, No medallion composition, no ornamental frame, no decorative border, "
+    "no floral border frame, no scrollwork frame."
 )
 
 def _scene_first_prompt(style_label: str, style_description: str) -> str:
     return (
         "Book cover illustration only — no text, no title, no author name, no lettering of any kind. "
-        "No border, no frame, no ornamental elements. This circular medallion illustration MUST depict the "
+        "No border, no frame, no ornamental elements, no medallion, no decorative edges. This illustration MUST depict the "
         "following specific scene: {SCENE}. Every figure, object, and setting element in this scene must be "
         "clearly recognizable and faithful to the source material. "
         f"Rendered in {style_label} style — {style_description}. "
-        "The mood is {MOOD}. Era reference: {ERA}. Circular vignette composition with soft edges. Square format, "
+        "The mood is {MOOD}. Era reference: {ERA}. Full scene composition filling the entire canvas, no circular framing. Square format, "
         "high resolution, print-ready."
     )
 
@@ -744,8 +745,9 @@ class PromptLibrary:
         style_text = ", ".join(anchor.style_text for anchor in selected)
         custom_part = f" {custom_text.strip()}" if custom_text.strip() else ""
         prompt = (
-            f"Create a circular medallion illustration for \"{book_title}\" showing the most iconic "
-            f"scene or symbolic moment from the story.{custom_part} {style_text}"
+            f"Create a full scene illustration for \"{book_title}\" showing the most iconic "
+            f"scene or symbolic moment from the story. No medallion, no decorative edges, no circular framing."
+            f"{custom_part} {style_text}"
         )
         return " ".join(prompt.split())
 
@@ -951,7 +953,7 @@ class PromptLibrary:
             StyleAnchor(
                 name="engraving_detailed",
                 description="Ultra-detailed copperplate engraving and etching line work.",
-                style_text="copper plate engraving, fine line work, meticulous etching detail, circular vignette composition",
+                style_text="copper plate engraving, fine line work, meticulous etching detail, full scene composition filling the entire canvas, no circular framing",
                 tags=["engraving", "detailed", "linework"],
             ),
             StyleAnchor(
