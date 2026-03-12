@@ -1213,8 +1213,8 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
     assert payload["local_path"] == payload["local_folder"]
     assert payload["retry_available"] is True
     assert payload["drive_folder_id"] == "drive-folder-1"
-    assert len(payload["saved_files"]) == 6
-    assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
+    assert len(payload["saved_files"]) == 4
+    assert {Path(path).suffix for path in payload["saved_files"]} == {".png", ".jpg", ".pdf", ".ai"}
     assert all(Path(path).exists() for path in payload["saved_files"])
     assert "Drive upload partially completed" in str(payload["warning"])
 
@@ -1566,6 +1566,7 @@ def test_save_raw_payload_uses_nested_drive_folder_parts_per_result(
     assert captured["folder_parts"][0] == "4. Emma - Jane Austen"
     assert captured["folder_parts"][1].startswith("save-raw__job-emma__variant-3__")
     assert captured["timeout_seconds"] == qr.SAVE_RAW_RESPONSE_TIMEOUT_SECONDS
+    assert captured["assume_unique_leaf"] is True
 
 
 def test_save_result_payload_uses_shared_drive_parent_folder(
@@ -1642,6 +1643,7 @@ def test_save_result_payload_uses_shared_drive_parent_folder(
     assert captured["folder_parts"][0] == "4. Emma - Jane Austen"
     assert captured["folder_parts"][1].startswith("save-result__job-emma-result__variant-3__")
     assert captured["timeout_seconds"] == qr.SAVE_RESULT_RESPONSE_TIMEOUT_SECONDS
+    assert captured["assume_unique_leaf"] is True
     assert len(payload["saved_files"]) == 3
     assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
     assert all(Path(path).exists() for path in payload["saved_files"])

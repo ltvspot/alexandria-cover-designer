@@ -15254,6 +15254,12 @@ def _copy_image_with_format(source: Path, destination: Path, *, format_name: str
     return destination
 
 
+def _copy_native_asset(source: Path, destination: Path) -> Path:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return destination
+
+
 def _copy_pdf_bytes_as_ai(source_pdf: Path, destination_ai: Path) -> Path:
     destination_ai.parent.mkdir(parents=True, exist_ok=True)
     destination_ai.write_bytes(source_pdf.read_bytes())
@@ -15459,6 +15465,68 @@ def _upload_single_file_to_drive(*, service: Any, parent_folder_id: str, file_pa
             }
 
 
+def _create_drive_folder(*, service: Any, parent_folder_id: str, folder_name: str) -> str:
+    created = service.files().create(
+        body={
+            "name": str(folder_name),
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [str(parent_folder_id)],
+        },
+        fields="id",
+        supportsAllDrives=True,
+    ).execute()
+    folder_id = str(created.get("id", "")).strip()
+    if not folder_id:
+        raise RuntimeError("Google Drive folder creation did not return an id")
+    return folder_id
+
+
+def _upload_single_file_to_drive_new(
+    *,
+    service: Any,
+    parent_folder_id: str,
+    file_path: Path,
+) -> dict[str, Any]:
+    max_attempts = SAVE_RAW_DRIVE_RETRY_ATTEMPTS
+    for attempt in range(1, max_attempts + 1):
+        try:
+            mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+            media = gdrive_sync.MediaFileUpload(str(file_path), mimetype=mime_type)
+            created = service.files().create(
+                body={"name": file_path.name, "parents": [str(parent_folder_id)]},
+                media_body=media,
+                fields="id",
+                supportsAllDrives=True,
+            ).execute()
+            file_id = str(created.get("id", "")).strip()
+            if not file_id:
+                raise RuntimeError("Google Drive file upload did not return an id")
+            return {
+                "ok": True,
+                "name": file_path.name,
+                "path": str(file_path),
+                "file_id": file_id,
+                "action": "created",
+                "attempts": attempt,
+            }
+        except Exception as exc:
+            details = _drive_error_details(exc)
+            if attempt < max_attempts and SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS > 0:
+                time.sleep(SAVE_RAW_DRIVE_RETRY_DELAY_SECONDS)
+                continue
+            return {
+                "ok": False,
+                "name": file_path.name,
+                "path": str(file_path),
+                "file_id": "",
+                "action": "failed",
+                "attempts": attempt,
+                "error": details["message"],
+                "error_code": details["code"],
+                "http_status": details["http_status"],
+            }
+
+
 def _upload_folder_to_drive(
     *,
     runtime: config.Config,
@@ -15466,6 +15534,7 @@ def _upload_folder_to_drive(
     folder_name: str = "",
     folder_parts: list[str] | None = None,
     parent_folder_id: str,
+    assume_unique_leaf: bool = False,
 ) -> dict[str, Any]:
     local_files = [file_path for file_path in sorted(local_folder.iterdir()) if file_path.is_file()]
     normalized_parts = [
@@ -15513,12 +15582,20 @@ def _upload_folder_to_drive(
 
     try:
         current_parent_folder_id = str(parent_folder_id)
-        for part in normalized_parts:
-            current_parent_folder_id = _ensure_drive_child_folder(
-                service=service,
-                parent_folder_id=current_parent_folder_id,
-                folder_name=part,
-            )
+        for index, part in enumerate(normalized_parts):
+            is_leaf = index == len(normalized_parts) - 1
+            if assume_unique_leaf and is_leaf:
+                current_parent_folder_id = _create_drive_folder(
+                    service=service,
+                    parent_folder_id=current_parent_folder_id,
+                    folder_name=part,
+                )
+            else:
+                current_parent_folder_id = _ensure_drive_child_folder(
+                    service=service,
+                    parent_folder_id=current_parent_folder_id,
+                    folder_name=part,
+                )
         child_folder_id = current_parent_folder_id
     except Exception as exc:
         details = _drive_error_details(exc)
@@ -15548,11 +15625,18 @@ def _upload_folder_to_drive(
     result["drive_url"] = f"https://drive.google.com/drive/folders/{child_folder_id}"
 
     for file_path in local_files:
-        upload_row = _upload_single_file_to_drive(
-            service=service,
-            parent_folder_id=child_folder_id,
-            file_path=file_path,
-        )
+        if assume_unique_leaf:
+            upload_row = _upload_single_file_to_drive_new(
+                service=service,
+                parent_folder_id=child_folder_id,
+                file_path=file_path,
+            )
+        else:
+            upload_row = _upload_single_file_to_drive(
+                service=service,
+                parent_folder_id=child_folder_id,
+                file_path=file_path,
+            )
         if bool(upload_row.get("ok", False)):
             result["uploaded"].append(upload_row)
         else:
@@ -15624,6 +15708,7 @@ def _upload_folder_to_drive_with_fallback(
     parent_folder_id: str,
     timeout_seconds: float = SAVE_TO_DRIVE_RESPONSE_TIMEOUT_SECONDS,
     operation_name: str = "Save",
+    assume_unique_leaf: bool = False,
 ) -> dict[str, Any]:
     normalized_parts = [str(part or "").strip() for part in folder_parts if str(part or "").strip()]
     done = threading.Event()
@@ -15637,6 +15722,7 @@ def _upload_folder_to_drive_with_fallback(
                 local_folder=local_folder,
                 folder_parts=normalized_parts,
                 parent_folder_id=parent_folder_id,
+                assume_unique_leaf=assume_unique_leaf,
             )
         except Exception as exc:  # pragma: no cover - defensive
             error_box["details"] = _drive_error_details(exc)
@@ -15763,23 +15849,10 @@ def _materialize_save_raw_package(
 
     raw_source = context["raw_source"]
     if isinstance(raw_source, Path) and raw_source.exists():
-        saved_files.extend(
-            _export_asset_triplet(
-                source_image=raw_source,
-                existing_pdf=None,
-                existing_ai=None,
-                local_folder=local_folder,
-                base_filename=str(context["raw_basename"]),
-            )
-        )
+        raw_target = local_folder / f"{context['raw_basename']}{raw_source.suffix.lower() or '.png'}"
+        saved_files.append(str(_copy_native_asset(raw_source, raw_target)))
     else:
-        missing_files.extend(
-            [
-                f"{context['raw_basename']}.jpg",
-                f"{context['raw_basename']}.pdf",
-                f"{context['raw_basename']}.ai",
-            ]
-        )
+        missing_files.append(f"{context['raw_basename']}.png")
         warnings.append("Generated raw image not found.")
 
     comp_source = context["comp_source"]
@@ -15839,6 +15912,7 @@ def _save_raw_payload_for_job(
         parent_folder_id=SAVE_RAW_DRIVE_FOLDER_ID,
         timeout_seconds=SAVE_RAW_RESPONSE_TIMEOUT_SECONDS,
         operation_name="Save Raw",
+        assume_unique_leaf=True,
     )
     warnings = [
         token
@@ -15984,6 +16058,7 @@ def _save_result_payload_for_job(
         parent_folder_id=SAVE_RESULT_DRIVE_FOLDER_ID,
         timeout_seconds=SAVE_RESULT_RESPONSE_TIMEOUT_SECONDS,
         operation_name="Save Result",
+        assume_unique_leaf=True,
     )
     warnings = [
         token

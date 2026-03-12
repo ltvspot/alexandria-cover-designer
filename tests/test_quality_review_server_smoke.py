@@ -492,8 +492,8 @@ def test_quality_review_server_save_raw_separates_same_book_results_into_unique_
         assert payload_a.get("local_folder") != payload_b.get("local_folder")
         assert payload_a.get("drive_ok") is False
         assert payload_b.get("drive_ok") is False
-        assert len(payload_a.get("saved_files", [])) == 6
-        assert len(payload_b.get("saved_files", [])) == 6
+        assert len(payload_a.get("saved_files", [])) == 4
+        assert len(payload_b.get("saved_files", [])) == 4
         assert all(Path(path).exists() for path in payload_a.get("saved_files", []))
         assert all(Path(path).exists() for path in payload_b.get("saved_files", []))
     finally:
