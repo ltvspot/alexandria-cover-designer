@@ -1640,10 +1640,10 @@ def test_save_result_payload_uses_shared_drive_parent_folder(
     assert payload["drive_ok"] is True
     assert payload["local_path"] == payload["local_folder"]
     assert captured["parent_folder_id"] == qr.SAVE_RESULT_DRIVE_FOLDER_ID == "0ABLZWLOVzq-qUk9PVA"
-    assert captured["folder_parts"] == [payload["package_folder_name"]]
-    assert captured["folder_parts"][0].startswith("save-result__job-emma-result__variant-3__")
+    assert captured["folder_parts"] == []
     assert captured["timeout_seconds"] == qr.SAVE_RESULT_RESPONSE_TIMEOUT_SECONDS
     assert captured["assume_unique_leaf"] is True
+    assert captured["upload_name_prefix"] == f"{payload['package_folder_name']}__"
     assert len(payload["saved_files"]) == 3
     assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
     assert all(Path(path).exists() for path in payload["saved_files"])

@@ -15486,14 +15486,16 @@ def _upload_single_file_to_drive_new(
     service: Any,
     parent_folder_id: str,
     file_path: Path,
+    upload_name: str = "",
 ) -> dict[str, Any]:
     max_attempts = SAVE_RAW_DRIVE_RETRY_ATTEMPTS
     for attempt in range(1, max_attempts + 1):
         try:
             mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
             media = gdrive_sync.MediaFileUpload(str(file_path), mimetype=mime_type)
+            target_name = str(upload_name or file_path.name).strip() or file_path.name
             created = service.files().create(
-                body={"name": file_path.name, "parents": [str(parent_folder_id)]},
+                body={"name": target_name, "parents": [str(parent_folder_id)]},
                 media_body=media,
                 fields="id",
                 supportsAllDrives=True,
@@ -15503,7 +15505,7 @@ def _upload_single_file_to_drive_new(
                 raise RuntimeError("Google Drive file upload did not return an id")
             return {
                 "ok": True,
-                "name": file_path.name,
+                "name": target_name,
                 "path": str(file_path),
                 "file_id": file_id,
                 "action": "created",
@@ -15516,7 +15518,7 @@ def _upload_single_file_to_drive_new(
                 continue
             return {
                 "ok": False,
-                "name": file_path.name,
+                "name": str(upload_name or file_path.name).strip() or file_path.name,
                 "path": str(file_path),
                 "file_id": "",
                 "action": "failed",
@@ -15535,6 +15537,7 @@ def _upload_folder_to_drive(
     folder_parts: list[str] | None = None,
     parent_folder_id: str,
     assume_unique_leaf: bool = False,
+    upload_name_prefix: str = "",
 ) -> dict[str, Any]:
     local_files = [file_path for file_path in sorted(local_folder.iterdir()) if file_path.is_file()]
     normalized_parts = [
@@ -15625,11 +15628,13 @@ def _upload_folder_to_drive(
     result["drive_url"] = f"https://drive.google.com/drive/folders/{child_folder_id}"
 
     for file_path in local_files:
+        upload_name = f"{upload_name_prefix}{file_path.name}" if upload_name_prefix else file_path.name
         if assume_unique_leaf:
             upload_row = _upload_single_file_to_drive_new(
                 service=service,
                 parent_folder_id=child_folder_id,
                 file_path=file_path,
+                upload_name=upload_name,
             )
         else:
             upload_row = _upload_single_file_to_drive(
@@ -15709,6 +15714,7 @@ def _upload_folder_to_drive_with_fallback(
     timeout_seconds: float = SAVE_TO_DRIVE_RESPONSE_TIMEOUT_SECONDS,
     operation_name: str = "Save",
     assume_unique_leaf: bool = False,
+    upload_name_prefix: str = "",
 ) -> dict[str, Any]:
     normalized_parts = [str(part or "").strip() for part in folder_parts if str(part or "").strip()]
     done = threading.Event()
@@ -15723,6 +15729,7 @@ def _upload_folder_to_drive_with_fallback(
                 folder_parts=normalized_parts,
                 parent_folder_id=parent_folder_id,
                 assume_unique_leaf=assume_unique_leaf,
+                upload_name_prefix=upload_name_prefix,
             )
         except Exception as exc:  # pragma: no cover - defensive
             error_box["details"] = _drive_error_details(exc)
@@ -16051,13 +16058,12 @@ def _save_result_payload_for_job(
     drive_payload = _upload_folder_to_drive_with_fallback(
         runtime=runtime,
         local_folder=Path(local_payload["local_folder"]),
-        folder_parts=[
-            str(local_payload.get("package_folder_name", "") or "").strip(),
-        ],
+        folder_parts=[],
         parent_folder_id=SAVE_RESULT_DRIVE_FOLDER_ID,
         timeout_seconds=SAVE_RESULT_RESPONSE_TIMEOUT_SECONDS,
         operation_name="Save Result",
         assume_unique_leaf=True,
+        upload_name_prefix=f"{str(local_payload.get('package_folder_name', '') or '').strip()}__",
     )
     warnings = [
         token
