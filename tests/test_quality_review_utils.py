@@ -1210,12 +1210,54 @@ def test_save_raw_payload_for_job_returns_partial_when_drive_upload_fails(
 
     assert payload["ok"] is True
     assert payload["status"] == "partial"
+    assert payload["local_path"] == payload["local_folder"]
     assert payload["retry_available"] is True
     assert payload["drive_folder_id"] == "drive-folder-1"
     assert len(payload["saved_files"]) == 6
     assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
     assert all(Path(path).exists() for path in payload["saved_files"])
     assert "Drive upload partially completed" in str(payload["warning"])
+
+
+def test_upload_folder_to_drive_with_fallback_returns_timeout_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    local_folder = tmp_path / "save-raw-timeout"
+    local_folder.mkdir(parents=True, exist_ok=True)
+    (local_folder / "Temple Dawn – A. Writer.jpg").write_bytes(b"jpg")
+
+    def _slow_upload(**_kwargs):  # type: ignore[no-untyped-def]
+        time.sleep(0.2)
+        return {
+            "ok": True,
+            "folder_id": "late-folder",
+            "drive_url": "https://drive.google.com/drive/folders/late-folder",
+            "uploaded": [],
+            "failed": [],
+            "warning": None,
+        }
+
+    monkeypatch.setattr(qr, "_upload_folder_to_drive", _slow_upload)
+
+    started = time.monotonic()
+    payload = qr._upload_folder_to_drive_with_fallback(
+        runtime=cfg,
+        local_folder=local_folder,
+        folder_parts=["7. Temple Dawn - A. Writer", "save-raw__job-timeout__variant-1__model"],
+        parent_folder_id="parent-folder",
+        timeout_seconds=0.01,
+        operation_name="Save Raw",
+    )
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 0.15
+    assert payload["ok"] is False
+    assert payload["folder_id"] == ""
+    assert payload["failed_count"] == 1
+    assert payload["failed"][0]["name"] == "Temple Dawn – A. Writer.jpg"
+    assert "did not respond within" in str(payload["warning"])
 
 
 def test_save_raw_context_uses_unique_package_folder_per_result(tmp_path: Path):
@@ -1523,6 +1565,77 @@ def test_save_raw_payload_uses_nested_drive_folder_parts_per_result(
     assert payload["status"] == "saved"
     assert captured["folder_parts"][0] == "4. Emma - Jane Austen"
     assert captured["folder_parts"][1].startswith("save-raw__job-emma__variant-3__")
+
+
+def test_save_result_payload_uses_shared_drive_parent_folder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _build_runtime_for_startup_checks(tmp_path)
+    cfg.book_catalog_path.write_text(
+        json.dumps([{"number": 4, "title": "Emma", "author": "Jane Austen"}]),
+        encoding="utf-8",
+    )
+    comp_path = cfg.output_dir / "saved_composites" / "4" / "job-emma-result_variant_3_openrouter_google_gemini-3-pro-image-preview.jpg"
+    comp_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (64, 64), (43, 53, 63)).save(comp_path, format="JPEG")
+
+    job = qr.job_store.JobRecord(
+        id="job-emma-result",
+        idempotency_key="idem-job-emma-result",
+        job_type="generate_cover",
+        status="completed",
+        catalog_id="classics",
+        book_number=4,
+        payload={},
+        result={
+            "results": [
+                {
+                    "success": True,
+                    "variant": 3,
+                    "model": "openrouter/google/gemini-3-pro-image-preview",
+                    "saved_composited_path": qr._to_project_relative(comp_path),
+                }
+            ]
+        },
+        error={},
+        attempts=1,
+        max_attempts=3,
+        priority=100,
+        retry_after="",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(timezone.utc).isoformat(),
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        worker_id="",
+    )
+
+    captured: dict[str, Any] = {}
+
+    def _fake_upload_folder_to_drive_with_fallback(**kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return {
+            "ok": True,
+            "folder_id": "drive-folder-2",
+            "drive_url": "https://drive.google.com/drive/folders/drive-folder-2",
+            "uploaded": [],
+            "failed": [],
+            "warning": None,
+        }
+
+    monkeypatch.setattr(qr, "_upload_folder_to_drive_with_fallback", _fake_upload_folder_to_drive_with_fallback)
+
+    payload = qr._save_result_payload_for_job(runtime=cfg, job=job)
+
+    assert payload["status"] == "saved"
+    assert payload["drive_ok"] is True
+    assert payload["local_path"] == payload["local_folder"]
+    assert captured["parent_folder_id"] == qr.SAVE_RESULT_DRIVE_FOLDER_ID == "0ABLZWLOVzq-qUk9PVA"
+    assert captured["folder_parts"][0] == "4. Emma - Jane Austen"
+    assert captured["folder_parts"][1].startswith("save-result__job-emma-result__variant-3__")
+    assert len(payload["saved_files"]) == 3
+    assert {Path(path).suffix for path in payload["saved_files"]} == {".jpg", ".pdf", ".ai"}
+    assert all(Path(path).exists() for path in payload["saved_files"])
 
 
 def test_save_raw_drive_status_payload_reports_parent_folder_access(

@@ -500,6 +500,66 @@ def test_quality_review_server_save_raw_separates_same_book_results_into_unique_
         _stop_server(process)
 
 
+def test_quality_review_server_save_result_returns_json_payload(tmp_path: Path):
+    config_dir = tmp_path / "config"
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    tmp_dir = tmp_path / "tmp"
+    data_dir = tmp_path / "data"
+    jobs_db_path = data_dir / "jobs.sqlite3"
+    _write_save_raw_smoke_config(config_dir=config_dir, input_dir=input_dir, output_dir=output_dir)
+
+    raw_art_path = output_dir / "raw_art" / "4" / "job-emma-save-result_variant_1_openrouter_google_gemini-3-pro-image-preview.png"
+    saved_composited_path = output_dir / "saved_composites" / "4" / "job-emma-save-result_variant_1_openrouter_google_gemini-3-pro-image-preview.jpg"
+    _write_image(raw_art_path, (24, 44, 84), format_name="PNG")
+    _write_image(saved_composited_path, (84, 44, 24), format_name="JPEG")
+    _seed_completed_save_raw_job(
+        jobs_db_path=jobs_db_path,
+        job_id="job-emma-save-result",
+        book_number=4,
+        variant=1,
+        model="openrouter/google/gemini-3-pro-image-preview",
+        raw_art_path=raw_art_path,
+        saved_composited_path=saved_composited_path,
+    )
+
+    process, base_url = _start_server(
+        extra_env={
+            "CATALOG_ID": "save-raw-smoke",
+            "CONFIG_DIR": str(config_dir),
+            "OUTPUT_DIR": str(output_dir),
+            "TMP_DIR": str(tmp_dir),
+            "DATA_DIR": str(data_dir),
+            "JOBS_DB_PATH": str(jobs_db_path),
+            "GOOGLE_CREDENTIALS_PATH": str(tmp_path / "missing-drive-creds.json"),
+            "GOOGLE_CREDENTIALS_JSON": "",
+        }
+    )
+    try:
+        status, payload = _request_json(
+            base_url,
+            "/api/save-result",
+            method="POST",
+            payload={
+                "job_id": "job-emma-save-result",
+                "expected_variant": 1,
+                "expected_model": "openrouter/google/gemini-3-pro-image-preview",
+                "expected_saved_composited_path": str(saved_composited_path),
+            },
+        )
+
+        assert status == 200
+        assert payload.get("ok") is True
+        assert payload.get("status") == "partial"
+        assert payload.get("drive_ok") is False
+        assert payload.get("local_path") == payload.get("local_folder")
+        assert str(payload.get("package_folder_name", "")).startswith("save-result__job-emma-save-result__variant-1__")
+        assert len(payload.get("saved_files", [])) == 3
+        assert all(Path(path).exists() for path in payload.get("saved_files", []))
+    finally:
+        _stop_server(process)
+
+
 def test_quality_review_server_cover_preview_and_visual_qa_missing_errors_are_json():
     process, base_url = _start_server(wait_path="/api/healthz", timeout_seconds=10.0)
     try:

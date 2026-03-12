@@ -25,6 +25,14 @@ except ImportError:  # pragma: no cover - optional dependency
     GOOGLE_API_AVAILABLE = False
 
 try:
+    import google_auth_httplib2  # type: ignore
+    import httplib2  # type: ignore
+
+    GOOGLE_TIMEOUT_HTTP_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency
+    GOOGLE_TIMEOUT_HTTP_AVAILABLE = False
+
+try:
     from src import config
     from src.logger import get_logger
     from src import safe_json
@@ -43,6 +51,27 @@ DRIVE_LIST_KWARGS = {
     "supportsAllDrives": True,
     "includeItemsFromAllDrives": True,
 }
+DRIVE_HTTP_TIMEOUT_SECONDS = max(1.0, float(os.getenv("GDRIVE_HTTP_TIMEOUT_SECONDS", "10")))
+
+
+def _build_drive_service(creds):  # type: ignore[no-untyped-def]
+    build_kwargs = {"cache_discovery": False}
+    if GOOGLE_TIMEOUT_HTTP_AVAILABLE:
+        try:
+            http = google_auth_httplib2.AuthorizedHttp(  # type: ignore[name-defined]
+                creds,
+                http=httplib2.Http(timeout=DRIVE_HTTP_TIMEOUT_SECONDS),  # type: ignore[name-defined]
+            )
+            try:
+                return build("drive", "v3", http=http, **build_kwargs)
+            except TypeError:
+                return build("drive", "v3", http=http)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Falling back to default Drive client without explicit timeout: %s", exc)
+    try:
+        return build("drive", "v3", credentials=creds, **build_kwargs)
+    except TypeError:
+        return build("drive", "v3", credentials=creds)
 
 
 def authenticate(credentials_path: Path | None = None):
@@ -65,7 +94,7 @@ def authenticate(credentials_path: Path | None = None):
         if info.get("type") != "service_account":
             raise ValueError("GOOGLE_CREDENTIALS_JSON must be a service account key")
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
-        return build("drive", "v3", credentials=creds)
+        return _build_drive_service(creds)
 
     resolved_path = Path(credentials_path) if credentials_path is not None else Path()
     if credentials_path is None:
@@ -80,12 +109,12 @@ def authenticate(credentials_path: Path | None = None):
     payload = json.loads(resolved_path.read_text(encoding="utf-8"))
     if payload.get("type") == "service_account":
         creds = service_account.Credentials.from_service_account_file(str(resolved_path), scopes=SCOPES)
-        return build("drive", "v3", credentials=creds)
+        return _build_drive_service(creds)
 
     # OAuth desktop flow fallback.
     flow = InstalledAppFlow.from_client_secrets_file(str(resolved_path), SCOPES)
     creds = flow.run_local_server(port=0)
-    return build("drive", "v3", credentials=creds)
+    return _build_drive_service(creds)
 
 
 def credential_details(credentials_path: Path | None = None) -> dict[str, Any]:
