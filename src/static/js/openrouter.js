@@ -48,52 +48,65 @@ window.OpenRouter = {
   MODELS: [],
   MODEL_COSTS: {},
   MODEL_MODALITIES: {},
+  INIT_TIMEOUT_MS: 5000,
+  _initPromise: null,
 
   async init() {
     if (this.MODELS.length > 0) return this.MODELS;
-    try {
-      const resp = await fetch('/api/models', { cache: 'no-store' });
-      const payload = await resp.json();
-      const rawModels = Array.isArray(payload.models) ? payload.models : [];
-      if (rawModels.length > 0 && typeof rawModels[0] === 'object') {
-        const parsed = rawModels.map((m, idx) => {
-          const id = String(m.id || m.model || '').trim();
-          const label = _labelForModel(id, String(m.label || '').trim());
-          const status = String(m.status || 'active').trim().toLowerCase();
-          const sortOrderRaw = Number(m.sort_order);
-          const sortOrder = Number.isFinite(sortOrderRaw) ? sortOrderRaw : idx;
-          return {
-            id,
-            label,
-            status,
-            sortOrder,
-            cost: Number(m.cost_per_image ?? m.cost ?? m.avg_cost_usd ?? DEFAULT_MODEL_COST),
-            modality: String(m.modality || 'image'),
-          };
-        }).filter((m) => m.id);
-        parsed.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
-        const active = parsed.filter((m) => m.status !== 'disabled');
-        this.MODELS = active.length ? active : parsed;
-      } else {
-        this.MODELS = rawModels.map((id) => ({ id: String(id), label: String(id), cost: DEFAULT_MODEL_COST, modality: 'image' }));
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.INIT_TIMEOUT_MS);
+        try {
+          const resp = await fetch('/api/models', { cache: 'no-store', signal: controller.signal });
+          const payload = await resp.json();
+          const rawModels = Array.isArray(payload.models) ? payload.models : [];
+          if (rawModels.length > 0 && typeof rawModels[0] === 'object') {
+            const parsed = rawModels.map((m, idx) => {
+              const id = String(m.id || m.model || '').trim();
+              const label = _labelForModel(id, String(m.label || '').trim());
+              const status = String(m.status || 'active').trim().toLowerCase();
+              const sortOrderRaw = Number(m.sort_order);
+              const sortOrder = Number.isFinite(sortOrderRaw) ? sortOrderRaw : idx;
+              return {
+                id,
+                label,
+                status,
+                sortOrder,
+                cost: Number(m.cost_per_image ?? m.cost ?? m.avg_cost_usd ?? DEFAULT_MODEL_COST),
+                modality: String(m.modality || 'image'),
+              };
+            }).filter((m) => m.id);
+            parsed.sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+            const active = parsed.filter((m) => m.status !== 'disabled');
+            this.MODELS = active.length ? active : parsed;
+          } else {
+            this.MODELS = rawModels.map((id) => ({ id: String(id), label: String(id), cost: DEFAULT_MODEL_COST, modality: 'image' }));
+          }
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } catch (err) {
+        console.warn('Unable to load models from backend:', err.message);
+        this.MODELS = [
+          { id: 'openrouter/openai/gpt-5-image', label: 'GPT-5 Image', cost: 0.04, modality: 'both' },
+          { id: 'openrouter/google/gemini-3-pro-image-preview', label: 'Nano Banana Pro', cost: 0.02, modality: 'both' },
+          { id: 'openrouter/google/gemini-2.5-flash-image', label: 'Nano Banana (Gemini 2.5 Flash)', cost: 0.003, modality: 'both' },
+        ];
       }
+      this.MODEL_COSTS = {};
+      this.MODEL_MODALITIES = {};
       this.MODELS.forEach((m) => {
         this.MODEL_COSTS[m.id] = Number(m.cost || DEFAULT_MODEL_COST);
         this.MODEL_MODALITIES[m.id] = m.modality || 'image';
       });
       return this.MODELS;
-    } catch (err) {
-      console.warn('Unable to load models from backend:', err.message);
-      this.MODELS = [
-        { id: 'openrouter/openai/gpt-5-image', label: 'GPT-5 Image', cost: 0.04, modality: 'both' },
-        { id: 'openrouter/google/gemini-3-pro-image-preview', label: 'Nano Banana Pro', cost: 0.02, modality: 'both' },
-        { id: 'openrouter/google/gemini-2.5-flash-image', label: 'Nano Banana (Gemini 2.5 Flash)', cost: 0.003, modality: 'both' },
-      ];
-      this.MODELS.forEach((m) => {
-        this.MODEL_COSTS[m.id] = m.cost;
-        this.MODEL_MODALITIES[m.id] = m.modality;
-      });
-      return this.MODELS;
+    })();
+    try {
+      return await this._initPromise;
+    } finally {
+      this._initPromise = null;
     }
   },
 

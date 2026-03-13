@@ -4552,10 +4552,6 @@ def write_iterate_books_data(*, runtime: config.Config | None = None, prompts_pa
     enriched_catalog = _json_list_rows_cache_entry(enriched_catalog_path).get("rows", [])
     winners_payload = _load_winner_payload(_winner_path_for_runtime(runtime))
     winner_map = winners_payload.get("selections", {}) if isinstance(winners_payload, dict) else {}
-    genre_prompts = _genre_prompt_payload(runtime=runtime)
-    template_rows = _template_rows_for_runtime(runtime=runtime)
-    default_template_id = str(template_rows[0].get("id", "")).strip() if template_rows else ""
-
     enriched_by_book: dict[int, dict[str, Any]] = {}
     if isinstance(enriched_catalog, list):
         for row in enriched_catalog:
@@ -4593,30 +4589,26 @@ def write_iterate_books_data(*, runtime: config.Config | None = None, prompts_pa
         author = str(book.get("author", prompt_row.get("author", ""))).strip()
         folder_name = str(book.get("folder_name", prompt_row.get("folder_name", ""))).strip()
         enrichment = enriched_by_book.get(number, {})
-        inferred = genre_intelligence.infer_genre(
-            title=title,
-            author=author,
-            metadata_genre=str(enrichment.get("genre", "") or book.get("genre", "")),
-            prompts=genre_prompts,
-        )
-        composed = _compose_prompt_for_book(
-            runtime=runtime,
-            book={
+        prompt_context = content_relevance.resolve_prompt_context(
+            {
                 "number": number,
                 "title": title,
                 "author": author,
                 "genre": book.get("genre", prompt_row.get("genre", "")),
                 "enrichment": enrichment,
-            },
-            base_prompt=str(
-                default_prompt
-                or (
-                    f'Cinematic full-bleed narrative scene for "{title}" by {author}, '
-                    "single dominant focal subject, scene artwork only, no text, no logos, no borders or frames."
-                )
-            ),
-            template_id=default_template_id,
+            }
         )
+        scene_text = str(prompt_context.get("scene_with_protagonist") or prompt_context.get("scene") or "").strip()
+        mood_text = str(prompt_context.get("mood") or "").strip()
+        era_text = str(prompt_context.get("era") or "").strip()
+        composed_prompt = (
+            "Book cover illustration only — no text, no title, no author name, no lettering of any kind. "
+            "No border, no frame, no ornamental elements, no medallion, no decorative edges. "
+            f"This illustration MUST depict the following specific scene: {scene_text}. "
+            f"{f'The mood is {mood_text}. ' if mood_text else ''}"
+            f"{f'Era reference: {era_text}. ' if era_text else ''}"
+            "Full scene composition filling the entire canvas, square format, high resolution, print-ready."
+        ).strip()
         winner_row = winner_map.get(str(number), {})
         winner_variant = _safe_int(winner_row.get("winner") if isinstance(winner_row, dict) else winner_row, 0)
         books.append(
@@ -4630,10 +4622,10 @@ def write_iterate_books_data(*, runtime: config.Config | None = None, prompts_pa
                 "cover_name": str(book.get("cover_name", book.get("drive_name", title))).strip(),
                 "drive_kind": str(book.get("drive_kind", "")).strip(),
                 "default_prompt": default_prompt,
-                "genre": str(composed.get("genre", inferred.get("genre", "literary_fiction")) or "literary_fiction"),
-                "composed_prompt": str(composed.get("prompt", default_prompt)).strip(),
+                "genre": str(enrichment.get("genre") or book.get("genre") or prompt_row.get("genre") or "literary_fiction").strip() or "literary_fiction",
+                "composed_prompt": composed_prompt,
                 "prompt_components": {
-                    "title_keywords": composed.get("title_keywords", genre_intelligence.extract_title_keywords(title=title, limit=6)),
+                    "title_keywords": genre_intelligence.extract_title_keywords(title=title, limit=6),
                 },
                 "enrichment": enrichment,
                 "local_cover_available": _folder_has_local_cover(runtime.input_dir / folder_name) or bool(book.get("cover_jpg_id")),
@@ -13215,6 +13207,11 @@ def serve_review_webapp(
             default_runtime.cost_per_image_usd = default_runtime.get_model_cost(default_runtime.ai_model)
             _set_startup_health(_run_startup_checks(default_runtime))
             _ensure_builtin_prompts_seeded(runtime=default_runtime, actor="startup")
+            try:
+                write_iterate_books_data(runtime=default_runtime)
+                write_iterate_data(runtime=default_runtime)
+            except Exception as exc:
+                logger.warning("Iterate payload prewarm failed during startup: %s", exc)
             stale_after_seconds, retry_delay_seconds = _job_stale_recovery_config(default_runtime)
             recovered = job_db_store.recover_stale_running_jobs(
                 stale_after_seconds=stale_after_seconds,

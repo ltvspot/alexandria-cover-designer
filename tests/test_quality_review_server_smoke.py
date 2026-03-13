@@ -1126,6 +1126,7 @@ def test_quality_review_server_iterate_books_view_filters_by_number():
         assert int(payload["books"][0].get("number", 0)) == 3
         assert str(first.get("enrichment", {}).get("emotional_tone", "")).strip()
         assert "Gulliver" in str(first.get("composed_prompt", ""))
+        assert "Book cover illustration only" in str(first.get("composed_prompt", ""))
         assert "A pivotal dramatic moment from the literary work" not in str(first.get("composed_prompt", ""))
     finally:
         _stop_server(process)

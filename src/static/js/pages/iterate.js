@@ -1819,6 +1819,16 @@ window.Pages.iterate = {
   async render() {
     const content = document.getElementById('content');
     const catalogId = 'classics';
+    if (content) {
+      content.innerHTML = `
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Loading Iterate</h3>
+          </div>
+          <p class="text-muted">Loading books, prompts, and models. This can take a few seconds after a fresh deploy.</p>
+        </div>
+      `;
+    }
     let books = DB.dbGetAll('books');
     if (!books.length) books = await DB.loadBooks(catalogId);
     if (!books.length) {
