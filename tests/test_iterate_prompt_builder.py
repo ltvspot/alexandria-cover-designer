@@ -155,7 +155,7 @@ def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto(
     )
 
     assert result["prompt"].startswith("Create a breathtaking legacy prompt.")
-    assert 'Create a colorful circular medallion illustration for "A Room with a View" by E. M. Forster.' in result["prompt"]
+    assert 'This illustration MUST depict a scene from "A Room with a View" by E. M. Forster.' in result["prompt"]
     assert result["styleLabel"] == "Romantic Sublime"
     assert result["styleId"] == "romantic-sublime"
     assert result["preservePromptText"] is False
@@ -365,9 +365,9 @@ def test_iterate_expanded_scene_pool_reaches_ten_unique_scenes_for_sparse_books(
 def test_iterate_wildcard_rotation_changes_across_days():
     prompts = [
         {"id": "alexandria-wildcard-illuminated-manuscript", "name": "WILDCARD 3 — Illuminated Manuscript", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-celtic-knotwork", "name": "WILDCARD 24 — Celtic Knotwork", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-soft", "name": "Painterly Soft Brushwork", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-temple-of-knowledge", "name": "WILDCARD 5 — Temple of Knowledge", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-venetian-renaissance", "name": "WILDCARD 6 — Venetian Renaissance", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-detailed", "name": "Painterly Hyper-Detailed", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-klimt-gold-leaf", "name": "WILDCARD 26 — Klimt Gold Leaf", "tags": ["alexandria", "wildcard"]},
     ]
     book = {"title": "The Gospel of Thomas", "author": "Unknown", "genre": "religious"}
@@ -390,9 +390,9 @@ def test_iterate_variant_prompt_plan_uses_base_then_rotating_wildcards():
     prompts = [
         {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "tags": ["alexandria", "base"]},
         {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-impressionist-plein-air", "name": "WILDCARD 8 — Impressionist Plein Air", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-soft", "name": "Painterly Soft Brushwork", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-romantic-landscape", "name": "WILDCARD 10 — Romantic Landscape", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-art-nouveau-poster", "name": "WILDCARD 11 — Art Nouveau Poster", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-detailed", "name": "Painterly Hyper-Detailed", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-pre-raphaelite-dream", "name": "WILDCARD 23 — Pre-Raphaelite Dream", "tags": ["alexandria", "wildcard"]},
     ]
     assignments = _run_iterate_hook(
@@ -425,9 +425,9 @@ def test_iterate_variant_prompt_plan_falls_back_to_literature_defaults_for_unkno
     assert assignments[0]["promptId"] == "alexandria-base-romantic-realism"
     assert assignments[1]["promptId"] in {
         "alexandria-wildcard-pre-raphaelite-garden",
-        "alexandria-wildcard-impressionist-plein-air",
+        "alexandria-wildcard-painterly-soft",
         "alexandria-wildcard-romantic-landscape",
-        "alexandria-wildcard-art-nouveau-poster",
+        "alexandria-wildcard-painterly-detailed",
         "alexandria-wildcard-pre-raphaelite-dream",
     }
 
@@ -440,9 +440,9 @@ def test_iterate_variant_prompt_plan_uses_all_five_bases_and_five_wildcards_for_
         {"id": "alexandria-base-esoteric-mysticism", "name": "BASE 5 — Esoteric Mysticism", "tags": ["alexandria", "base"]},
         {"id": "alexandria-base-philosophical-gravitas", "name": "BASE 3 — Philosophical Gravitas", "tags": ["alexandria", "base"]},
         {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-antique-map", "name": "WILDCARD 7 — Antique Map", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-soft", "name": "Painterly Soft Brushwork", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-maritime-chart", "name": "WILDCARD 9 — Maritime Chart", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-vintage-pulp-cover", "name": "WILDCARD 14 — Vintage Pulp Cover", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-detailed", "name": "Painterly Hyper-Detailed", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-edo-meets-alexandria", "name": "WILDCARD 18 — Edo Meets Alexandria", "tags": ["alexandria", "wildcard"]},
     ]
     assignments = _run_iterate_hook(
@@ -467,9 +467,9 @@ def test_iterate_variant_prompt_plan_uses_all_five_bases_and_five_wildcards_for_
     }.issubset(set(prompt_ids))
     assert {
         "alexandria-wildcard-pre-raphaelite-garden",
-        "alexandria-wildcard-antique-map",
+        "alexandria-wildcard-painterly-soft",
         "alexandria-wildcard-maritime-chart",
-        "alexandria-wildcard-vintage-pulp-cover",
+        "alexandria-wildcard-painterly-detailed",
         "alexandria-wildcard-edo-meets-alexandria",
     }.issubset(set(prompt_ids))
 
@@ -478,9 +478,9 @@ def test_iterate_variant_payloads_auto_rotate_assign_distinct_scenes():
     prompts = [
         {"id": "alexandria-base-romantic-realism", "name": "BASE 4 — Romantic Realism", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "base"]},
         {"id": "alexandria-wildcard-pre-raphaelite-garden", "name": "WILDCARD 2 — Pre-Raphaelite Garden", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-impressionist-plein-air", "name": "WILDCARD 8 — Impressionist Plein Air", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-soft", "name": "Painterly Soft Brushwork", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-romantic-landscape", "name": "WILDCARD 10 — Romantic Landscape", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-art-nouveau-poster", "name": "WILDCARD 11 — Art Nouveau Poster", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-detailed", "name": "Painterly Hyper-Detailed", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
         {"id": "alexandria-wildcard-pre-raphaelite-dream", "name": "WILDCARD 23 — Pre-Raphaelite Dream", "prompt_template": "Book cover illustration only - no text. Scene: {SCENE}. Mood: {MOOD}. Era: {ERA}.", "tags": ["alexandria", "wildcard"]},
     ]
     result = _run_iterate_variant_payloads(
@@ -549,11 +549,10 @@ def test_iterate_variant_payloads_resolve_legacy_prompt_id_aliases():
 
 def test_iterate_science_genre_maps_to_scientific_wildcards():
     prompts = [
-        {"id": "alexandria-wildcard-scientific-diagram", "name": "Scientific Diagram", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-celestial-cartography", "name": "Celestial Cartography", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-naturalist-field-study", "name": "Naturalist Field Study", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-botanical-plate", "name": "Botanical Plate", "tags": ["alexandria", "wildcard"]},
-        {"id": "alexandria-wildcard-antique-map-illustration", "name": "Antique Map Illustration", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-naturalist-field-drawing", "name": "Naturalist Field Drawing", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-soft", "name": "Painterly Soft Brushwork", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-painterly-detailed", "name": "Painterly Hyper-Detailed", "tags": ["alexandria", "wildcard"]},
+        {"id": "alexandria-wildcard-antique-map", "name": "Antique Map", "tags": ["alexandria", "wildcard"]},
     ]
     book = {"title": "On the Origin of Species", "author": "Charles Darwin", "genre": "science"}
 

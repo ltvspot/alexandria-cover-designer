@@ -1037,6 +1037,68 @@
       "updated_at": "2026-03-11T18:31:22.822748+00:00"
     },
     {
+      "id": "alexandria-wildcard-painterly-soft",
+      "name": "Painterly Soft Brushwork",
+      "prompt_template": "Book cover illustration only — no text, no title, no author name, no lettering of any kind. No border, no frame, no ornamental elements, no medallion, no decorative edges. This illustration MUST depict the following specific scene: {SCENE}. Every figure, object, and setting element in this scene must be clearly recognizable and faithful to the source material. RENDERING TECHNIQUE: HAND-PAINTED illustration in gouache and oil painting style. MANDATORY visible brushwork texture on every surface — soft blended edges, NO hard vector lines, NO photorealism, NO 3D rendering, NO digital sharpness. Every element must look traditionally painted by hand. Atmospheric lighting with warm light sources blending into cool shadow areas. Color palette: deep midnight navy (#0a1628) for shadows and dark areas, warm burnished gold (#c5941a) and burnt amber (#cc7722) for all highlights and warm light, soft muted greens for any organic elements, dusty warm tones (#c08b7a) for skin. All surfaces must show visible brushstroke texture — layered pigment, soft dry-brush transitions, atmospheric depth between foreground and background. Composition uses cinematic depth: clear foreground subject, atmospheric middle ground, soft-focus painted background. The mood is {MOOD}. Era reference: {ERA}. Full scene composition filling the entire canvas, no circular framing. Square format, high resolution, print-ready.",
+      "style_anchors": [
+        "painterly",
+        "gouache",
+        "hand-painted",
+        "brushwork",
+        "atmospheric"
+      ],
+      "negative_prompt": "no text, no letters, no words, no numbers, no medallion, no circular frame, no border, no photorealism, no 3D rendering, no vector art, no digital sharpness, no hard edges",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 1.0,
+      "saved_by": "system",
+      "created_at": "2026-03-13T00:00:00+00:00",
+      "notes": "Alexandria wildcard prompt. Soft hand-painted gouache and oil brushwork with atmospheric depth.",
+      "tags": [
+        "painterly",
+        "soft-brushwork",
+        "gouache",
+        "atmospheric"
+      ],
+      "category": "wildcard",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-13T00:00:00+00:00"
+    },
+    {
+      "id": "alexandria-wildcard-painterly-detailed",
+      "name": "Painterly Hyper-Detailed",
+      "prompt_template": "Book cover illustration only — no text, no title, no author name, no lettering of any kind. No border, no frame, no ornamental elements, no medallion, no decorative edges. This illustration MUST depict the following specific scene: {SCENE}. Every figure, object, and setting element in this scene must be clearly recognizable and faithful to the source material. RENDERING TECHNIQUE: HAND-PAINTED hyper-detailed digital painting with meticulously controlled painterly brushwork and METICULOUS individual rendering of every element — every fabric fold, every architectural detail, every natural texture must be individually painted with precision. Saturated jewel-tone color palette with golden-hour lighting warmth, NO photorealism, NO 3D rendering. Color palette: rich warm gold (#d4a017) and amber (#cc7722) for dominant warm light, deep cobalt blue (#0047ab) for sky and shadow areas, saturated emerald (#1a6b3a) for organic elements, rich crimson (#8b0000) and burgundy for warm accents, warm ivory (#f5e6c8) for illuminated surfaces. Light must glow and scatter — reflections on water, light through foliage, warm halos around light sources. Surface quality: highly polished and finished, smooth blending, NO visible canvas texture, every edge clean and precise. Maximalist detail density — the image should reward close inspection with ever-finer detail. Vibrant, luminous, jewel-like color saturation throughout. The mood is {MOOD}. Era reference: {ERA}. Full scene composition filling the entire canvas, no circular framing. Square format, high resolution, print-ready.",
+      "style_anchors": [
+        "hyper-detailed",
+        "jewel-tone",
+        "polished",
+        "maximalist",
+        "golden-hour"
+      ],
+      "negative_prompt": "no text, no letters, no words, no numbers, no medallion, no circular frame, no border, no photorealism, no 3D rendering, no vector art, no rough brushwork, no sketch lines",
+      "source_book": "builtin",
+      "source_model": "openrouter/google/gemini-3-pro-image-preview",
+      "quality_score": 1.0,
+      "saved_by": "system",
+      "created_at": "2026-03-13T00:00:00+00:00",
+      "notes": "Alexandria wildcard prompt. Hyper-detailed painterly rendering with jewel-tone saturation and luminous finish.",
+      "tags": [
+        "painterly",
+        "hyper-detailed",
+        "jewel-tone",
+        "maximalist"
+      ],
+      "category": "wildcard",
+      "version": 1,
+      "usage_count": 0,
+      "win_count": 0,
+      "last_used_at": "",
+      "updated_at": "2026-03-13T00:00:00+00:00"
+    },
+    {
       "id": "3cb72b01-44c2-48bf-8aaf-c1d5f9923822",
       "name": "7A Winner #1 — Variant 4",
       "prompt_template": "Dramatic oil painting of desperate final embrace in a candlelit crypt amid roses and cold marble, classical oil painting, masterpiece quality, warm golden lighting, renaissance art style, detailed brushwork, gallery-quality illustration, circular vignette composition, rich color palette, dramatic chiaroscuro, no text, no letters, no words, no watermarks, inspired by the narrative of {title}",
