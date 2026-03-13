@@ -1819,6 +1819,17 @@ window.Pages.iterate = {
   async render() {
     const content = document.getElementById('content');
     const catalogId = 'classics';
+    const setHeaderBookCount = (count, { loading = false } = {}) => {
+      const headerSyncStatusEl = document.getElementById('syncStatus');
+      if (!headerSyncStatusEl) return;
+      const normalized = Number(count || 0);
+      if (normalized > 0) {
+        headerSyncStatusEl.textContent = `${Math.round(normalized)} books`;
+        return;
+      }
+      headerSyncStatusEl.textContent = loading ? 'Loading books…' : 'No books';
+    };
+    setHeaderBookCount(0, { loading: true });
     if (content) {
       content.innerHTML = `
         <div class="card">
@@ -1838,6 +1849,7 @@ window.Pages.iterate = {
         // no-op
       }
     }
+    setHeaderBookCount(books.length);
     await DB.loadPrompts(catalogId);
     await OpenRouter.init();
 
@@ -2370,6 +2382,7 @@ window.Pages.iterate = {
             ? `${sorted.length} books loaded (catalog). Drive found: ${driveTotal}.`
             : `${sorted.length} books loaded (catalog).`;
         }
+        setHeaderBookCount(sorted.length);
         updateHeader();
         if (driveTotal > 0) {
           Toast.success(`Catalog synced: ${sorted.length} books (Drive found ${driveTotal})`);
