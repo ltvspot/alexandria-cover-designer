@@ -221,7 +221,10 @@ def test_config_runtime_methods_and_get_config_fallback(monkeypatch: pytest.Monk
     assert runtime.resolve_model_provider("openai/gpt-image-1") == "openai"
     assert runtime.resolve_model_provider("unknown-model", default_provider="google") == "google"
     assert runtime.resolve_model_alias("nano-banana-pro") == "openrouter/google/gemini-3-pro-image-preview"
+    assert runtime.resolve_model_alias("nano-banana-2") == "openrouter/google/gemini-2.5-flash-image"
     assert runtime.get_model_cost("nano-banana-pro") == pytest.approx(0.02)
+    assert runtime.get_model_cost("nano-banana-2") == pytest.approx(0.003)
+    assert runtime.get_model_modality("nano-banana-2") == "both"
     assert runtime.get_model_cost("openai/gpt-image-1") >= 0.0
     assert runtime.slo_monitor_interval_seconds >= 0
     assert runtime.composite_max_invalid_variants >= 0

@@ -23,12 +23,16 @@ const PREFERRED_DEFAULT_MODELS = [
 const RECOMMENDED_PINNED_MODEL_IDS = [
   'openrouter/google/gemini-3-pro-image-preview',
   'google/gemini-3-pro-image-preview',
+  'nano-banana-2',
   'google/gemini-2.5-flash-image',
   'openrouter/google/gemini-2.5-flash-image',
 ];
 const NANO_BANANA_MODEL_IDS = new Set([
   'openrouter/google/gemini-3-pro-image-preview',
   'nano-banana-pro',
+  'nano-banana-2',
+  'openrouter/google/gemini-2.5-flash-image',
+  'google/gemini-2.5-flash-image',
 ]);
 const GEMINI_FLASH_DIRECT_MODEL_IDS = new Set([
   'google/gemini-2.5-flash-image',
@@ -1246,6 +1250,10 @@ window.__ITERATE_TEST_HOOKS__.isGenericContent = _isGenericContent;
 window.__ITERATE_TEST_HOOKS__.buildIterateGenerationJobs = (payload) => buildIterateGenerationJobs(payload);
 window.__ITERATE_TEST_HOOKS__.sortIterateResultJobs = ({ jobs, sortMode }) => sortIterateResultJobs(jobs, sortMode);
 window.__ITERATE_TEST_HOOKS__.saveRawRequestPayloadForJob = ({ job }) => saveRawRequestPayloadForJob(job);
+window.__ITERATE_TEST_HOOKS__.modelDescription = ({ model }) => modelDescription(model);
+window.__ITERATE_TEST_HOOKS__.filterModelListIds = ({ models, filterName }) => (
+  filterModelList(models, filterName).map((model) => normalizedModelId(model))
+);
 
 function sortPromptsForUI(prompts) {
   return [...(Array.isArray(prompts) ? prompts : [])].sort((left, right) => {
@@ -1621,9 +1629,12 @@ function modelCapabilities(model) {
 
 function modelDescription(model) {
   const token = normalizedModelId(model).toLowerCase();
+  if (token.includes('openrouter/google/gemini-2.5-flash-image') || token === 'nano-banana-2') {
+    return 'Fast, lower-cost Nano Banana 2 tier for quick iterative runs.';
+  }
+  if (token.includes('google/gemini-2.5-flash-image')) return 'Nano Banana 2 direct Google provider route.';
   if (isNanoModel(model)) return 'Best Nano Banana quality tier (recommended default).';
   if (token.includes('google/gemini-3-pro-image-preview')) return 'Nano Banana Pro direct Google provider route.';
-  if (token.includes('google/gemini-2.5-flash-image')) return 'Gemini 2.5 Flash direct Google provider route.';
   if (isGeminiFlashDirectModel(model)) return 'Gemini direct Google provider route.';
   if (token.includes('gpt-5-image-mini')) return 'Lower-cost GPT-5 image generation.';
   if (token.includes('gpt-5-image') || token.includes('gpt-image-1')) return 'Premium multimodal image + text output.';

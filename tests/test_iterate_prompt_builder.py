@@ -76,6 +76,14 @@ def _run_iterate_ui_defaults() -> dict:
     return _run_iterate_hook(function_name="iterateUiDefaults", payload={})
 
 
+def _run_iterate_model_description(model: dict) -> str:
+    return _run_iterate_hook(function_name="modelDescription", payload={"model": model})
+
+
+def _run_iterate_filter_model_ids(models: list[dict], filter_name: str) -> list[str]:
+    return _run_iterate_hook(function_name="filterModelListIds", payload={"models": models, "filterName": filter_name})
+
+
 def _run_iterate_generation_jobs(payload: dict) -> dict:
     return _run_iterate_hook(function_name="buildIterateGenerationJobs", payload=payload)
 
@@ -159,6 +167,30 @@ def test_iterate_ui_defaults_use_ten_variants_and_auto_rotate_label():
 
     assert result["defaultVariantCount"] == 10
     assert result["autoRotateLabel"] == "Auto-Rotate (Recommended)"
+
+
+def test_iterate_model_description_calls_out_nano_banana_2():
+    assert _run_iterate_model_description({"id": "openrouter/google/gemini-2.5-flash-image"}) == (
+        "Fast, lower-cost Nano Banana 2 tier for quick iterative runs."
+    )
+    assert _run_iterate_model_description({"id": "google/gemini-2.5-flash-image"}) == (
+        "Nano Banana 2 direct Google provider route."
+    )
+
+
+def test_iterate_nano_filter_includes_nano_banana_2_routes():
+    models = [
+        {"id": "openrouter/google/gemini-3-pro-image-preview"},
+        {"id": "openrouter/google/gemini-2.5-flash-image"},
+        {"id": "google/gemini-2.5-flash-image"},
+        {"id": "openrouter/openai/gpt-5-image"},
+    ]
+
+    assert _run_iterate_filter_model_ids(models, "nano") == [
+        "openrouter/google/gemini-3-pro-image-preview",
+        "openrouter/google/gemini-2.5-flash-image",
+        "google/gemini-2.5-flash-image",
+    ]
 
 
 def test_iterate_variant_summary_lines_are_single_line_and_compact():

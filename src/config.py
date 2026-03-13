@@ -179,6 +179,7 @@ MODEL_PROVIDER_MAP: dict[str, str] = {
 
 MODEL_ALIAS_MAP: dict[str, str] = {
     "nano-banana-pro": "openrouter/google/gemini-3-pro-image-preview",
+    "nano-banana-2": "openrouter/google/gemini-2.5-flash-image",
 }
 
 MODEL_COST_USD: dict[str, float] = {
@@ -189,6 +190,7 @@ MODEL_COST_USD: dict[str, float] = {
     "imagen-4-ultra": 0.060,
     "imagen-4-fast": 0.030,
     "nano-banana-pro": 0.02,
+    "nano-banana-2": 0.003,
     "openrouter/google/gemini-3-pro-image-preview": 0.02,
     "google/gemini-2.5-flash-image": 0.003,
     "google/gemini-3-pro-image-preview": 0.02,
@@ -230,6 +232,8 @@ _OPENROUTER_PRICING_SYNC_STATE: dict[str, Any] = {
 }
 
 MODEL_MODALITY: dict[str, str] = {
+    "nano-banana-pro": "both",
+    "nano-banana-2": "both",
     "openrouter/openai/gpt-5-image": "both",
     "openrouter/sourceful/riverflow-v2-pro": "image",
     "openrouter/sourceful/riverflow-v2-max-preview": "image",

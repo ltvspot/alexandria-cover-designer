@@ -75,6 +75,7 @@ class _Runtime:
         }
         self.model_alias_map = {
             "nano-banana-pro": "openrouter/google/gemini-3-pro-image-preview",
+            "nano-banana-2": "openrouter/google/gemini-2.5-flash-image",
         }
 
         self.data_dir = root / "data"
@@ -199,6 +200,7 @@ def test_negative_prompt_merge_and_nano_alias_resolution(tmp_path: Path, monkeyp
     assert ig.ALEXANDRIA_NEGATIVE_PROMPT in merged
     assert "No circular vignette, no medallion composition" in merged
     assert ig._resolve_provider_model_name("openrouter", "nano-banana-pro") == "google/gemini-3-pro-image-preview"
+    assert ig._resolve_provider_model_name("openrouter", "nano-banana-2") == "google/gemini-2.5-flash-image"
 
 
 def test_base_provider_allowlist_and_notimplemented(tmp_path: Path):
