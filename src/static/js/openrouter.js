@@ -1,4 +1,5 @@
 const DEFAULT_MODEL_COST = 0.01;
+const GENERATION_MODE_CACHE_TTL_MS = 15000;
 const MODEL_LABEL_OVERRIDES = {
   'nano-banana-pro': 'Nano Banana Pro',
   'nano-banana-2': 'Nano Banana 2',
@@ -6,6 +7,10 @@ const MODEL_LABEL_OVERRIDES = {
   'openrouter/google/gemini-2.5-flash-image': 'Nano Banana 2',
   'google/gemini-3-pro-image-preview': 'Nano Banana Pro (Google Direct)',
   'google/gemini-2.5-flash-image': 'Nano Banana 2 (Google Direct)',
+};
+let _generationModeCache = {
+  expiresAt: 0,
+  useSync: false,
 };
 
 function _sleep(ms) {
@@ -19,6 +24,31 @@ function _labelForModel(modelId, fallback = '') {
   if (override) return override;
   if (fallback) return fallback;
   return token;
+}
+
+async function _shouldUseSyncGeneration(signal) {
+  const now = Date.now();
+  if (_generationModeCache.expiresAt > now) return _generationModeCache.useSync;
+  let useSync = false;
+  try {
+    const resp = await fetch('/api/config', { cache: 'no-store', signal });
+    if (resp.ok) {
+      const payload = await resp.json();
+      const syncAllowed = Boolean(payload?.feature_flags?.sync_generation_allowed);
+      const workerAlive = payload?.worker?.alive;
+      useSync = syncAllowed && workerAlive === false;
+      if (useSync) {
+        console.warn('Worker heartbeat is stale; using synchronous generation fallback.');
+      }
+    }
+  } catch (err) {
+    console.warn('Unable to inspect generation mode:', err?.message || err);
+  }
+  _generationModeCache = {
+    expiresAt: now + GENERATION_MODE_CACHE_TTL_MS,
+    useSync,
+  };
+  return useSync;
 }
 
 async function _pollJob(jobId, signal, timeoutMs = 120000, onProgress = null) {
@@ -101,6 +131,7 @@ window.OpenRouter = {
   async generateImage(prompt, model, _apiKey, signal, timeoutMs = 120000, options = {}) {
     const requestedVariants = Math.max(1, Number(options.variants || 1));
     const requestedVariant = Math.max(1, Number(options.variant || 1));
+    const useSyncGeneration = await _shouldUseSyncGeneration(signal);
     const pickResult = (results) => {
       const rows = Array.isArray(results) ? results : [];
       if (!rows.length) return null;
@@ -117,7 +148,7 @@ window.OpenRouter = {
       prompt_source: options.prompt_source || 'custom',
       prompt,
       cover_source: options.cover_source || 'drive',
-      async: true,
+      async: !useSyncGeneration,
     };
     const selectedCoverId = String(options.selected_cover_id || '').trim();
     const selectedCoverBook = Number(options.selected_cover_book_number || 0);
@@ -159,6 +190,15 @@ window.OpenRouter = {
     }
 
     const generateData = await generateResp.json();
+    const syncResults = Array.isArray(generateData?.results) ? generateData.results : [];
+    if (!generateData.job && !generateData.job_id && syncResults.length > 0) {
+      const first = pickResult(syncResults);
+      return {
+        status: 'completed',
+        job: null,
+        result: first,
+      };
+    }
     const immediate = generateData.job || {};
     if (typeof options.onProgress === 'function' && immediate && typeof immediate === 'object') {
       try {
