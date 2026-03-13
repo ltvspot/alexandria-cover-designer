@@ -144,7 +144,7 @@ def test_iterate_prompt_builder_keeps_library_prompt_precomposed():
     assert result["backendPromptSource"] == "custom"
 
 
-def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto():
+def test_iterate_prompt_builder_uses_medallion_free_fallback_for_default_auto():
     result = _run_iterate_prompt_builder(
         {
             "book": {
@@ -162,7 +162,9 @@ def test_iterate_prompt_builder_keeps_legacy_style_diversifier_for_default_auto(
     )
 
     assert result["prompt"].startswith("Create a breathtaking legacy prompt.")
-    assert 'Create a colorful circular medallion illustration for "A Room with a View" by E. M. Forster.' in result["prompt"]
+    assert 'Book cover illustration only' in result["prompt"]
+    assert 'This illustration MUST depict a scene from "A Room with a View" by E. M. Forster.' in result["prompt"]
+    assert 'circular medallion' not in result["prompt"]
     assert result["styleLabel"] == "Romantic Sublime"
     assert result["styleId"] == "romantic-sublime"
     assert result["preservePromptText"] is False
