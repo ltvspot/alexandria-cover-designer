@@ -529,6 +529,73 @@ ALEXANDRIA_PROMPT_CATALOG: tuple[dict[str, object], ...] = (
         "category": "wildcard",
     },
     {
+        "id": "alexandria-wildcard-painterly-storybook",
+        "name": "Painterly Storybook",
+        "style_label": "hand-painted gouache storybook illustration",
+        "style_description": (
+            "visible gouache and oil brushwork, warm gold to navy palette, luminous atmospheric lighting, "
+            "storybook warmth, softly blended painterly edges"
+        ),
+        "prompt_template": (
+            "Book cover illustration only — no text, no title, no author name, no lettering of any kind. "
+            "No border, no frame, no ornamental elements, no medallion, no decorative edges. This "
+            "illustration MUST depict the following specific scene: {SCENE}. Every figure, object, and "
+            "setting element in this scene must be clearly recognizable and faithful to the source material. "
+            "Rendered as a HAND-PAINTED storybook illustration in gouache and oil painting style — "
+            "MANDATORY visible brushwork texture throughout, soft blended edges with NO hard vector lines, "
+            "NO photorealism, NO 3D rendering, NO digital sharpness. Atmospheric lighting with warm golden "
+            "hour glow blending into cool deep blues. Color palette: deep midnight navy sky (#0a1628), warm "
+            "wheat gold (#c5941a) and burnt amber (#cc7722) for foreground warmth, soft sage green (#6b8e5e) "
+            "and muted olive for foliage, dusty rose (#c08b7a) for skin and warm accents. Clouds must have "
+            "visible painterly brushstrokes with warm-lit edges. Landscape elements (fields, trees, "
+            "buildings) rendered with the soft textural quality of traditional gouache painting — luminous, "
+            "layered, slightly impressionistic depth. Overall mood: the warmth and wonder of a beautifully "
+            "illustrated classic storybook. The mood is {MOOD}. Era reference: {ERA}. Full scene "
+            "composition filling the entire canvas, no circular framing. Square format, high resolution, "
+            "print-ready."
+        ),
+        "negative_prompt": (
+            "no text, no letters, no words, no numbers, no medallion, no circular frame, no border, "
+            "no photorealism, no 3D rendering, no vector art, no digital sharpness, no hard edges"
+        ),
+        "notes": "Alexandria wildcard prompt. Hand-painted storybook gouache with warm gold and navy brushwork.",
+        "tags": ["painterly", "storybook", "gouache", "atmospheric"],
+        "category": "wildcard",
+    },
+    {
+        "id": "alexandria-wildcard-painterly-atmospheric",
+        "name": "Painterly Atmospheric",
+        "style_label": "hand-painted atmospheric concept-art illustration",
+        "style_description": (
+            "cinematic concept-art lighting, volumetric atmosphere, visible canvas grain and layered pigment, "
+            "dramatic painterly depth, warm copper and gold against indigo shadows"
+        ),
+        "prompt_template": (
+            "Book cover illustration only — no text, no title, no author name, no lettering of any kind. "
+            "No border, no frame, no ornamental elements, no medallion, no decorative edges. This "
+            "illustration MUST depict the following specific scene: {SCENE}. Every figure, object, and "
+            "setting element in this scene must be clearly recognizable and faithful to the source material. "
+            "Rendered as a HAND-PAINTED atmospheric illustration in the style of premium editorial concept art "
+            "— MANDATORY soft painterly brushwork, rich tonal depth, dramatic light-to-shadow transitions, "
+            "NO photorealism, NO 3D rendering, NO vector lines. Warm light sources scatter through volumetric "
+            "atmosphere (clouds, mist, dust motes). Color palette: rich deep indigo night (#1a1a3e) and "
+            "midnight teal (#0d2f4f) for shadows and sky, warm burnished gold (#d4a017) and copper (#b87333) "
+            "for all highlights and light sources, deep forest green (#1a4a1a) and moss (#4a6a3a) for organic "
+            "elements, warm ivory (#f5e6c8) for illuminated surfaces. Every surface must show visible painted "
+            "texture — canvas grain, layered pigment, soft dry-brush details. Composition uses cinematic "
+            "depth with a clear foreground subject, atmospheric middle ground, and painterly soft-focus "
+            "background. The mood is {MOOD}. Era reference: {ERA}. Full scene composition filling the entire "
+            "canvas, no circular framing. Square format, high resolution, print-ready."
+        ),
+        "negative_prompt": (
+            "no text, no letters, no words, no numbers, no medallion, no circular frame, no border, "
+            "no photorealism, no 3D rendering, no vector art, no digital sharpness, no hard edges"
+        ),
+        "notes": "Alexandria wildcard prompt. Atmospheric painterly concept art with dramatic volumetric light.",
+        "tags": ["painterly", "atmospheric", "concept-art", "cinematic"],
+        "category": "wildcard",
+    },
+    {
         "id": "alexandria-wildcard-naturalist-field-drawing",
         "name": "Naturalist Field Drawing",
         "style_label": "Victorian naturalist field drawing",
