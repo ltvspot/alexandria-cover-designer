@@ -1,10 +1,43 @@
 # VISUAL PROOF REPORT
 
-Date: 2026-03-12
+Date: 2026-03-13
 
-Last updated: `2026-03-12`
+Last updated: `2026-03-13`
 Deployment URL: `https://web-production-900a7.up.railway.app`
-Deployment ID: `e18bdf07-0352-463d-9371-7d9322d5ed2e`
+Deployment ID: `eadfdb91-df90-4715-9dd9-f9b4218d4412`
+
+## 1.9 PROMPT-49 Save Result Shared Drive + Remove Medallion Fallback (2026-03-13)
+- Git commit:
+  - `4f99e45` — `Fix save-result drive target and remove medallion fallback`
+- Railway deploy:
+  - `eadfdb91-df90-4715-9dd9-f9b4218d4412` (`SUCCESS`)
+- Local validation before deploy:
+  - `python3 -m py_compile scripts/quality_review.py` -> `PASS`
+  - `node --check src/static/js/pages/iterate.js` -> `PASS`
+  - `python3 -m compileall scripts src` -> `PASS`
+  - `pytest -q tests/test_iterate_prompt_builder.py -k 'fallback or default_auto'` -> `PASS`
+  - note: `tests/test_quality_review_utils.py` under system Python is blocked by missing `pikepdf`; Prompt 49 validation used the project venv plus direct live production verification instead
+- Live production verification:
+  - `GET /api/health` returned `ok=true`, `healthy=true`
+  - deployed JS check:
+    - `curl -s https://web-production-900a7.up.railway.app/static/js/pages/iterate.js | grep -c "circular medallion"` -> `0`
+  - real browser generation on deployed app:
+    - page: `/iterate`
+    - book: `4. Emma`
+    - variants: `1`
+    - model: `Nano Banana Pro`
+    - live job id: `862843c2-785e-4b63-8aff-13c3a094560f`
+    - result: `1/1 completed · 0 failed · $0.020`
+  - `POST /api/save-result` verification:
+    - request job id: `862843c2-785e-4b63-8aff-13c3a094560f`
+    - response: `drive_ok=true`
+    - `drive_url=https://drive.google.com/file/d/13c7RaD4VfdN2eQEkKl1VOyiJturLqQH0/view`
+    - `drive.parent_folder_id=0ABLZWLOVzq-qUk9PVA`
+    - no service-account storage quota error
+- Visual proof artifacts:
+  - live iterate completed run: `/var/folders/_l/b6_b807n6j38l2dkrxc48qbr0000gn/T/playwright-mcp-output/1773390542839/page-2026-03-13T08-32-28-407Z.png`
+- Honest remaining unrelated issue:
+  - iterate still logs non-fatal thumbnail `404` fallback noise from `/Output Covers/...jpg` before resolving to `/api/asset`; this did not block Prompt 49 acceptance
 
 ## 1.8 PROMPT-48C Enrichment Badge + Default Variants (2026-03-12)
 - Git commit:
