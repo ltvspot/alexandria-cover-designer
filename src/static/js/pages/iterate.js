@@ -1037,8 +1037,11 @@ function cleanupResolvedPrompt(promptText) {
 function applyPromptPlaceholders(promptText, book, sceneOverride, moodOverride, eraOverride) {
   const baseScene = sceneForVariant(book, 1, sceneOverride || defaultSceneForBook(book));
   const protagonist = defaultProtagonistForBook(book);
+  // IMPORTANT: Do NOT use "main character" or "central character" phrasing here.
+  // _isGenericContent() regex /\b(main|central)\s+character\b/ will false-positive.
+  // Use "Depicted prominently:" instead. (See PROMPT-54)
   const scene = protagonist && !baseScene.toLowerCase().includes(protagonist.toLowerCase())
-    ? `${baseScene}. ${protagonist.toLowerCase().includes(' and ') ? 'The main characters shown are' : 'The main character shown is'} ${protagonist}.`
+    ? `${baseScene}. Depicted prominently: ${protagonist}.`
     : baseScene;
   const mood = _normalizePromptText(moodOverride || defaultMoodForBook(book));
   const era = _normalizePromptText(eraOverride || defaultEraForBook(book));
@@ -1146,6 +1149,7 @@ function compactSceneLabel(value, maxLength = 72) {
   if (!normalized) return '';
   const shortened = normalized
     .replace(/^the illustration must depict:\s*/i, '')
+    .replace(/\.\s*Depicted prominently:\s*.*$/i, '')
     .replace(/\.\s*The main character shown is .*$/i, '')
     .replace(/\.\s*The main characters shown are .*$/i, '')
     .trim();

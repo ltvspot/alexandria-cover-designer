@@ -76,6 +76,64 @@ def _run_iterate_ui_defaults() -> dict:
     return _run_iterate_hook(function_name="iterateUiDefaults", payload={})
 
 
+def _run_iterate_apply_prompt_placeholders(
+    *,
+    prompt_text: str,
+    book: dict,
+    scene_override: str = "",
+    mood_override: str = "",
+    era_override: str = "",
+) -> str:
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+
+    node_script = textwrap.dedent(
+        f"""
+        const fs = require('fs');
+        const vm = require('vm');
+
+        global.window = {{ Pages: {{}}, __ITERATE_TEST_HOOKS__: {{}} }};
+        global.document = {{}};
+        global.DB = {{
+          dbGetAll: () => [],
+          dbGet: () => null,
+        }};
+        global.OpenRouter = {{ MODELS: [] }};
+        global.Toast = {{}};
+        global.JobQueue = {{}};
+        global.escapeHtml = (value) => String(value ?? '');
+        global.getBlobUrl = () => '';
+        global.fetchDownloadBlob = async () => {{ throw new Error('unused'); }};
+        global.ensureJSZip = async () => {{ throw new Error('unused'); }};
+        global.uuid = () => 'job-1';
+        global.StyleDiversifier = {{
+          buildDiversifiedPrompt: () => 'Create a breathtaking legacy prompt.',
+          selectDiverseStyles: () => [{{ id: 'romantic-sublime', label: 'Romantic Sublime' }}],
+        }};
+
+        const source = fs.readFileSync('src/static/js/pages/iterate.js', 'utf8');
+        vm.runInThisContext(source, {{ filename: 'iterate.js' }});
+        const result = window.__ITERATE_TEST_HOOKS__.applyPromptPlaceholders(
+          {json.dumps(prompt_text)},
+          {json.dumps(book)},
+          {json.dumps(scene_override)},
+          {json.dumps(mood_override)},
+          {json.dumps(era_override)}
+        );
+        process.stdout.write(JSON.stringify(result));
+        """
+    )
+    proc = subprocess.run(
+        ["node", "-e", node_script],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    return json.loads(proc.stdout)
+
+
 def _run_iterate_model_description(model: dict) -> str:
     return _run_iterate_hook(function_name="modelDescription", payload={"model": model})
 
@@ -206,6 +264,57 @@ def test_iterate_variant_summary_lines_are_single_line_and_compact():
 
     assert lines == ["Variant 1: Romantic Realism — Gulliver wakes on the beach in Lilliput."]
     assert "\n" not in lines[0]
+
+
+def test_apply_prompt_placeholders_uses_depicted_prominently_for_protagonist_injection():
+    book = {
+        "title": "Emma",
+        "author": "Jane Austen",
+        "enrichment": {
+            "protagonist": "Emma Woodhouse",
+            "iconic_scenes": [
+                "Emma Woodhouse and Harriet Smith walking through the gardens of Hartfield at sunset."
+            ],
+        },
+    }
+    result = _run_iterate_apply_prompt_placeholders(
+        prompt_text="Book cover illustration — no text, no lettering. {SCENE}",
+        book=book,
+        scene_override="A lively drawing-room conversation at Hartfield during the afternoon.",
+    )
+
+    assert "Depicted prominently: Emma Woodhouse." in result
+    assert "main character shown" not in result.lower()
+    assert "main characters shown" not in result.lower()
+
+
+def test_validate_prompt_before_generation_allows_depicted_prominently_scene_text():
+    book = {
+        "title": "Emma",
+        "author": "Jane Austen",
+        "enrichment": {
+            "protagonist": "Emma Woodhouse",
+            "iconic_scenes": [
+                "A lively drawing-room conversation at Hartfield during the afternoon."
+            ],
+        },
+    }
+    prompt = _run_iterate_apply_prompt_placeholders(
+        prompt_text=(
+            "Book cover illustration — no text, no lettering. This illustration MUST depict the following "
+            "specific scene: {SCENE}. The mood is witty romantic self-discovery. Era reference: Regency England."
+        ),
+        book=book,
+        scene_override="A lively drawing-room conversation at Hartfield during the afternoon.",
+    )
+
+    validation = _run_iterate_hook(
+        function_name="validatePromptBeforeGeneration",
+        payload={"prompt": prompt, "book": book},
+    )
+
+    assert validation["ok"] is True
+    assert "Prompt still contains generic content in the first 320 characters." not in validation["errors"]
 
 
 def test_iterate_generation_jobs_expand_variants_across_multiple_models():
