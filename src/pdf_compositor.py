@@ -468,9 +468,33 @@ def composite_cover_pdf(
 
     result_img.save(output_jpg, format="JPEG", quality=100, subsampling=0, dpi=(EXPECTED_DPI, EXPECTED_DPI))
 
-    # Copy source PDF and AI files for reference (they are not modified)
-    shutil.copyfile(source_pdf, output_pdf)
-    shutil.copyfile(source_pdf, output_ai)
+    # Write a real composited PDF with AI art swapped into /Im0 via SMask preservation.
+    try:
+        from src.pdf_swap_compositor import composite_via_pdf_swap
+    except ModuleNotFoundError:
+        from pdf_swap_compositor import composite_via_pdf_swap  # type: ignore
+
+    try:
+        composite_via_pdf_swap(
+            source_pdf_path=source_pdf,
+            ai_art_path=art_path,
+            output_jpg_path=output_pdf.with_name(output_pdf.stem + "_swap_render.jpg"),
+            expected_output_size=(jpg_w, jpg_h),
+        )
+        swap_pdf = output_pdf.with_name(output_pdf.stem + "_swap_render.pdf")
+        if swap_pdf.exists():
+            shutil.move(str(swap_pdf), str(output_pdf))
+        else:
+            logger.warning("PDF swap did not produce output PDF; copying source as fallback")
+            shutil.copyfile(source_pdf, output_pdf)
+        swap_jpg = output_pdf.with_name(output_pdf.stem + "_swap_render.jpg")
+        if swap_jpg.exists():
+            swap_jpg.unlink(missing_ok=True)
+    except Exception as exc:
+        logger.warning("PDF swap compositor failed; copying source PDF as fallback: %s", exc)
+        shutil.copyfile(source_pdf, output_pdf)
+
+    shutil.copyfile(output_pdf, output_ai)
 
     logger.info(
         "JPG blend compositor completed",
