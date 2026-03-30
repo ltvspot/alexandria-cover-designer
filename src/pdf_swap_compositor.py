@@ -102,24 +102,18 @@ def composite_via_pdf_swap(
                 f"AI art shape mismatch: got {art_arr.shape}, expected {original_arr.shape}"
             )
 
-        safe_outer_radius = detect_blend_radius_from_smask(smask_arr)
-        requested_radius = int(blend_radius) if blend_radius is not None else DEFAULT_BLEND_RADIUS
-        effective_outer_radius = int(requested_radius)
-        art_mask = _build_art_mask(
-            width=width,
-            height=height,
-            outer_radius=effective_outer_radius,
-            feather_px=feather_px,
-        )
+        # SMask-based pixel preservation: the SMask from the original
+        # designer encodes the exact frame boundary.
+        #   SMask > 250  → fully opaque (illustration area) → use AI art
+        #   SMask < 5    → fully transparent (hidden by background) → use AI art
+        #   SMask 5–250  → semi-transparent frame ring → keep ORIGINAL pixels
+        SMASK_FRAME_LO = 5
+        SMASK_FRAME_HI = 250
 
-        blended = original_arr.copy()
-        mix = art_mask[:, :, np.newaxis]
-        blended_float = (art_arr.astype(np.float32) * mix) + (original_arr.astype(np.float32) * (1.0 - mix))
-        blended[:] = np.clip(blended_float, 0.0, 255.0).astype(np.uint8)
+        frame_ring_mask = (smask_arr >= SMASK_FRAME_LO) & (smask_arr <= SMASK_FRAME_HI)
 
-        if np.any(art_mask <= 0.0):
-            preserve = art_mask <= 0.0
-            blended[preserve] = original_arr[preserve]
+        blended = art_arr.copy()
+        blended[frame_ring_mask] = original_arr[frame_ring_mask]
 
         _write_im0_stream(
             pdf=pdf,
@@ -129,6 +123,8 @@ def composite_via_pdf_swap(
             height=height,
             bands=bands,
         )
+
+        frame_pixels_preserved = int(np.sum(frame_ring_mask))
 
         output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
         pdf.save(str(output_pdf_path))
@@ -140,11 +136,10 @@ def composite_via_pdf_swap(
         expected_output_size=expected_output_size,
     )
     logger.info(
-        "PDF swap composite complete: source=%s output=%s safe_radius=%d effective_radius=%d",
+        "PDF swap composite complete (SMask-preserve): source=%s output=%s frame_pixels=%d",
         source_pdf_path.name,
         output_jpg_path,
-        safe_outer_radius,
-        effective_outer_radius,
+        frame_pixels_preserved,
     )
     return output_jpg_path
 
