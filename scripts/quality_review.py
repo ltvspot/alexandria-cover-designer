@@ -2933,40 +2933,17 @@ def _execute_generation_payload(
                     ),
                     0.15,
                 )
+            # Gemini punch-mask is the primary compositor; PDF swap disabled.
             used_pdf_mode = False
-            source_pdf = pdf_compositor.find_source_pdf_for_book(
-                input_dir=runtime.input_dir,
+            _emit_stage("composite", "Compositing generated variants via Gemini mask...", 0.78)
+            cover_compositor.composite_all_variants(
                 book_number=book,
+                input_dir=runtime.input_dir,
+                generated_dir=generated_root,
+                output_dir=composited_root,
+                regions=regions,
                 catalog_path=runtime.book_catalog_path,
             )
-            if source_pdf is not None:
-                _emit_stage("composite", "Compositing generated variants via source PDF...", 0.78)
-                try:
-                    pdf_compositor.composite_all_variants(
-                        book_number=book,
-                        input_dir=runtime.input_dir,
-                        generated_dir=generated_root,
-                        output_dir=composited_root,
-                        catalog_path=runtime.book_catalog_path,
-                    )
-                    used_pdf_mode = True
-                except Exception as pdf_exc:
-                    logger.warning(
-                        "PDF compositor failed for book %s; falling back to JPG compositor: %s",
-                        book,
-                        pdf_exc,
-                    )
-
-            if not used_pdf_mode:
-                _emit_stage("composite", "Compositing generated variants via JPG fallback...", 0.78)
-                cover_compositor.composite_all_variants(
-                    book_number=book,
-                    input_dir=runtime.input_dir,
-                    generated_dir=generated_root,
-                    output_dir=composited_root,
-                    regions=regions,
-                    catalog_path=runtime.book_catalog_path,
-                )
 
             for row in serialized:
                 if not isinstance(row, dict):
