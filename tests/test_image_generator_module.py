@@ -286,9 +286,10 @@ def test_download_postprocess_and_blank_detection(monkeypatch):
 
     processed = ig._post_process_image(downloaded, width=64, height=64)
     assert processed.mode == "RGBA"
-    assert processed.size == (64, 64)
+    # _post_process_image preserves native resolution (no forced resize)
+    assert processed.size == downloaded.size
     assert processed.getpixel((0, 0))[3] == 255
-    assert processed.getpixel((63, 63))[3] == 255
+    assert processed.getpixel((processed.size[0] - 1, processed.size[1] - 1))[3] == 255
 
     assert ig._is_blank_or_solid(Image.new("RGB", (64, 64), (10, 10, 10))) is True
     assert ig._is_blank_or_solid(Image.open(io.BytesIO(_image_bytes((64, 64), gradient=True)))) is False

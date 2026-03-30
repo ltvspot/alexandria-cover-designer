@@ -24,10 +24,11 @@ python-dotenv>=1.0
 tqdm>=4.65
 pathlib2>=2.3; python_version < "3.6"
 
-# Google Drive sync
+# Google Drive sync + Gemini image generation
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.1
 google-auth-httplib2>=0.1
+google-genai>=1.67.0
 
 # Testing
 pytest>=7.4

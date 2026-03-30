@@ -3559,7 +3559,8 @@ def _model_provider_prefix(runtime: config.Config, model: str) -> str | None:
 
 
 def _post_process_image(image: Image.Image, width: int, height: int) -> Image.Image:
-    return image.convert("RGBA").resize((width, height), Image.LANCZOS)
+    # Preserve original aspect ratio — do not force-resize to width×height.
+    return image.convert("RGBA")
 
 
 def _clip(value: float) -> float:
